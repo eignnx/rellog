@@ -1,3 +1,5 @@
+#![deny(unused_must_use)]
+
 mod ast;
 mod data_structures;
 mod lex;

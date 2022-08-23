@@ -3,18 +3,33 @@ use crate::{
     my_nom::Span,
 };
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Tok {
-    RBrack,
-    LBrack,
-    RBrace,
-    LBrace,
+    /// Open square bracket `[`
+    OBrack,
+
+    /// Close square bracket `]`
+    CBrack,
+
+    /// The symbol `][`.
+    COBrack,
+
+    /// Open curly brace `{`
+    OBrace,
+
+    /// Close curly brace `}`
+    CBrace,
+
     Dash,
     Pipe,
     Comma,
+
+    /// The "cons operator" which looks like `...`
     Spread,
+
     Sym(Sym),
     Var(Var),
+
     Indent,
     Dedent,
 }

@@ -57,33 +57,89 @@ include_impl[list {L ...Ls} :: {T}][Pred :: rel{T}] ->
 [list {_ ...Xs}][length [incr N]] if
     [list Xs][length N]
 
+
+[x :: Int][y :: Int][sum :: Int] modes
+    - {A, B, C} ins {in, out}
+    - [not {A, B, C} are_all {X}^(X != out)]
+    - [x :: A][y :: B][sum :: C]
+
 [x 0][Y][sum Y]
 [x [incr X]][Y][sum [incr Z]] if
     [X][Y][sum Z]
 
 # maplist/2
-[Rel1][List] if
-    | List = {}
-    |   - List = {X ...Xs}
-        - [rel Rel1][params {X}]
-        - [Rel1][list Xs]
+[Rel][Rows] if
+    | Rows = {}
+    |   - Rows = {R ...Rs}
+        - [Rel][params {R}]
+        - [Rel][rows Rs]
 
-# malist/3
+[Rel][rows {}]
+[Rel][rows {Row ...Rows}] if
+    - [Rel][params {Row}]
+    - [Rel][Rows]
+
+[Rel][Elems] if
+    | Elems = {}
+    | Elems = {X ...Xs}
+    - [Rel][params {X}]
+    - [Rel][elems Xs]
+
+[[operator "are_all"][precedence 123]]
+
+{} are_all Rel
+{X ...Xs} are_all Rel if
+    - [Rel][params {X}]
+    - Xs are_all Rel
+
+# maplist/3
 [Rel2][list1 {}][list2 {}]
 [Rel2][list1 {A ...As}][list2 {B ...Bs}] if
     - [rel Rel2][params {A, B}]
     - [Rel2][list1 As][list2 Bs]
 
-# malist/4
+# maplist/4
 [Rel3][list1 {}][list2 {}][list3 {}]
 [Rel3][list1 {A ...As}][list2 {B ...Bs}][list3 {C ...Cs}] if
     - [rel Rel3][params {A, B, C}]
     - [Rel3][list1 As][list2 Bs][list3 Cs]
 
-?- [rel3 [x][y][sum]][list1 {1, 2, 3}][list2 {4, 5, 6}][list3 What]
+[elementwise Application] if
+    - [Application][Functor][Attrs]
+    - Functor = [x][y][sum]
+    - Attrs = {
+        [x {1, 2, 3}],
+        [y {4, 5, 6}],
+        [Sum],
+    }
+    - Matrix = {
+        [x 1][y 4][sum Sum0],
+        [x 2][y 5][sum Sum1],
+        [x 3][y 6][sum Sum2],
+    }
+    - 
+
+local.[elementwise]
+
+
+>>> [elementwise [x {1, 2, 3}][y {4, 5, 6}][Sum]]
+    Sum = {5, 7, 9}
+
+### Destructures/Constructs a "block" from a functor and list of elements
+[Functor][Elements][Block]
+
+>>> - [select Nat][as Nats][where [Nat] and [perfect Nat]]
+    - [all Nats][satisfy [prime]]
+
+>>> - [select {A, B}][as Pairs][where [nat A] and B in [from a][through z]]
+    - Pairs all_sat divides
+>>> [rel [x][y][sum]][Arity]
+    Arity = 3
+
+>>> [rel3 [x][y][sum]][list1 {1, 2, 3}][list2 {4, 5, 6}][list3 What]
     What = {5, 7, 9}
 
-?- [rel2 [x][y 999][sum]][list1 {1, 2, 3}][list2 What]
+>>> [rel2 [x][y 999][sum]][list1 {1, 2, 3}][list2 What]
     What = {1000, 1001, 1002}
 
 #  {TcxVars}/[X]>>maplist(\==(X), TcxVars)
