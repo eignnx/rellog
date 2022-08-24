@@ -2,6 +2,9 @@
 
 use std::io::{BufReader, Read};
 
+use nom::Finish;
+use parse::tm;
+
 use crate::my_nom::Span;
 
 mod ast;
@@ -18,7 +21,19 @@ fn main() {
     let mut src = String::new();
     r.read_to_string(&mut src).unwrap();
     let tokens = lex::tokenize(Span::new(&src));
-    for tok in tokens {
-        println!("{:?}", tok);
-    }
+    let (_, ast) = tm(&tokens).finish().unwrap_or_else(|verbose_err| {
+        eprintln!("Parse error:");
+        let (last, init) = verbose_err.errors.split_last().unwrap();
+        for (i, ekind) in init {
+            eprintln!("\tparser {ekind:?} failed because...");
+        }
+        let (i, last) = last;
+        eprintln!(
+            "\t...{last:?}, got {}.",
+            i.first()
+                .map_or_else(|| "end of input".into(), |tok| format!("{tok}"))
+        );
+        std::process::exit(1)
+    });
+    println!("{:?}", ast);
 }
