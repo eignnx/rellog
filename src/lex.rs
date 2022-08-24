@@ -1,16 +1,18 @@
 use std::{
-    cell::{RefCell, RefMut},
+    borrow::{Borrow, BorrowMut},
+    cell::{Cell, RefCell, RefMut},
     cmp::Ordering,
+    rc::Rc,
 };
 
 use crate::{
     data_structures::Sym,
-    my_nom::{Res, Span},
+    my_nom::{PErr, Res, Span},
     tok::{At, Tok},
 };
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_while},
+    bytes::complete::{tag, take_while, take_while1},
     character::complete::multispace0,
     combinator::{opt, value},
     error::{make_error, ErrorKind},
@@ -19,151 +21,191 @@ use nom::{
     Parser,
 };
 
-fn lex_token<'state, 'i: 'state>(
-    st: &'state RefCell<LexState>,
-) -> impl FnMut(Span<'i>) -> Res<'i, Tok> + 'state {
-    move |i: Span<'i>| {
-        let mut st = st.borrow_mut();
-
-        let (i, tok) = preceded(
-            multispace0,
-            alt((
-                value(Tok::COBrack, tag("][")),
-                value(Tok::OBrack, tag("[")),
-                value(Tok::CBrack, tag("]")),
-                value(Tok::OBrace, tag("{")),
-                value(Tok::CBrace, tag("}")),
-                value(Tok::Dash, tag("-")),
-                value(Tok::Pipe, tag("|")),
-                value(Tok::Comma, tag(",")),
-                value(Tok::Spread, tag("...")),
-            )),
-        )(i)?;
-
-        st.push_tok(tok.clone().at(i));
-
-        match tok {
-            Tok::Dash | Tok::Pipe => {
-                let indent = i.get_utf8_column();
-                st.block_ctx.push(BlockCtx::Block(indent));
-            }
-            Tok::OBrack | Tok::OBrace => {
-                st.block_ctx.push(BlockCtx::WsInsensitive);
-            }
-            Tok::CBrack | Tok::CBrace => {
-                st.block_ctx.pop().expect("non-empty block_ctx");
-            }
-            _ => {}
-        }
-
-        Ok((i, tok))
-    }
+fn split_indent_text<'i>(line: Span<'i>) -> Res<'i, Span<'i>> {
+    take_while(char::is_whitespace)(line)
 }
 
-fn parse_indentation<'i>(i: Span<'i>) -> Res<'i, usize> {
-    if i.is_empty() {
-        return Err(nom::Err::Error(make_error(i, ErrorKind::NonEmpty)));
+const INDENT_SIZE_IN_SPACES: usize = 4;
+
+fn indent_count<'i>(indent_text: Span<'i>) -> usize {
+    if indent_text.is_empty() {
+        return 0;
     }
 
-    take_while(|c| c == ' ')
-        .map(|ws: Span<'i>| ws.len())
-        .parse(i)
+    enum IndentChar {
+        Tabs,
+        Spaces,
+    }
+
+    use IndentChar::*;
+
+    let mut indent_char = None;
+
+    for ch in indent_text.chars() {
+        match (ch, &indent_char) {
+            (' ', &None) => indent_char = Some(Spaces),
+            ('\t', &None) => indent_char = Some(Tabs),
+            (' ', &Some(Spaces)) => {}
+            ('\t', &Some(Tabs)) => {}
+            _ => panic!("Mixed indentation characters!"),
+        }
+    }
+
+    return match indent_char {
+        Some(Tabs) => indent_text.len(),
+        Some(Spaces) if indent_text.len() % INDENT_SIZE_IN_SPACES == 0 => {
+            indent_text.len() / INDENT_SIZE_IN_SPACES
+        }
+        Some(Spaces) => panic!("Indent is not a multiple of {INDENT_SIZE_IN_SPACES} spaces!"),
+        _ => unreachable!(),
+    };
 }
 
-fn parse_block_line<'state, 'i: 'state>(
-    st: &'state RefCell<LexState>,
-) -> impl FnMut(Span<'i>) -> Res<'i, ()> + 'state {
-    move |i: Span<'i>| {
-        if i.is_empty() {
-            return Err(nom::Err::Error(make_error(i, ErrorKind::Eof)));
-        }
-
-        let (i, indent) = take_while(|c| c == ' ')
-            .map(|ws: Span<'i>| ws.len())
-            .parse(i)?;
-
-        let (i, line) = take_while(|c| c != '\n')(i)?;
-
-        if !line.is_empty() {
-            st.borrow_mut().indent(indent, i)?;
-            let (_i, _vec) = many0(lex_token(st))(line)?;
-        }
-
-        let (i, _) = opt(tag("\n"))(i)?;
-
-        Ok((i, ()))
-    }
+enum SimpleTok<'i> {
+    Text(Span<'i>),
+    Indent,
+    Dedent,
 }
 
-fn parse_block<'state, 'i: 'state>(
-    st: &'state RefCell<LexState>,
-) -> impl FnMut(Span<'i>) -> Res<'i, ()> + 'state {
-    move |i: Span<'i>| {
-        let (i, _) = many0(parse_block_line(st))(i)?;
-        Ok((i, ()))
-    }
+fn insert_indent_dedent_tokens<'i>(
+    lines: impl Iterator<Item = (usize, Span<'i>)>,
+) -> impl Iterator<Item = SimpleTok<'i>> {
+    let prev = Rc::new(Cell::new(0usize));
+    let fm_prev = prev.clone();
+
+    lines
+        .flat_map(move |(curr, line)| {
+            let prev = fm_prev.clone();
+            if curr == prev.get() {
+                vec![SimpleTok::Text(line)]
+            } else {
+                let mut out = vec![];
+                for _ in 0..(curr as isize - prev.get() as isize).abs() {
+                    out.push(if curr > prev.get() {
+                        SimpleTok::Indent
+                    } else {
+                        SimpleTok::Dedent
+                    })
+                }
+                out.push(SimpleTok::Text(line));
+                prev.replace(curr);
+                out
+            }
+        })
+        .chain((0..=prev.get()).map(|_| SimpleTok::Dedent))
 }
 
 #[derive(Debug, Clone, Copy)]
 enum BlockCtx {
-    Block(usize),
-    WsInsensitive,
+    Block,
+    Bracketed,
 }
 
-#[derive(Debug)]
-struct BadDedent;
+fn tokenize_line<'st, 'i: 'st>(
+    mut line: Span<'i>,
+    state: &'st mut BlockCtx,
+) -> impl Iterator<Item = Tok> + 'st {
+    std::iter::from_fn(move || loop {
+        if line.is_empty() {
+            return None;
+        }
 
-struct LexState {
-    block_ctx: Vec<BlockCtx>,
-    toks: Vec<At<Tok>>,
+        if let Ok((rem, sym)) = take_while1::<_, _, PErr<'i>>(char::is_alphanumeric)(line) {
+            line = rem;
+            return Some(Tok::Sym(sym.to_string()));
+        }
+
+        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("[")(line) {
+            line = rem;
+            *state = BlockCtx::Bracketed;
+            return Some(Tok::OBrack);
+        }
+
+        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("]")(line) {
+            line = rem;
+            *state = BlockCtx::Block;
+            return Some(Tok::CBrack);
+        }
+
+        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("{")(line) {
+            line = rem;
+            *state = BlockCtx::Bracketed;
+            return Some(Tok::OBrace);
+        }
+
+        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("}")(line) {
+            line = rem;
+            *state = BlockCtx::Block;
+            return Some(Tok::CBrace);
+        }
+
+        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("-")(line) {
+            line = rem;
+            *state = BlockCtx::Block;
+            return Some(Tok::Dash);
+        }
+
+        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("|")(line) {
+            line = rem;
+            *state = BlockCtx::Block;
+            return Some(Tok::Pipe);
+        }
+
+        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>(",")(line) {
+            line = rem;
+            *state = BlockCtx::Block;
+            return Some(Tok::Comma);
+        }
+
+        if let Ok((rem, _)) = take_while1::<_, _, PErr<'i>>(char::is_whitespace)(line) {
+            line = rem;
+            continue;
+        }
+
+        panic!("Unknown symbol encountered: {:?}", &line[0..5])
+    })
 }
 
-impl LexState {
-    fn new() -> Self {
-        Self {
-            block_ctx: vec![],
-            toks: vec![],
+fn lex<'i>(src: Span<'i>) -> Vec<Tok> {
+    let lines = src
+        .lines()
+        .map(|s| s.into()) // TODO: do we lose position info?
+        .filter_map(|line| split_indent_text(line).ok())
+        .map(|(text, ws)| (indent_count(ws), text));
+
+    let simple_toks = insert_indent_dedent_tokens(lines);
+
+    let mut state = BlockCtx::Block;
+    let mut tokens = vec![];
+
+    for stok in simple_toks {
+        match (stok, state.clone()) {
+            (SimpleTok::Text(line), _) => tokens.extend(tokenize_line(line, &mut state)),
+            (SimpleTok::Indent, BlockCtx::Block) => tokens.push(Tok::Indent),
+            (SimpleTok::Dedent, BlockCtx::Block) => tokens.push(Tok::Dedent),
+            _ => {}
         }
     }
 
-    fn new_cell() -> RefCell<Self> {
-        RefCell::new(Self::new())
-    }
-
-    #[must_use]
-    fn indent<'i>(&mut self, new_indent: usize, i: Span<'i>) -> Res<'i> {
-        if let Some(BlockCtx::Block(prev_indent)) = self.block_ctx.pop() {
-            match new_indent.cmp(&prev_indent) {
-                Ordering::Equal => {}
-                Ordering::Greater => {
-                    self.push_tok(Tok::Indent.at(i));
-                }
-                Ordering::Less => {
-                    self.push_tok(Tok::Dedent.at(i));
-                }
-            }
-        }
-
-        Ok((i, ()))
-    }
-
-    fn current_block_ctx(&self) -> BlockCtx {
-        self.block_ctx
-            .last()
-            .copied()
-            .unwrap_or(BlockCtx::WsInsensitive)
-    }
-
-    fn push_tok(&mut self, tok: At<Tok>) {
-        self.toks.push(tok);
-    }
+    tokens
 }
+
+// value(Tok::COBrack, tag("][")),
+// value(Tok::OBrack, tag("[")),
+// value(Tok::CBrack, tag("]")),
+// value(Tok::OBrace, tag("{")),
+// value(Tok::CBrace, tag("}")),
+// value(Tok::Dash, tag("-")),
+// value(Tok::Pipe, tag("|")),
+// value(Tok::Comma, tag(",")),
+// value(Tok::Spread, tag("...")),
+
+//////////////////////////////////////////////////////////////////////////
 
 #[cfg(test)]
 mod block_tests {
-    use crate::lex::LexState;
+    use super::lex;
 
-    use super::parse_block;
     use super::At;
     use super::Tok::*;
 
@@ -177,17 +219,7 @@ mod block_tests {
         "
         .trim();
 
-        let st = LexState::new_cell();
-        let (rest, ()) = parse_block(&st)(src.into()).unwrap();
-
-        assert_eq!(rest.to_string(), "".to_string());
-
-        let actual = st
-            .into_inner()
-            .toks
-            .into_iter()
-            .map(At::without_loc)
-            .collect::<Vec<_>>();
+        let actual = lex(src.into());
 
         let expected = vec![
             OBrack,
