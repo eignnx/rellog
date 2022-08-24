@@ -1,9 +1,9 @@
 use nom::{
     branch::alt,
     combinator::cut,
-    error::{context, ParseError},
+    error::{context, ParseError, VerboseErrorKind},
     error::{ErrorKind, VerboseError},
-    multi::separated_list1,
+    multi::{many1, separated_list1},
     sequence::tuple,
     IResult, Parser,
 };
@@ -76,8 +76,42 @@ fn rel(ts: Toks) -> Res<Tm> {
     Ok((ts, Tm::Rel(map)))
 }
 
+fn one_of<'set: 'ts, 'ts>(set: &'set [Tok]) -> impl Fn(Toks<'ts>) -> Res<'ts, Tok> + 'ts {
+    move |ts: Toks<'ts>| match ts.split_first() {
+        Some((t, ts)) if set.contains(t) => Ok((ts, t.clone())),
+        Some(_) => Err(verbose_error(ts, ErrorKind::OneOf)),
+        None => Err(verbose_error(ts, ErrorKind::Eof)),
+    }
+}
+
+fn block_member(ts: Toks) -> Res<(Tok, Tm)> {
+    tuple((one_of(&[Dash, Pipe]), tm))(ts)
+}
+
+fn block(ts: Toks) -> Res<Tm> {
+    let (ts, _) = tok(Indent)(ts)?;
+    let (ts, pairs) = many1(block_member)(ts)?;
+
+    let first_functor = pairs[0].0.clone();
+    let members = pairs
+        .into_iter()
+        .map(|(functor, tm)| {
+            if &functor == &first_functor {
+                Ok(tm)
+            } else {
+                Err(nom::Err::Error(VerboseError {
+                    errors: vec![(ts, VerboseErrorKind::Context("Block functor mismatch"))],
+                }))
+            }
+        })
+        .collect::<Result<Vec<Tm>, nom::Err<_>>>()?;
+
+    let (ts, _) = cut(tok(Dedent))(ts)?;
+    Ok((ts, Tm::Block(first_functor, members)))
+}
+
 pub fn tm(ts: Toks) -> Res<Tm> {
-    alt((rel, sym.map(Tm::Sym), var.map(Tm::Var)))(ts)
+    alt((sym.map(Tm::Sym), var.map(Tm::Var), block, rel))(ts)
 }
 
 #[cfg(test)]
@@ -87,7 +121,7 @@ mod tests {
     use pretty_assertions::assert_eq;
 
     #[test]
-    fn test1() {
+    fn simple_nested_relation_tm() {
         let src = r#"[goal [List][Pred]][initial Sublist][final empty_list]"#;
         let tokens = tokenize(Span::from(src));
         let (rest, actual) = tm(&tokens).unwrap();
@@ -110,6 +144,69 @@ mod tests {
             ]
             .into_iter()
             .collect(),
+        );
+
+        assert_eq!(actual, expected, "Input was {:?}", src);
+        assert!(
+            rest.is_empty(),
+            "expected empty remainder, got: {:?}, input was {:?}",
+            rest,
+            src
+        );
+    }
+
+    #[test]
+    fn simple_block() {
+        let src = "
+    - [Blah]
+    - [Blah]
+    - [Blah]\n";
+
+        let tokens = tokenize(Span::from(src));
+        let (rest, actual) = tm(&tokens).unwrap();
+
+        let blah = Tm::Rel(
+            vec![("blah".into(), Tm::Var("Blah".into()))]
+                .into_iter()
+                .collect(),
+        );
+
+        let expected = Tm::Block(Dash, vec![blah.clone(), blah.clone(), blah.clone()]);
+
+        assert_eq!(actual, expected, "Input was {:?}", src);
+        assert!(
+            rest.is_empty(),
+            "expected empty remainder, got: {:?}, input was {:?}",
+            rest,
+            src
+        );
+    }
+
+    #[test]
+    fn nested_block() {
+        let src = "
+    - [Blah]
+    -
+        | [Blah]
+        | [Blah]
+    - [Blah]\n";
+
+        let tokens = tokenize(Span::from(src));
+        let (rest, actual) = tm(&tokens).unwrap();
+
+        let blah = Tm::Rel(
+            vec![("blah".into(), Tm::Var("Blah".into()))]
+                .into_iter()
+                .collect(),
+        );
+
+        let expected = Tm::Block(
+            Dash,
+            vec![
+                blah.clone(),
+                Tm::Block(Pipe, vec![blah.clone(), blah.clone()]),
+                blah.clone(),
+            ],
         );
 
         assert_eq!(actual, expected, "Input was {:?}", src);
