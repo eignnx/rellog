@@ -1,23 +1,20 @@
 use std::{
-    borrow::{Borrow, BorrowMut},
-    cell::{Cell, RefCell, RefMut},
+    cell::Cell,
     cmp::Ordering,
+    iter::{once, repeat},
     rc::Rc,
 };
 
 use crate::{
     data_structures::Sym,
     my_nom::{PErr, Res, Span},
-    tok::{At, Tok},
+    tok::Tok,
 };
 use nom::{
-    branch::alt,
     bytes::complete::{tag, take_while, take_while1},
-    character::complete::multispace0,
-    combinator::{opt, value},
-    error::{make_error, ErrorKind},
-    multi::many0,
-    sequence::preceded,
+    character::complete::anychar,
+    combinator::{recognize, verify},
+    sequence::tuple,
     Parser,
 };
 
@@ -61,6 +58,7 @@ fn indent_count<'i>(indent_text: Span<'i>) -> usize {
     };
 }
 
+#[derive(Clone)]
 enum SimpleTok<'i> {
     Text(Span<'i>),
     Indent,
@@ -76,29 +74,44 @@ fn insert_indent_dedent_tokens<'i>(
     lines
         .flat_map(move |(curr, line)| {
             let prev = fm_prev.clone();
-            if curr == prev.get() {
-                vec![SimpleTok::Text(line)]
-            } else {
-                let mut out = vec![];
-                for _ in 0..(curr as isize - prev.get() as isize).abs() {
-                    out.push(if curr > prev.get() {
-                        SimpleTok::Indent
-                    } else {
-                        SimpleTok::Dedent
-                    })
-                }
-                out.push(SimpleTok::Text(line));
-                prev.replace(curr);
-                out
-            }
+            let out: Box<dyn Iterator<Item = _>> = match curr.cmp(&prev.get()) {
+                Ordering::Equal => Box::new(once(SimpleTok::Text(line))),
+                Ordering::Greater => Box::new(
+                    repeat(SimpleTok::Indent)
+                        .take(curr - prev.get())
+                        .chain(once(SimpleTok::Text(line))),
+                ),
+                Ordering::Less => Box::new(
+                    repeat(SimpleTok::Dedent)
+                        .take(prev.get() - curr)
+                        .chain(once(SimpleTok::Text(line))),
+                ),
+            };
+            prev.replace(curr);
+            out
         })
-        .chain((0..=prev.get()).map(|_| SimpleTok::Dedent))
+        .chain(repeat(SimpleTok::Dedent).take_while(move |_| {
+            let old = prev.get();
+            if old > 0 {
+                prev.replace(old - 1);
+            }
+            old > 0
+        }))
 }
 
 #[derive(Debug, Clone, Copy)]
 enum BlockCtx {
     Block,
     Bracketed,
+}
+
+fn any_symbol(i: Span) -> Res<Sym> {
+    recognize(tuple((
+        verify(anychar::<Span, _>, |&c| c.is_alphabetic() || c == '_'),
+        take_while(|c: char| c.is_alphanumeric() || c == '_'),
+    )))
+    .map(|span| span.to_string())
+    .parse(i)
 }
 
 fn tokenize_line<'st, 'i: 'st>(
@@ -110,7 +123,7 @@ fn tokenize_line<'st, 'i: 'st>(
             return None;
         }
 
-        if let Ok((rem, sym)) = take_while1::<_, _, PErr<'i>>(char::is_alphanumeric)(line) {
+        if let Ok((rem, sym)) = any_symbol(line) {
             line = rem;
             if sym.starts_with(char::is_uppercase) {
                 return Some(Tok::Var(sym.to_string()));
@@ -220,11 +233,12 @@ pub fn tokenize<'i>(src: Span<'i>) -> Vec<Tok> {
 #[cfg(test)]
 mod block_tests {
     use super::tokenize;
-
     use super::Tok::*;
+    use crate::my_nom::Span;
+    use pretty_assertions::assert_eq;
 
     #[test]
-    fn test_parse_block2() {
+    fn tokenize_basic_relation_def() {
         let src = r"
 [A] if
     - [blah]
@@ -256,6 +270,22 @@ mod block_tests {
             Dedent,
         ];
 
-        assert_eq!(actual, expected);
+        assert_eq!(actual, expected, "Input was {:?}", src);
+    }
+
+    #[test]
+    fn tokenize_relation_term() {
+        let src = r#"[asdf Qwerty][Poiu]"#;
+        let actual = tokenize(Span::from(src));
+        let expected = vec![
+            OBrack,
+            Sym("asdf".into()),
+            Var("Qwerty".into()),
+            COBrack,
+            Var("Poiu".into()),
+            CBrack,
+        ];
+
+        assert_eq!(actual, expected, "Input was {:?}", src);
     }
 }

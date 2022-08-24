@@ -8,6 +8,7 @@ mod ast;
 mod data_structures;
 mod lex;
 mod my_nom;
+mod parse;
 mod tok;
 
 fn main() {
