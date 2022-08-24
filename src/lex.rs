@@ -150,6 +150,18 @@ fn tokenize_line<'st, 'i: 'st>(
             return Some(Tok::CBrace);
         }
 
+        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("(")(line) {
+            line = rem;
+            *state = BlockCtx::Bracketed;
+            return Some(Tok::OParen);
+        }
+
+        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>(")")(line) {
+            line = rem;
+            *state = BlockCtx::Block;
+            return Some(Tok::CParen);
+        }
+
         if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("-")(line) {
             line = rem;
             *state = BlockCtx::Block;
