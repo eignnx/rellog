@@ -112,7 +112,18 @@ fn tokenize_line<'st, 'i: 'st>(
 
         if let Ok((rem, sym)) = take_while1::<_, _, PErr<'i>>(char::is_alphanumeric)(line) {
             line = rem;
-            return Some(Tok::Sym(sym.to_string()));
+            if sym.starts_with(char::is_uppercase) {
+                return Some(Tok::Var(sym.to_string()));
+            } else if sym.starts_with(char::is_lowercase) {
+                return Some(Tok::Sym(sym.to_string()));
+            } else {
+                todo!()
+            }
+        }
+
+        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("][")(line) {
+            line = rem;
+            return Some(Tok::COBrack);
         }
 
         if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("[")(line) {
@@ -153,8 +164,12 @@ fn tokenize_line<'st, 'i: 'st>(
 
         if let Ok((rem, _)) = tag::<_, _, PErr<'i>>(",")(line) {
             line = rem;
-            *state = BlockCtx::Block;
             return Some(Tok::Comma);
+        }
+
+        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("...")(line) {
+            line = rem;
+            return Some(Tok::Spread);
         }
 
         if let Ok((rem, _)) = take_while1::<_, _, PErr<'i>>(char::is_whitespace)(line) {
@@ -166,7 +181,7 @@ fn tokenize_line<'st, 'i: 'st>(
     })
 }
 
-fn lex<'i>(src: Span<'i>) -> Vec<Tok> {
+pub fn tokenize<'i>(src: Span<'i>) -> Vec<Tok> {
     let lines = src
         .lines()
         .map(|s| s.into()) // TODO: do we lose position info?
@@ -190,23 +205,10 @@ fn lex<'i>(src: Span<'i>) -> Vec<Tok> {
     tokens
 }
 
-// value(Tok::COBrack, tag("][")),
-// value(Tok::OBrack, tag("[")),
-// value(Tok::CBrack, tag("]")),
-// value(Tok::OBrace, tag("{")),
-// value(Tok::CBrace, tag("}")),
-// value(Tok::Dash, tag("-")),
-// value(Tok::Pipe, tag("|")),
-// value(Tok::Comma, tag(",")),
-// value(Tok::Spread, tag("...")),
-
-//////////////////////////////////////////////////////////////////////////
-
 #[cfg(test)]
 mod block_tests {
-    use super::lex;
+    use super::tokenize;
 
-    use super::At;
     use super::Tok::*;
 
     #[test]
@@ -219,7 +221,7 @@ mod block_tests {
         "
         .trim();
 
-        let actual = lex(src.into());
+        let actual = tokenize(src.into());
 
         let expected = vec![
             OBrack,

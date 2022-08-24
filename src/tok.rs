@@ -20,6 +20,12 @@ pub enum Tok {
     /// Close curly brace `}`
     CBrace,
 
+    /// Open parenthesis `(`
+    OParen,
+
+    /// Close parenthesis `)`
+    CParen,
+
     Dash,
     Pipe,
     Comma,
