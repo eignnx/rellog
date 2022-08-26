@@ -23,7 +23,7 @@ fn main() {
     let (_, ast) = module(&tokens).finish().unwrap_or_else(|verbose_err| {
         eprintln!("Parse error:");
         let (last, init) = verbose_err.errors.split_last().unwrap();
-        for (i, ekind) in init {
+        for (_i, ekind) in init {
             eprintln!("\tparser {ekind:?} failed because...");
         }
         let (i, last) = last;

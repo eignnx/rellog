@@ -20,7 +20,7 @@ use crate::{
 type Toks<'ts> = &'ts [Tok];
 type Res<'ts, T> = IResult<Toks<'ts>, T, VerboseError<Toks<'ts>>>;
 
-fn verbose_error<'ts>(ts: Toks<'ts>, kind: ErrorKind) -> nom::Err<VerboseError<Toks<'ts>>> {
+fn verbose_error(ts: Toks, kind: ErrorKind) -> nom::Err<VerboseError<Toks>> {
     nom::Err::Error(VerboseError::from_error_kind(ts, kind))
 }
 
@@ -93,7 +93,7 @@ fn block(ts: Toks) -> Res<Tm> {
     let members = pairs
         .into_iter()
         .map(|(functor, tm)| {
-            if &functor == &first_functor {
+            if functor == first_functor {
                 Ok(tm)
             } else {
                 Err(nom::Err::Error(VerboseError {

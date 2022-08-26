@@ -45,7 +45,7 @@ pub enum Tok {
 }
 
 impl Tok {
-    pub fn at<'i>(self, i: Span<'i>) -> At<Self> {
+    pub fn at(self, i: Span) -> At<Self> {
         let line = i.location_line();
         let col = i.get_utf8_column();
         At(self, line, col)

@@ -18,13 +18,13 @@ use nom::{
     Parser,
 };
 
-fn split_indent_text<'i>(line: Span<'i>) -> Res<'i, Span<'i>> {
+fn split_indent_text(line: Span) -> Res<Span> {
     take_while(char::is_whitespace)(line)
 }
 
 const INDENT_SIZE_IN_SPACES: usize = 4;
 
-fn indent_count<'i>(indent_text: Span<'i>) -> usize {
+fn indent_count(indent_text: Span) -> usize {
     if indent_text.is_empty() {
         return 0;
     }
@@ -48,14 +48,14 @@ fn indent_count<'i>(indent_text: Span<'i>) -> usize {
         }
     }
 
-    return match indent_char {
+    match indent_char {
         Some(Tabs) => indent_text.len(),
         Some(Spaces) if indent_text.len() % INDENT_SIZE_IN_SPACES == 0 => {
             indent_text.len() / INDENT_SIZE_IN_SPACES
         }
         Some(Spaces) => panic!("Indent is not a multiple of {INDENT_SIZE_IN_SPACES} spaces!"),
         _ => unreachable!(),
-    };
+    }
 }
 
 #[derive(Clone)]
@@ -223,7 +223,7 @@ fn tokenize_line<'st, 'i: 'st>(
     })
 }
 
-pub fn tokenize<'i>(src: Span<'i>) -> Vec<Tok> {
+pub fn tokenize(src: Span) -> Vec<Tok> {
     let lines = src
         .lines()
         .map(|s| s.into()) // TODO: do we lose position info?
@@ -236,7 +236,7 @@ pub fn tokenize<'i>(src: Span<'i>) -> Vec<Tok> {
     let mut tokens = vec![];
 
     for stok in simple_toks {
-        match (stok, state.clone()) {
+        match (stok, state) {
             (SimpleTok::Text(line), _) => tokens.extend(tokenize_line(line, &mut state)),
             (SimpleTok::Indent, BlockCtx::Block) => tokens.push(Tok::Indent),
             (SimpleTok::Dedent, BlockCtx::Block) => tokens.push(Tok::Dedent),
