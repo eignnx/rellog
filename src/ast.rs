@@ -1,4 +1,7 @@
-use std::fmt;
+use std::{
+    fmt::{self, write},
+    rc::Rc,
+};
 
 use crate::{
     data_structures::{Map, Num, Sym, Var},
@@ -16,6 +19,8 @@ pub enum Tm {
     Txt(String),
     Block(Tok, Vec<Tm>),
     Rel(Rel),
+    Cons(Rc<Tm>, Rc<Tm>),
+    Nil,
 }
 
 #[derive(Default)]
@@ -32,7 +37,7 @@ impl<'tm> TmDisplayer<'tm> {
         }
     }
 
-    fn with_tm(&self, tm: &'tm Tm) -> Self {
+    pub fn with_tm(&self, tm: &'tm Tm) -> Self {
         Self {
             tm: Some(tm),
             ..*self
@@ -69,6 +74,29 @@ impl<'tm> TmDisplayer<'tm> {
         }
         Ok(())
     }
+
+    fn fmt_list(&self, mut x: Rc<Tm>, mut xs: Rc<Tm>, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{{")?;
+
+        loop {
+            write!(f, "{}", self.indented(&*x))?;
+
+            match &*xs {
+                // xs = {y, ...{}} = {y}
+                Tm::Cons(y, ys) if matches!(**ys, Tm::Nil) => {
+                    return write!(f, ", {}}}", self.indented(&**y))
+                }
+                // xs = {y, ...ys} (continue loop)
+                Tm::Cons(y, ys) => (x, xs) = (y.clone(), ys.clone()),
+                // xs = {} (handled in first branch, and in fmt::Display impl)
+                Tm::Nil => unreachable!("End of list should be printed before here!"),
+                // Malformed list like: {1, 2, ...3} (instead of {1, 2, 3, ...{}})
+                xs => return write!(f, " {}{}}}", Tok::Spread, self.indented(&*xs)),
+            }
+
+            write!(f, ", ")?;
+        }
+    }
 }
 
 impl<'tm> fmt::Display for TmDisplayer<'tm> {
@@ -85,6 +113,8 @@ impl<'tm> fmt::Display for TmDisplayer<'tm> {
             Tm::Txt(s) => write!(f, "\"{s}\""),
             Tm::Block(functor, members) => self.fmt_block(functor, members, f),
             Tm::Rel(map) => self.fmt_rel(map, f),
+            Tm::Cons(x, xs) => self.fmt_list(x.clone(), xs.clone(), f),
+            Tm::Nil => write!(f, "{{}}"),
         }
     }
 }

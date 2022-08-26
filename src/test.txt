@@ -1,4 +1,6 @@
 [[operator if][precedence 20]]
+[[block_functor "-"]]
+[[block_functor "|"]]
 
 [blah][Qwerty]
     - [A][gsdg Wres][sdf Kd_sl234]

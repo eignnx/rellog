@@ -1,10 +1,12 @@
+use std::rc::Rc;
+
 use nom::{
     branch::alt,
     combinator::{cut, opt},
     error::{context, ParseError, VerboseErrorKind},
     error::{ErrorKind, VerboseError},
-    multi::{many0, many1, separated_list1},
-    sequence::tuple,
+    multi::{many0, many1, separated_list0, separated_list1},
+    sequence::{preceded, terminated, tuple},
     IResult, Parser,
 };
 
@@ -107,6 +109,60 @@ fn block(ts: Toks) -> Res<Tm> {
     Ok((ts, Tm::Block(first_functor, members)))
 }
 
+fn list(ts: Toks) -> Res<Tm> {
+    let (ts, _) = tok(OBrace)(ts)?;
+
+    if let Ok((ts, _)) = tok(CBrace)(ts) {
+        return Ok((ts, Tm::Nil));
+    }
+
+    // We now know there's at least one element in the list.
+    let (ts, first) = tm(ts)?;
+
+    let mut ts = ts;
+    let mut xs_reversed = vec![first];
+
+    let spread_element = loop {
+        use ListSegment::*;
+        enum ListSegment {
+            CommaTm(Tm),
+            SpreadTmEnd(Tm),
+            CloseBrace,
+        }
+
+        let spread_tm_end =
+            tuple((tok(Spread), tm, opt(tok(Comma)), tok(CBrace))).map(|(_, tm, _, _)| tm);
+
+        let mut list_segment = alt((
+            preceded(tok(Comma), tm).map(CommaTm), // ts = ", tm"
+            preceded(
+                opt(tok(Comma)),
+                alt((
+                    tok(CBrace).map(|_| CloseBrace), // ts = ", }"
+                    spread_tm_end.map(SpreadTmEnd),  // ts = ", ...tm, }"
+                )),
+            ),
+        ));
+
+        // Parse the list segment.
+        let (new_ts, x) = list_segment(ts)?;
+
+        ts = new_ts;
+
+        match x {
+            CommaTm(tm) => xs_reversed.push(tm),
+            SpreadTmEnd(tm) => break tm,
+            CloseBrace => break Tm::Nil,
+        }
+    };
+
+    let xs = xs_reversed.into_iter().rfold(spread_element, |tail, x| {
+        Tm::Cons(Rc::new(x), Rc::new(tail))
+    });
+
+    Ok((ts, xs))
+}
+
 pub fn tm(ts: Toks) -> Res<Tm> {
     alt((
         sym.map(Tm::Sym),
@@ -115,6 +171,7 @@ pub fn tm(ts: Toks) -> Res<Tm> {
         txt.map(Tm::Txt),
         block,
         rel.map(Tm::Rel),
+        list,
     ))(ts)
 }
 
@@ -139,14 +196,31 @@ pub fn module(ts: Toks) -> Res<Module> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex::tokenize, my_nom::Span};
+    use crate::{ast::TmDisplayer, lex::tokenize, my_nom::Span};
     use pretty_assertions::assert_eq;
+
+    fn parse_to_tm(src: &'static str) -> Tm {
+        let tokens = tokenize(Span::from(src));
+        let (rest, t) = tm(&tokens).unwrap();
+
+        assert!(
+            rest.is_empty(),
+            "\nCould not parse entire input: ```\n{src}\n```\n\
+             Remaining input begins with: [{}]\n",
+            rest.into_iter()
+                .take(5)
+                .map(|tok| format!("`{tok}`"))
+                .collect::<Vec<_>>()
+                .join(", "),
+        );
+
+        t
+    }
 
     #[test]
     fn simple_nested_relation_tm() {
         let src = r#"[goal [List][Pred]][initial Sublist][final empty_list]"#;
-        let tokens = tokenize(Span::from(src));
-        let (rest, actual) = tm(&tokens).unwrap();
+        let actual = parse_to_tm(src);
 
         let expected = Tm::Rel(
             vec![
@@ -169,12 +243,6 @@ mod tests {
         );
 
         assert_eq!(actual, expected, "Input was {:?}", src);
-        assert!(
-            rest.is_empty(),
-            "expected empty remainder, got: {:?}, input was {:?}",
-            rest,
-            src
-        );
     }
 
     #[test]
@@ -184,8 +252,7 @@ mod tests {
     - [Blah]
     - [Blah]\n";
 
-        let tokens = tokenize(Span::from(src));
-        let (rest, actual) = tm(&tokens).unwrap();
+        let actual = parse_to_tm(src);
 
         let blah = Tm::Rel(
             vec![("blah".into(), Tm::Var("Blah".into()))]
@@ -196,12 +263,6 @@ mod tests {
         let expected = Tm::Block(Dash, vec![blah.clone(), blah.clone(), blah.clone()]);
 
         assert_eq!(actual, expected, "Input was {:?}", src);
-        assert!(
-            rest.is_empty(),
-            "expected empty remainder, got: {:?}, input was {:?}",
-            rest,
-            src
-        );
     }
 
     #[test]
@@ -213,8 +274,7 @@ mod tests {
         | [Blah]
     - [Blah]\n";
 
-        let tokens = tokenize(Span::from(src));
-        let (rest, actual) = tm(&tokens).unwrap();
+        let actual = parse_to_tm(src);
 
         let blah = Tm::Rel(
             vec![("blah".into(), Tm::Var("Blah".into()))]
@@ -232,11 +292,70 @@ mod tests {
         );
 
         assert_eq!(actual, expected, "Input was {:?}", src);
-        assert!(
-            rest.is_empty(),
-            "expected empty remainder, got: {:?}, input was {:?}",
-            rest,
-            src
+    }
+
+    #[test]
+    fn empty_list() {
+        assert_eq!(parse_to_tm("{}"), Tm::Nil);
+    }
+
+    #[test]
+    fn singleton_list() {
+        assert_eq!(
+            parse_to_tm("{123}"),
+            Tm::Cons(Rc::new(Tm::Num(123)), Rc::new(Tm::Nil))
         );
+    }
+
+    #[test]
+    fn singleton_list_trailing_comma() {
+        assert_eq!(
+            parse_to_tm("{123,}"),
+            Tm::Cons(Rc::new(Tm::Num(123)), Rc::new(Tm::Nil))
+        );
+    }
+
+    #[test]
+    fn multi_element_list() {
+        let src = r#"{123, "asdf", {}, [aardvark][Zebra], socrates, Unknown, {1, 2, 3}}"#;
+
+        let formatted = TmDisplayer::default()
+            .with_tm(&parse_to_tm(src))
+            .to_string();
+
+        assert_eq!(formatted, src);
+    }
+
+    #[test]
+    fn list_with_spread() {
+        let src = r#"{X ...Xs}"#;
+
+        let formatted = TmDisplayer::default()
+            .with_tm(&parse_to_tm(src))
+            .to_string();
+
+        assert_eq!(formatted, src);
+    }
+
+    #[test]
+    fn list_with_spread_and_1_comma() {
+        let src = r#"{X, ...Xs}"#;
+
+        let formatted = TmDisplayer::default()
+            .with_tm(&parse_to_tm(src))
+            .to_string();
+
+        assert_eq!(formatted, "{X ...Xs}");
+    }
+
+    #[test]
+    fn list_with_spread_and_2_commas() {
+        let src = r#"{X, ...Xs,}"#;
+
+        let formatted = TmDisplayer::default()
+            .with_tm(&parse_to_tm(src))
+            .to_string();
+
+        assert_eq!(formatted, "{X ...Xs}");
     }
 }
