@@ -44,14 +44,6 @@ pub enum Tok {
     Dedent,
 }
 
-impl Tok {
-    pub fn at(self, i: Span) -> At<Self> {
-        let line = i.location_line();
-        let col = i.get_utf8_column();
-        At(self, line, col)
-    }
-}
-
 impl fmt::Display for Tok {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         use Tok::*;
@@ -77,11 +69,46 @@ impl fmt::Display for Tok {
     }
 }
 
-#[derive(Debug)]
-pub struct At<T>(T, u32, usize);
+#[derive(Debug, Clone)]
+pub struct At<T> {
+    pub value: T,
+    pub line: u32,
+    pub col: usize,
+}
 
 impl<T> At<T> {
-    pub fn without_loc(self) -> T {
-        self.0
+    pub fn value(self) -> T {
+        self.value
+    }
+}
+
+impl<T> AsRef<T> for At<T> {
+    fn as_ref(&self) -> &T {
+        &self.value
+    }
+}
+
+pub trait MakeAt: Sized {
+    fn at(self, i: Span) -> At<Self>;
+    fn copy_loc<T>(self, other: &At<T>) -> At<Self>;
+}
+
+impl<T> MakeAt for T {
+    fn at(self, i: Span) -> At<Self> {
+        let line = i.location_line();
+        let col = i.get_utf8_column();
+        At {
+            value: self,
+            line,
+            col,
+        }
+    }
+
+    fn copy_loc<U>(self, other: &At<U>) -> At<Self> {
+        At {
+            value: self,
+            line: other.line,
+            col: other.col,
+        }
     }
 }

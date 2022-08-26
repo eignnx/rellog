@@ -5,8 +5,8 @@ use nom::{
     combinator::{cut, opt},
     error::{context, ParseError, VerboseErrorKind},
     error::{ErrorKind, VerboseError},
-    multi::{many0, many1, separated_list0, separated_list1},
-    sequence::{preceded, terminated, tuple},
+    multi::{many0, many1, separated_list1},
+    sequence::{preceded, tuple},
     IResult, Parser,
 };
 
@@ -16,46 +16,49 @@ use crate::{
         Tm::{self},
     },
     data_structures::{Map, Num, Sym, Var},
-    tok::Tok::{self, *},
+    tok::{
+        At,
+        Tok::{self, *},
+    },
 };
 
-type Toks<'ts> = &'ts [Tok];
+type Toks<'ts> = &'ts [At<Tok>];
 type Res<'ts, T> = IResult<Toks<'ts>, T, VerboseError<Toks<'ts>>>;
 
 fn verbose_error(ts: Toks, kind: ErrorKind) -> nom::Err<VerboseError<Toks>> {
     nom::Err::Error(VerboseError::from_error_kind(ts, kind))
 }
 
-fn tok<'ts>(tgt: Tok) -> impl Fn(Toks<'ts>) -> Res<'ts, Tok> {
+fn tok<'ts>(tgt: Tok) -> impl Fn(Toks<'ts>) -> Res<'ts, At<Tok>> {
     move |ts| match ts.split_first() {
-        Some((t, rest)) if t == &tgt => Ok((rest, t.clone())),
+        Some((t, rest)) if t.as_ref() == &tgt => Ok((rest, t.clone())),
         _ => Err(verbose_error(ts, ErrorKind::Char)),
     }
 }
 
 fn sym(ts: Toks) -> Res<Sym> {
-    match ts.split_first() {
+    match ts.split_first().map(|(x, xs)| (x.as_ref(), xs)) {
         Some((Sym(s), rest)) => Ok((rest, s.clone())),
         _ => Err(verbose_error(ts, ErrorKind::Char)),
     }
 }
 
 fn var(ts: Toks) -> Res<Var> {
-    match ts.split_first() {
+    match ts.split_first().map(|(x, xs)| (x.as_ref(), xs)) {
         Some((Var(v), rest)) => Ok((rest, v.clone())),
         _ => Err(verbose_error(ts, ErrorKind::Char)),
     }
 }
 
 fn num(ts: Toks) -> Res<Num> {
-    match ts.split_first() {
+    match ts.split_first().map(|(x, xs)| (x.as_ref(), xs)) {
         Some((Num(i), rest)) => Ok((rest, *i)),
         _ => Err(verbose_error(ts, ErrorKind::Char)),
     }
 }
 
 fn txt(ts: Toks) -> Res<String> {
-    match ts.split_first() {
+    match ts.split_first().map(|(x, xs)| (x.as_ref(), xs)) {
         Some((Txt(s), rest)) => Ok((rest, s.clone())),
         _ => Err(verbose_error(ts, ErrorKind::Char)),
     }
@@ -84,7 +87,7 @@ fn rel(ts: Toks) -> Res<Rel> {
 }
 
 fn block_member(ts: Toks) -> Res<(Tok, Tm)> {
-    tuple((alt((tok(Dash), tok(Pipe))), tm))(ts)
+    tuple((alt((tok(Dash), tok(Pipe))).map(At::value), tm))(ts)
 }
 
 fn block(ts: Toks) -> Res<Tm> {
@@ -209,7 +212,7 @@ mod tests {
              Remaining input begins with: [{}]\n",
             rest.into_iter()
                 .take(5)
-                .map(|tok| format!("`{tok}`"))
+                .map(|tok| format!("`{}`", tok.as_ref()))
                 .collect::<Vec<_>>()
                 .join(", "),
         );

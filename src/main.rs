@@ -23,14 +23,21 @@ fn main() {
     let (_, ast) = module(&tokens).finish().unwrap_or_else(|verbose_err| {
         eprintln!("Parse error:");
         let (last, init) = verbose_err.errors.split_last().unwrap();
-        for (_i, ekind) in init {
-            eprintln!("\tparser {ekind:?} failed because...");
+        for (i, ekind) in init {
+            let loc = match i {
+                [t, ..] => format!("{}:{}", t.line, t.col),
+                [] => "eof".into(),
+            };
+
+            eprintln!("\t[{loc}] Parser {ekind:?} failed because...");
         }
         let (i, last) = last;
         eprintln!(
             "\t...{last:?}, got {}.",
-            i.first()
-                .map_or_else(|| "end of input".into(), |tok| format!("{tok}"))
+            i.first().map_or_else(
+                || "end of input".into(),
+                |tok| format!("token `{}` at [{}:{}]", tok.value, tok.line, tok.col)
+            )
         );
         std::process::exit(1)
     });

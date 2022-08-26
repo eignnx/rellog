@@ -1,7 +1,4 @@
-use std::{
-    fmt::{self, write},
-    rc::Rc,
-};
+use std::{fmt, rc::Rc};
 
 use crate::{
     data_structures::{Map, Num, Sym, Var},
