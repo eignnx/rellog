@@ -12,7 +12,7 @@ use crate::{
 };
 use nom::{
     bytes::complete::{tag, take_while, take_while1},
-    character::complete::anychar,
+    character::complete::{anychar, i64},
     combinator::{recognize, verify},
     sequence::tuple,
     Parser,
@@ -105,6 +105,13 @@ enum BlockCtx {
     Bracketed,
 }
 
+fn text_literal(i: Span) -> Res<String> {
+    let (i, _) = tag("\"")(i)?;
+    let (i, text) = take_while(|c: char| c != '"')(i)?;
+    let (i, _) = tag("\"")(i)?;
+    Ok((i, text.to_string()))
+}
+
 fn any_symbol(i: Span) -> Res<Sym> {
     recognize(tuple((
         verify(anychar::<Span, _>, |&c| c.is_alphabetic() || c == '_'),
@@ -123,12 +130,22 @@ fn tokenize_line<'st, 'i: 'st>(
             return None;
         }
 
+        if let Ok((rem, num)) = i64::<_, PErr<'i>>(line) {
+            line = rem;
+            return Some(Tok::Num(num));
+        }
+
+        if let Ok((rem, txt)) = text_literal(line) {
+            line = rem;
+            return Some(Tok::Txt(txt));
+        }
+
         if let Ok((rem, sym)) = any_symbol(line) {
             line = rem;
             if sym.starts_with(char::is_uppercase) {
-                return Some(Tok::Var(sym.to_string()));
+                return Some(Tok::Var(sym.into()));
             } else if sym.starts_with(char::is_lowercase) {
-                return Some(Tok::Sym(sym.to_string()));
+                return Some(Tok::Sym(sym.into()));
             } else {
                 todo!()
             }

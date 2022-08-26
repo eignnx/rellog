@@ -1,4 +1,4 @@
-[[operator if][precedence twenty]]
+[[operator if][precedence 20]]
 
 [blah][Qwerty]
     - [A][gsdg Wres][sdf Kd_sl234]
@@ -10,4 +10,6 @@
 
 [mortal socrates]
 
-[[operator are][precedence thirty]]
+[story "There once was a man from Nantucket..."]
+
+[[operator "::"][precedence 32]]

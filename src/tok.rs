@@ -1,7 +1,7 @@
 use core::fmt;
 
 use crate::{
-    data_structures::{Sym, Var},
+    data_structures::{Num, Sym, Var},
     my_nom::Span,
 };
 
@@ -37,6 +37,8 @@ pub enum Tok {
 
     Sym(Sym),
     Var(Var),
+    Num(Num),
+    Txt(String),
 
     Indent,
     Dedent,
@@ -67,6 +69,8 @@ impl fmt::Display for Tok {
             Spread => write!(f, "..."),
             Sym(s) => write!(f, "{s}"),
             Var(v) => write!(f, "{v}"),
+            Num(i) => write!(f, "{i}"),
+            Txt(s) => write!(f, "\"{s}\""),
             Indent => write!(f, "<INDENT>"),
             Dedent => write!(f, "<DEDENT>"),
         }

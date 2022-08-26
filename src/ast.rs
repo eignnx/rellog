@@ -1,7 +1,7 @@
 use std::fmt;
 
 use crate::{
-    data_structures::{Map, Sym, Var},
+    data_structures::{Map, Num, Sym, Var},
     tok::Tok,
 };
 
@@ -12,6 +12,8 @@ pub type Rel = Map<Sym, Tm>;
 pub enum Tm {
     Sym(Sym),
     Var(Var),
+    Num(Num),
+    Txt(String),
     Block(Tok, Vec<Tm>),
     Rel(Rel),
 }
@@ -79,6 +81,8 @@ impl<'tm> fmt::Display for TmDisplayer<'tm> {
         match tm {
             Tm::Sym(s) => write!(f, "{s}"),
             Tm::Var(v) => write!(f, "{v}"),
+            Tm::Num(i) => write!(f, "{i}"),
+            Tm::Txt(s) => write!(f, "\"{s}\""),
             Tm::Block(functor, members) => self.fmt_block(functor, members, f),
             Tm::Rel(map) => self.fmt_rel(map, f),
         }

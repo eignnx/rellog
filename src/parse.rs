@@ -13,7 +13,7 @@ use crate::{
         Item, Module, Rel,
         Tm::{self},
     },
-    data_structures::{Map, Sym, Var},
+    data_structures::{Map, Num, Sym, Var},
     tok::Tok::{self, *},
 };
 
@@ -24,25 +24,16 @@ fn verbose_error<'ts>(ts: Toks<'ts>, kind: ErrorKind) -> nom::Err<VerboseError<T
     nom::Err::Error(VerboseError::from_error_kind(ts, kind))
 }
 
-fn tag<'tgt, 'ts>(tgt: Toks<'tgt>) -> impl Fn(Toks<'ts>) -> Res<Toks<'ts>> + 'tgt {
-    move |ts| {
-        if tgt.len() > ts.len() {
-            return Err(verbose_error(ts, ErrorKind::Tag));
-        }
-
-        let (prefix, rest) = ts.split_at(tgt.len());
-
-        if prefix == tgt {
-            Ok((rest, prefix))
-        } else {
-            Err(verbose_error(ts, ErrorKind::Tag))
-        }
-    }
-}
-
 fn tok<'ts>(tgt: Tok) -> impl Fn(Toks<'ts>) -> Res<'ts, Tok> {
     move |ts| match ts.split_first() {
         Some((t, rest)) if t == &tgt => Ok((rest, t.clone())),
+        _ => Err(verbose_error(ts, ErrorKind::Char)),
+    }
+}
+
+fn sym(ts: Toks) -> Res<Sym> {
+    match ts.split_first() {
+        Some((Sym(s), rest)) => Ok((rest, s.clone())),
         _ => Err(verbose_error(ts, ErrorKind::Char)),
     }
 }
@@ -54,9 +45,16 @@ fn var(ts: Toks) -> Res<Var> {
     }
 }
 
-fn sym(ts: Toks) -> Res<Sym> {
+fn num(ts: Toks) -> Res<Num> {
     match ts.split_first() {
-        Some((Sym(s), rest)) => Ok((rest, s.clone())),
+        Some((Num(i), rest)) => Ok((rest, *i)),
+        _ => Err(verbose_error(ts, ErrorKind::Char)),
+    }
+}
+
+fn txt(ts: Toks) -> Res<String> {
+    match ts.split_first() {
+        Some((Txt(s), rest)) => Ok((rest, s.clone())),
         _ => Err(verbose_error(ts, ErrorKind::Char)),
     }
 }
@@ -110,7 +108,14 @@ fn block(ts: Toks) -> Res<Tm> {
 }
 
 pub fn tm(ts: Toks) -> Res<Tm> {
-    alt((sym.map(Tm::Sym), var.map(Tm::Var), block, rel.map(Tm::Rel)))(ts)
+    alt((
+        sym.map(Tm::Sym),
+        var.map(Tm::Var),
+        num.map(Tm::Num),
+        txt.map(Tm::Txt),
+        block,
+        rel.map(Tm::Rel),
+    ))(ts)
 }
 
 fn rel_def(ts: Toks) -> Res<Item> {
