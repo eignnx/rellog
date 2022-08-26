@@ -10,6 +10,11 @@
         | t5yh
     - [A][B]
 
+[forwards {}][backwards {}]
+[forwards {A ...As}][Backwards]
+    - [forwards As][backwards AsBackwards]
+    - [prefix AsBackwards][suffix {A}][compound Backwards]
+
 [mortal socrates]
 
 [story "There once was a man from Nantucket..."]

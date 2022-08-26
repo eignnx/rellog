@@ -85,8 +85,8 @@ impl<'tm> TmDisplayer<'tm> {
                 }
                 // xs = {y, ...ys} (continue loop)
                 Tm::Cons(y, ys) => (x, xs) = (y.clone(), ys.clone()),
-                // xs = {} (handled in first branch, and in fmt::Display impl)
-                Tm::Nil => unreachable!("End of list should be printed before here!"),
+                // xs = {x}
+                Tm::Nil => return write!(f, "}}"),
                 // Malformed list like: {1, 2, ...3} (instead of {1, 2, 3, ...{}})
                 xs => return write!(f, " {}{}}}", Tok::Spread, self.indented(&*xs)),
             }
