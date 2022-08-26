@@ -17,27 +17,20 @@ pub enum Tm {
 }
 
 #[derive(Default)]
-pub struct TmDisplayer {
+pub struct TmDisplayer<'tm> {
     indent: usize,
-    tm: Option<Tm>,
+    tm: Option<&'tm Tm>,
 }
 
-impl TmDisplayer {
-    pub fn new(tm: Tm) -> Self {
-        Self {
-            tm: Some(tm),
-            ..Self::default()
-        }
-    }
-
-    fn indented(&self, tm: impl Into<Option<Tm>>) -> Self {
+impl<'tm> TmDisplayer<'tm> {
+    fn indented(&self, tm: impl Into<Option<&'tm Tm>>) -> Self {
         Self {
             indent: self.indent + 1,
             tm: tm.into(),
         }
     }
 
-    fn replace(&self, tm: Tm) -> Self {
+    fn with_tm(&self, tm: &'tm Tm) -> Self {
         Self {
             tm: Some(tm),
             ..*self
@@ -55,7 +48,7 @@ impl TmDisplayer {
             for _ in 0..self.indent {
                 f.write_str("    ")?;
             }
-            write!(f, "{functor} {}", self.indented(member.clone()))?;
+            write!(f, "{functor} {}", self.indented(member))?;
         }
         Ok(())
     }
@@ -69,14 +62,14 @@ impl TmDisplayer {
                 (s, Tm::Var(v)) if s.eq_ignore_ascii_case(v) => {
                     write!(f, "[{v}]")?;
                 }
-                _ => write!(f, "[{sym} {}]", self.replace(tm.clone()))?,
+                _ => write!(f, "[{sym} {}]", self.with_tm(tm))?,
             }
         }
         Ok(())
     }
 }
 
-impl fmt::Display for TmDisplayer {
+impl<'tm> fmt::Display for TmDisplayer<'tm> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let tm = self
             .tm
@@ -114,7 +107,7 @@ impl fmt::Display for Item {
             Item::RelDef(rel, body) => {
                 TmDisplayer::default().fmt_rel(rel, f)?;
                 if let Some(body) = body {
-                    let td = TmDisplayer::default().indented(body.clone());
+                    let td = TmDisplayer::default().indented(body);
                     write!(f, " {td}",)?;
                 }
                 Ok(())
@@ -129,8 +122,12 @@ pub struct Module(pub Vec<Item>);
 
 impl fmt::Display for Module {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for item in &self.0 {
-            write!(f, "{item}\n\n")?;
+        let Module(items) = self;
+        for (idx, item) in items.iter().enumerate() {
+            if idx > 0 {
+                writeln!(f)?;
+            }
+            writeln!(f, "{item}")?;
         }
         Ok(())
     }
