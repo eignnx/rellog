@@ -1,10 +1,13 @@
-[blah Blah][Qwerty] if
-    - {
-        something,
-        (
-            - dfghj
-            - t5yh
-        )
-        asdfgh,
-    }
-    - else
+[[operator if][precedence twenty]]
+
+[blah][Qwerty]
+    - [A][gsdg Wres][sdf Kd_sl234]
+    - [a][b][c]
+    -
+        | dfghj
+        | t5yh
+    - [A][B]
+
+[mortal socrates]
+
+[[operator are][precedence thirty]]

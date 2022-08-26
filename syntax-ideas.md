@@ -81,9 +81,9 @@ include_impl[list {L ...Ls} :: {T}][Pred :: rel{T}] ->
 
 [Rel][Elems] if
     | Elems = {}
-    | Elems = {X ...Xs}
-    - [Rel][params {X}]
-    - [Rel][elems Xs]
+    |   - Elems = {X ...Xs}
+        - [Rel][params {X}]
+        - [Rel][elems Xs]
 
 [[operator "are_all"][precedence 123]]
 
@@ -164,10 +164,35 @@ local.[elementwise]
     - [prefix AsBackwards][suffix {A}][compound Backwards]
 
 
-> [operator "in"][precedence 342]
+[[operator "in"][precedence 342]]
 
 X in {Y ...Ys} if
     | X = Y
     | X in Ys
 
 ```
+
+## Block Intro Symbols
+
+Ideas:
+
+1. Any `symbol` that begins with `-` or `|`
+    - Examples: `-`, `|`, `-^`, `|^`, `-&`
+1. Begin with `-`, `+`, `*`
+1. Any punctuation except `:` (and probably `,` and `.`)
+    - This allows for infix operators to use `:` (i.e. `::`)
+    - Maybe all infix operators must contain `:` or `.`
+        * Examples: `::`, `.gt.`, `.gt`, `:gt`
+
+### Block Ideas
+
+What if a block is sugar for:
+
+<tm1> <block-functor> "{" ( <tm2>, )+ "}" --> <tm1> ( <block-functor> <tm2> )+
+
+No this doesn't make sense.
+
+How much do I care about homoiconicity?
+
+*Just define up-front which functors can be infix and which can be block functors.*
+*And have syntax sugar so that the `if` can be omitted*

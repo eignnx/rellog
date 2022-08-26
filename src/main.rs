@@ -3,9 +3,8 @@
 use std::io::{BufReader, Read};
 
 use nom::Finish;
-use parse::tm;
 
-use crate::my_nom::Span;
+use crate::{my_nom::Span, parse::module};
 
 mod ast;
 mod data_structures;
@@ -21,7 +20,7 @@ fn main() {
     let mut src = String::new();
     r.read_to_string(&mut src).unwrap();
     let tokens = lex::tokenize(Span::new(&src));
-    let (_, ast) = tm(&tokens).finish().unwrap_or_else(|verbose_err| {
+    let (_, ast) = module(&tokens).finish().unwrap_or_else(|verbose_err| {
         eprintln!("Parse error:");
         let (last, init) = verbose_err.errors.split_last().unwrap();
         for (i, ekind) in init {
@@ -35,5 +34,6 @@ fn main() {
         );
         std::process::exit(1)
     });
-    println!("{:?}", ast);
+
+    println!("{}", ast);
 }

@@ -1,15 +1,18 @@
 use nom::{
     branch::alt,
-    combinator::cut,
+    combinator::{cut, opt},
     error::{context, ParseError, VerboseErrorKind},
     error::{ErrorKind, VerboseError},
-    multi::{many1, separated_list1},
+    multi::{many0, many1, separated_list1},
     sequence::tuple,
     IResult, Parser,
 };
 
 use crate::{
-    ast::Tm::{self},
+    ast::{
+        Item, Module, Rel,
+        Tm::{self},
+    },
     data_structures::{Map, Sym, Var},
     tok::Tok::{self, *},
 };
@@ -60,12 +63,16 @@ fn sym(ts: Toks) -> Res<Sym> {
 
 fn attr(ts: Toks) -> Res<(Sym, Tm)> {
     alt((
+        // [name Value]
         tuple((sym, tm)),
+        // [AttrVarSameName]
         var.map(|v| (v.to_lowercase(), Tm::Var(v))),
+        // [attr_sym_same_name]
+        sym.map(|s| (s.clone(), Tm::Sym(s))),
     ))(ts)
 }
 
-fn rel(ts: Toks) -> Res<Tm> {
+fn rel(ts: Toks) -> Res<Rel> {
     let (ts, _) = tok(OBrack)(ts)?;
     let (ts, attrs) = separated_list1(
         tok(COBrack),
@@ -73,19 +80,11 @@ fn rel(ts: Toks) -> Res<Tm> {
     )(ts)?;
     let (ts, _) = tok(CBrack)(ts)?;
     let map = attrs.into_iter().collect::<Map<_, _>>();
-    Ok((ts, Tm::Rel(map)))
-}
-
-fn one_of<'set: 'ts, 'ts>(set: &'set [Tok]) -> impl Fn(Toks<'ts>) -> Res<'ts, Tok> + 'ts {
-    move |ts: Toks<'ts>| match ts.split_first() {
-        Some((t, ts)) if set.contains(t) => Ok((ts, t.clone())),
-        Some(_) => Err(verbose_error(ts, ErrorKind::OneOf)),
-        None => Err(verbose_error(ts, ErrorKind::Eof)),
-    }
+    Ok((ts, map))
 }
 
 fn block_member(ts: Toks) -> Res<(Tok, Tm)> {
-    tuple((one_of(&[Dash, Pipe]), tm))(ts)
+    tuple((alt((tok(Dash), tok(Pipe))), tm))(ts)
 }
 
 fn block(ts: Toks) -> Res<Tm> {
@@ -111,7 +110,25 @@ fn block(ts: Toks) -> Res<Tm> {
 }
 
 pub fn tm(ts: Toks) -> Res<Tm> {
-    alt((sym.map(Tm::Sym), var.map(Tm::Var), block, rel))(ts)
+    alt((sym.map(Tm::Sym), var.map(Tm::Var), block, rel.map(Tm::Rel)))(ts)
+}
+
+fn rel_def(ts: Toks) -> Res<Item> {
+    let (ts, (r, b)) = tuple((rel, opt(block)))(ts)?;
+    Ok((ts, Item::RelDef(r, b)))
+}
+
+fn directive(ts: Toks) -> Res<Item> {
+    let (ts, (_, r, _)) = tuple((tok(OBrack), rel, tok(CBrack)))(ts)?;
+    Ok((ts, Item::Directive(r)))
+}
+
+pub fn item(ts: Toks) -> Res<Item> {
+    alt((directive, rel_def))(ts)
+}
+
+pub fn module(ts: Toks) -> Res<Module> {
+    many0(item).map(Module).parse(ts)
 }
 
 #[cfg(test)]
