@@ -4,15 +4,18 @@ use std::io::{BufReader, Read};
 
 use nom::Finish;
 
-use crate::{my_nom::Span, parse::module};
+use crate::{interner::INTERNER, my_nom::Span, parse::module};
 
 mod ast;
 mod data_structures;
+mod interner;
 mod lex;
 mod my_nom;
 mod parse;
+mod rt;
 mod tok;
 
+#[magic_static::main(INTERNER)]
 fn main() {
     let fname = std::env::args().nth(1).expect("Please provide a filename");
     let f = std::fs::File::open(fname).unwrap();

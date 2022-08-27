@@ -5,16 +5,16 @@ use crate::{
     tok::Tok,
 };
 
-pub type Rel = Map<Sym, Tm>;
+pub type Rel = Map<Sym, Rc<Tm>>;
 
 /// A term.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Tm {
     Sym(Sym),
     Var(Var),
     Num(Num),
     Txt(String),
-    Block(Tok, Vec<Tm>),
+    Block(Tok, Vec<Rc<Tm>>),
     Rel(Rel),
     Cons(Rc<Tm>, Rc<Tm>),
     Nil,
@@ -44,7 +44,7 @@ impl<'tm> TmDisplayer<'tm> {
     fn fmt_block(
         &self,
         functor: &Tok,
-        members: &Vec<Tm>,
+        members: &Vec<Rc<Tm>>,
         f: &mut fmt::Formatter,
     ) -> Result<(), fmt::Error> {
         for member in members {
@@ -52,18 +52,18 @@ impl<'tm> TmDisplayer<'tm> {
             for _ in 0..self.indent {
                 f.write_str("    ")?;
             }
-            write!(f, "{functor} {}", self.indented(member))?;
+            write!(f, "{functor} {}", self.indented(member.as_ref()))?;
         }
         Ok(())
     }
 
     fn fmt_rel(&self, map: &Rel, f: &mut fmt::Formatter) -> fmt::Result {
         for (sym, tm) in map {
-            match (sym, tm) {
+            match (sym, tm.as_ref()) {
                 (s1, Tm::Sym(s2)) if s1 == s2 => {
                     write!(f, "[{sym}]")?;
                 }
-                (s, Tm::Var(v)) if s.eq_ignore_ascii_case(v) => {
+                (s, Tm::Var(v)) if s.to_str().eq_ignore_ascii_case(v.to_str().as_ref()) => {
                     write!(f, "[{v}]")?;
                 }
                 _ => write!(f, "[{sym} {}]", self.with_tm(tm))?,
@@ -123,7 +123,7 @@ pub enum Item {
     Directive(Rel),
 
     /// The definition of a relation.
-    RelDef(Rel, Option<Tm>),
+    RelDef(Rel, Option<Rc<Tm>>),
 }
 
 impl fmt::Display for Item {
@@ -138,7 +138,7 @@ impl fmt::Display for Item {
             Item::RelDef(rel, body) => {
                 TmDisplayer::default().fmt_rel(rel, f)?;
                 if let Some(body) = body {
-                    let td = TmDisplayer::default().indented(body);
+                    let td = TmDisplayer::default().indented(body.as_ref());
                     write!(f, " {td}",)?;
                 }
                 Ok(())
@@ -150,6 +150,15 @@ impl fmt::Display for Item {
 /// A single-file program (compilation unit).
 #[derive(Debug)]
 pub struct Module(pub Vec<Item>);
+
+impl Module {
+    pub fn rel_defs(&self) -> impl Iterator<Item = (&Rel, &Option<Rc<Tm>>)> {
+        self.0.iter().filter_map(|item| match item {
+            Item::Directive(_) => None,
+            Item::RelDef(head, body) => Some((head, body)),
+        })
+    }
+}
 
 impl fmt::Display for Module {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

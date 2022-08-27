@@ -123,7 +123,7 @@ fn any_symbol(i: Span) -> Res<Sym> {
         verify(anychar::<Span, _>, |&c| c.is_alphabetic() || c == '_'),
         take_while(|c: char| c.is_alphanumeric() || c == '_'),
     )))
-    .map(|span| span.to_string())
+    .map(|span| span.fragment().into())
     .parse(i)
 }
 
@@ -150,10 +150,10 @@ fn tokenize_line<'st, 'i: 'st>(
 
         if let Ok((rem, sym)) = any_symbol(line) {
             line = rem;
-            if sym.starts_with(char::is_uppercase) {
-                return Some(Tok::Var(sym.into()).at(old_line));
-            } else if sym.starts_with(char::is_lowercase) {
-                return Some(Tok::Sym(sym.into()).at(old_line));
+            if sym.to_str().starts_with(char::is_uppercase) {
+                return Some(Tok::Var(sym).at(old_line));
+            } else if sym.to_str().starts_with(char::is_lowercase) {
+                return Some(Tok::Sym(sym).at(old_line));
             } else {
                 todo!()
             }
@@ -278,7 +278,6 @@ pub fn tokenize(src: Span) -> Vec<At<Tok>> {
 mod block_tests {
     use super::tokenize;
     use super::Tok::*;
-    use crate::my_nom::Span;
     use crate::tok::At;
     use pretty_assertions::assert_eq;
 

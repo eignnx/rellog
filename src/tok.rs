@@ -5,7 +5,7 @@ use crate::{
     my_nom::Span,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Tok {
     /// Open square bracket `[`
     OBrack,
@@ -59,8 +59,8 @@ impl fmt::Display for Tok {
             Pipe => write!(f, "|"),
             Comma => write!(f, ","),
             Spread => write!(f, "..."),
-            Sym(s) => write!(f, "{s}"),
-            Var(v) => write!(f, "{v}"),
+            Sym(s) => write!(f, "{}", s.to_str()),
+            Var(v) => write!(f, "{}", v.to_str()),
             Num(i) => write!(f, "{i}"),
             Txt(s) => write!(f, "\"{s}\""),
             Indent => write!(f, "<INDENT>"),

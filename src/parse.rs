@@ -38,7 +38,7 @@ fn tok<'ts>(tgt: Tok) -> impl Fn(Toks<'ts>) -> Res<'ts, At<Tok>> {
 
 fn sym(ts: Toks) -> Res<Sym> {
     match ts.split_first().map(|(x, xs)| (x.as_ref(), xs)) {
-        Some((Sym(s), rest)) => Ok((rest, s.clone())),
+        Some((Tok::Sym(s), rest)) => Ok((rest, s.clone())),
         _ => Err(verbose_error(ts, ErrorKind::Char)),
     }
 }
@@ -64,15 +64,17 @@ fn txt(ts: Toks) -> Res<String> {
     }
 }
 
-fn attr(ts: Toks) -> Res<(Sym, Tm)> {
+fn attr(ts: Toks) -> Res<(Sym, Rc<Tm>)> {
     alt((
         // [name Value]
         tuple((sym, tm)),
         // [AttrVarSameName]
-        var.map(|v| (v.to_lowercase(), Tm::Var(v))),
+        var.map(|v| (v.to_str().to_lowercase().into(), Tm::Var(v))),
         // [attr_sym_same_name]
-        sym.map(|s| (s.clone(), Tm::Sym(s))),
-    ))(ts)
+        sym.map(|s| (s, Tm::Sym(s))),
+    ))
+    .map(|(sym, tm)| (sym, Rc::new(tm)))
+    .parse(ts)
 }
 
 fn rel(ts: Toks) -> Res<Rel> {
@@ -99,14 +101,14 @@ fn block(ts: Toks) -> Res<Tm> {
         .into_iter()
         .map(|(functor, tm)| {
             if functor == first_functor {
-                Ok(tm)
+                Ok(Rc::new(tm))
             } else {
                 Err(nom::Err::Error(VerboseError {
                     errors: vec![(ts, VerboseErrorKind::Context("Block functor mismatch"))],
                 }))
             }
         })
-        .collect::<Result<Vec<Tm>, nom::Err<_>>>()?;
+        .collect::<Result<Vec<_>, nom::Err<_>>>()?;
 
     let (ts, _) = cut(tok(Dedent))(ts)?;
     Ok((ts, Tm::Block(first_functor, members)))
@@ -179,7 +181,7 @@ pub fn tm(ts: Toks) -> Res<Tm> {
 }
 
 fn rel_def(ts: Toks) -> Res<Item> {
-    let (ts, (r, b)) = tuple((rel, opt(block)))(ts)?;
+    let (ts, (r, b)) = tuple((rel, opt(block.map(Rc::new))))(ts)?;
     Ok((ts, Item::RelDef(r, b)))
 }
 
@@ -229,17 +231,17 @@ mod tests {
             vec![
                 (
                     "goal".into(),
-                    Tm::Rel(
+                    Rc::new(Tm::Rel(
                         vec![
-                            ("list".into(), Tm::Var("List".into())),
-                            ("pred".into(), Tm::Var("Pred".into())),
+                            ("list".into(), Rc::new(Tm::Var("List".into()))),
+                            ("pred".into(), Rc::new(Tm::Var("Pred".into()))),
                         ]
                         .into_iter()
                         .collect(),
-                    ),
+                    )),
                 ),
-                ("initial".into(), Tm::Var("Sublist".into())),
-                ("final".into(), Tm::Sym("empty_list".into())),
+                ("initial".into(), Rc::new(Tm::Var("Sublist".into()))),
+                ("final".into(), Rc::new(Tm::Sym("empty_list".into()))),
             ]
             .into_iter()
             .collect(),
@@ -257,11 +259,11 @@ mod tests {
 
         let actual = parse_to_tm(src);
 
-        let blah = Tm::Rel(
-            vec![("blah".into(), Tm::Var("Blah".into()))]
+        let blah = Rc::new(Tm::Rel(
+            vec![("blah".into(), Rc::new(Tm::Var("Blah".into())))]
                 .into_iter()
                 .collect(),
-        );
+        ));
 
         let expected = Tm::Block(Dash, vec![blah.clone(), blah.clone(), blah.clone()]);
 
@@ -279,17 +281,17 @@ mod tests {
 
         let actual = parse_to_tm(src);
 
-        let blah = Tm::Rel(
-            vec![("blah".into(), Tm::Var("Blah".into()))]
+        let blah = Rc::new(Tm::Rel(
+            vec![("blah".into(), Rc::new(Tm::Var("Blah".into())))]
                 .into_iter()
                 .collect(),
-        );
+        ));
 
         let expected = Tm::Block(
             Dash,
             vec![
                 blah.clone(),
-                Tm::Block(Pipe, vec![blah.clone(), blah.clone()]),
+                Rc::new(Tm::Block(Pipe, vec![blah.clone(), blah.clone()])),
                 blah.clone(),
             ],
         );
