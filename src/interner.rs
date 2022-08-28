@@ -17,14 +17,21 @@ where
     }
 }
 
-impl From<&Sym> for Ref<'_, str> {
+impl<'str_ref, 'sym_ref> From<&'sym_ref Sym> for Ref<'str_ref, str>
+where
+    'sym_ref: 'str_ref,
+    // 'str_ref: 'sym_ref,
+{
     fn from(sym: &Sym) -> Self {
         Ref::map(INTERNER.borrow(), |i| i.resolve(&sym.0))
     }
 }
 
 impl Sym {
-    pub fn to_str(&self) -> Ref<str> {
+    pub fn to_str<'str_ref, 'sym_ref>(&'sym_ref self) -> Ref<'str_ref, str>
+    where
+        'sym_ref: 'str_ref,
+    {
         self.into()
     }
 }

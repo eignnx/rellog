@@ -252,8 +252,8 @@ fn span_lines(mut src: Span) -> impl Iterator<Item = Span> {
     })
 }
 
-pub fn tokenize(src: Span) -> Vec<At<Tok>> {
-    let lines = span_lines(src)
+pub fn tokenize<'i>(src: impl Into<Span<'i>> + 'i) -> Vec<At<Tok>> {
+    let lines = span_lines(src.into())
         .filter_map(|line| split_indent_text(line).ok())
         .map(|(text, ws)| (indent_count(ws), text));
 
@@ -291,10 +291,7 @@ mod block_tests {
         "
         .trim();
 
-        let actual = tokenize(src.into())
-            .into_iter()
-            .map(At::value)
-            .collect::<Vec<_>>();
+        let actual = tokenize(src).into_iter().map(At::value).collect::<Vec<_>>();
 
         let expected = vec![
             OBrack,
@@ -324,10 +321,7 @@ mod block_tests {
     fn tokenize_relation_term() {
         let src = r#"[asdf Qwerty][Poiu]"#;
 
-        let actual = tokenize(src.into())
-            .into_iter()
-            .map(At::value)
-            .collect::<Vec<_>>();
+        let actual = tokenize(src).into_iter().map(At::value).collect::<Vec<_>>();
 
         let expected = vec![
             OBrack,

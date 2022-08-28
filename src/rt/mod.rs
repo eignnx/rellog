@@ -3,7 +3,7 @@ use std::{iter, rc::Rc};
 use rpds::HashTrieMap;
 
 use crate::{
-    ast::{Item, Module, Tm},
+    ast::{Module, Tm},
     data_structures::Var,
     tok::Tok,
 };
@@ -29,19 +29,29 @@ trait Unify: Sized {
 
 impl Unify for UnifierSet {
     fn unify(&self, a: &Rc<Tm>, b: &Rc<Tm>) -> Res<Self> {
+        dbg!((&a, &b));
         match (a.as_ref(), b.as_ref()) {
             (tm1, tm2) if tm1 == tm2 => Ok(self.clone()),
+
+            // Both variables.
             (Tm::Var(va), Tm::Var(vb)) => match (self.find_root(*va), self.find_root(*vb)) {
                 (None, None) => Ok(self.insert(*va, b.clone())),
                 (None, Some(root)) => Ok(self.insert(*va, root.clone())),
                 (Some(root), None) => Ok(self.insert(*vb, root.clone())),
-                (Some(root_a), Some(root_b)) => self.unify(&root_a, &root_b),
+                (Some(ra), Some(rb)) => match (ra.as_ref(), rb.as_ref()) {
+                    (Tm::Var(root_va), _) => Ok(self.insert(*root_va, rb)),
+                    (_, Tm::Var(root_vb)) => Ok(self.insert(*root_vb, ra)),
+                    _ => self.unify(&ra, &rb),
+                },
             },
+
+            // One variable.
             (Tm::Var(va), _non_var) => match self.find_root(*va) {
                 None => Ok(self.insert(*va, b.clone())),
                 Some(root_a) => self.unify(&root_a, b),
             },
-            // Just swap them and try again.
+
+            // One variable in opposite order. Just swap them and try again.
             (_non_var, Tm::Var(_)) => self.unify(b, a),
             (Tm::Rel(r1), Tm::Rel(r2)) if r1.keys().eq(r2.keys()) => {
                 let mut u = self.clone();
@@ -50,12 +60,14 @@ impl Unify for UnifierSet {
                 }
                 Ok(u)
             }
+
             (Tm::Cons(x, xs), Tm::Cons(y, ys)) => {
                 let u = self;
                 let u = u.unify(x, y)?;
                 let u = u.unify(xs, ys)?;
                 Ok(u)
             }
+
             // Prolog equiv.: `(a, B, c) = (X, 2, Z).`
             (Tm::Block(f1, b1), Tm::Block(f2, b2)) if f1 == f2 && b1.len() == b2.len() => {
                 let mut u = self.clone();
@@ -64,6 +76,7 @@ impl Unify for UnifierSet {
                 }
                 Ok(u)
             }
+
             _ => Err(Err::UnificationFailure(a.clone(), b.clone())),
         }
     }
@@ -101,6 +114,7 @@ impl Rt {
         'rt: 'it,
         'q: 'it,
     {
+        dbg!(&query);
         match query.as_ref() {
             Tm::Rel(_) => self.solve_rel(query, u),
             Tm::Block(Tok::Pipe, members) => self.solve_or_block(members, u),
@@ -125,10 +139,11 @@ impl Rt {
         'rt: 'it,
         'q: 'it,
     {
+        dbg!(&query);
         Box::new(self.db.rel_defs().flat_map(move |(head, opt_body)| {
+            dbg!(&(head, opt_body));
             let head = Rc::new(Tm::Rel(head.clone())); // TODO use rpds for Rel.
             match u.clone().unify(&head, &query) {
-                Err(e) => Box::new(iter::once(Err(e))),
                 Ok(u) => {
                     if let Some(body) = opt_body {
                         self.solve_query(body, u)
@@ -136,6 +151,8 @@ impl Rt {
                         Box::new(iter::once(Ok(u)))
                     }
                 }
+                Err(Err::UnificationFailure(_, _)) => Box::new(iter::empty()),
+                Err(e) => Box::new(iter::once(Err(e))),
             }
         }))
     }
@@ -149,6 +166,7 @@ impl Rt {
         'rt: 'it,
         'q: 'it,
     {
+        dbg!(&members);
         Box::new(
             members
                 .iter()
@@ -165,6 +183,7 @@ impl Rt {
         'rt: 'it,
         'q: 'it,
     {
+        dbg!(&members);
         let init: Box<dyn SolnStream> = Box::new(iter::once(Ok(u)));
         Box::new(
             members

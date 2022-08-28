@@ -12,6 +12,7 @@ mod interner;
 mod lex;
 mod my_nom;
 mod parse;
+mod repl;
 mod rt;
 mod tok;
 
@@ -45,5 +46,5 @@ fn main() {
         std::process::exit(1)
     });
 
-    println!("{}", ast);
+    repl::repl(ast);
 }

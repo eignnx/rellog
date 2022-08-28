@@ -2,20 +2,17 @@
 [[block_functor "-"]]
 [[block_functor "|"]]
 
-[blah][Qwerty]
-    - [A][gsdg Wres][sdf Kd_sl234]
-    - [a][b][c]
-    -
-        | dfghj
-        | t5yh
-    - [A][B]
+[mortal socrates]
+
+[prefix {}][Suffix][compound Suffix]
+[prefix {A ...As}][Suffix][Compound]
+    - [prefix As][suffix {A ...Suffix}][Compound]
 
 [forwards {}][backwards {}]
 [forwards {A ...As}][Backwards]
     - [forwards As][backwards AsBackwards]
     - [prefix AsBackwards][suffix {A}][compound Backwards]
 
-[mortal socrates]
 
 [story "There once was a man from Nantucket..."]
 
