@@ -1,23 +1,105 @@
-use std::{fmt, rc::Rc};
+use std::{fmt, iter, ops::Deref, rc::Rc};
+
+use unifier_set::{ClassifyTerm, DirectChildren, TermKind};
 
 use crate::{
     data_structures::{Map, Num, Sym, Var},
     tok::Tok,
 };
 
-pub type Rel = Map<Sym, Rc<Tm>>;
+pub type Rel = Map<Sym, RcTm>;
 
 /// A term.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Tm {
     Sym(Sym),
     Var(Var),
     Num(Num),
     Txt(String),
-    Block(Tok, Vec<Rc<Tm>>),
+    Block(Tok, Vec<RcTm>),
     Rel(Rel),
-    Cons(Rc<Tm>, Rc<Tm>),
+    Cons(RcTm, RcTm),
     Nil,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct RcTm(Rc<Tm>);
+
+impl AsRef<Tm> for RcTm {
+    fn as_ref(&self) -> &Tm {
+        self.0.as_ref()
+    }
+}
+
+impl Deref for RcTm {
+    type Target = Tm;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_ref()
+    }
+}
+
+impl From<Tm> for RcTm {
+    fn from(tm: Tm) -> Self {
+        RcTm(Rc::new(tm))
+    }
+}
+
+impl From<Var> for RcTm {
+    fn from(var: Var) -> Self {
+        Tm::Var(var).into()
+    }
+}
+
+impl fmt::Display for RcTm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", TmDisplayer::default().with_tm(self.as_ref()))
+    }
+}
+
+impl ClassifyTerm<Var> for RcTm {
+    fn classify_term(&self) -> unifier_set::TermKind<&Var> {
+        match self.as_ref() {
+            Tm::Var(var) => TermKind::Var(var),
+            _ => TermKind::NonVar,
+        }
+    }
+
+    fn superficially_unifiable(&self, other: &Self) -> bool {
+        match (self.as_ref(), other.as_ref()) {
+            (Tm::Sym(s1), Tm::Sym(s2)) => s1 == s2,
+            (Tm::Var(_), Tm::Var(_)) => true,
+            (Tm::Num(_), Tm::Num(_)) => true,
+            (Tm::Txt(_), Tm::Txt(_)) => true,
+            (Tm::Block(f1, _), Tm::Block(f2, _)) => f1 == f2,
+            (Tm::Rel(r1), Tm::Rel(r2)) => r1.keys().eq(r2.keys()),
+            (Tm::Cons(_, _), Tm::Cons(_, _)) => true,
+            (Tm::Nil, Tm::Nil) => true,
+            _ => false,
+        }
+    }
+}
+
+impl DirectChildren for RcTm {
+    fn direct_children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self> + 'a> {
+        match self.as_ref() {
+            Tm::Sym(_) | Tm::Var(_) | Tm::Num(_) | Tm::Txt(_) | Tm::Nil => Box::new(iter::empty()),
+            Tm::Block(_, members) => Box::new(members.iter()),
+            Tm::Rel(rel) => Box::new(rel.values()),
+            Tm::Cons(head, tail) => Box::new(iter::once(head).chain(iter::once(tail))),
+        }
+    }
+
+    fn map_direct_children<'a>(&'a self, mut f: impl FnMut(&'a Self) -> Self + 'a) -> Self {
+        match self.as_ref() {
+            Tm::Sym(_) | Tm::Var(_) | Tm::Num(_) | Tm::Txt(_) | Tm::Nil => self.clone(),
+            Tm::Block(functor, members) => {
+                Tm::Block(functor.clone(), members.iter().map(f).collect()).into()
+            }
+            Tm::Rel(rel) => Tm::Rel(rel.iter().map(|(k, v)| (*k, f(v))).collect()).into(),
+            Tm::Cons(head, tail) => Tm::Cons(f(head), f(tail)).into(),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -44,7 +126,7 @@ impl<'tm> TmDisplayer<'tm> {
     fn fmt_block(
         &self,
         functor: &Tok,
-        members: &Vec<Rc<Tm>>,
+        members: &Vec<RcTm>,
         f: &mut fmt::Formatter,
     ) -> Result<(), fmt::Error> {
         for member in members {
@@ -66,13 +148,13 @@ impl<'tm> TmDisplayer<'tm> {
                 (s, Tm::Var(v)) if s.to_str().eq_ignore_ascii_case(v.to_str().as_ref()) => {
                     write!(f, "[{v}]")?;
                 }
-                _ => write!(f, "[{sym} {}]", self.with_tm(tm))?,
+                _ => write!(f, "[{sym} {}]", self.with_tm(tm.as_ref()))?,
             }
         }
         Ok(())
     }
 
-    fn fmt_list(&self, mut x: Rc<Tm>, mut xs: Rc<Tm>, f: &mut fmt::Formatter) -> fmt::Result {
+    fn fmt_list(&self, mut x: RcTm, mut xs: RcTm, f: &mut fmt::Formatter) -> fmt::Result {
         write!(f, "{{")?;
 
         loop {
@@ -123,7 +205,7 @@ pub enum Item {
     Directive(Rel),
 
     /// The definition of a relation.
-    RelDef(Rel, Option<Rc<Tm>>),
+    RelDef(Rel, Option<RcTm>),
 }
 
 impl fmt::Display for Item {
@@ -152,7 +234,7 @@ impl fmt::Display for Item {
 pub struct Module(pub Vec<Item>);
 
 impl Module {
-    pub fn rel_defs(&self) -> impl Iterator<Item = (&Rel, &Option<Rc<Tm>>)> {
+    pub fn rel_defs(&self) -> impl Iterator<Item = (&Rel, &Option<RcTm>)> {
         self.0.iter().filter_map(|item| match item {
             Item::Directive(_) => None,
             Item::RelDef(head, body) => Some((head, body)),

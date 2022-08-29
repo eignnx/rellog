@@ -5,7 +5,7 @@ use crate::{
     my_nom::Span,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Tok {
     /// Open square bracket `[`
     OBrack,

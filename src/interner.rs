@@ -1,33 +1,48 @@
-use std::cell::{Ref, RefCell};
+use std::{
+    cell::{Ref, RefCell},
+    fmt,
+};
 
 use lasso::Rodeo;
 use magic_static::magic_static;
 
-use crate::data_structures::Sym;
-
 #[magic_static]
 pub static INTERNER: RefCell<Rodeo> = RefCell::new(Rodeo::default());
 
-impl<S> From<S> for Sym
+#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
+pub struct IStr(pub(crate) lasso::Spur);
+
+impl fmt::Debug for IStr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Sym({})", self.to_str())
+    }
+}
+
+impl fmt::Display for IStr {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.to_str())
+    }
+}
+
+impl<S> From<S> for IStr
 where
     S: AsRef<str>,
 {
     fn from(s: S) -> Self {
-        Sym(INTERNER.borrow_mut().get_or_intern(s.as_ref()))
+        IStr(INTERNER.borrow_mut().get_or_intern(s.as_ref()))
     }
 }
 
-impl<'str_ref, 'sym_ref> From<&'sym_ref Sym> for Ref<'str_ref, str>
+impl<'str_ref, 'sym_ref> From<&'sym_ref IStr> for Ref<'str_ref, str>
 where
     'sym_ref: 'str_ref,
-    // 'str_ref: 'sym_ref,
 {
-    fn from(sym: &Sym) -> Self {
-        Ref::map(INTERNER.borrow(), |i| i.resolve(&sym.0))
+    fn from(s: &IStr) -> Self {
+        Ref::map(INTERNER.borrow(), |i| i.resolve(&s.0))
     }
 }
 
-impl Sym {
+impl IStr {
     pub fn to_str<'str_ref, 'sym_ref>(&'sym_ref self) -> Ref<'str_ref, str>
     where
         'sym_ref: 'str_ref,

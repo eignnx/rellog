@@ -1,7 +1,4 @@
-use std::{
-    io::{self, Write},
-    rc::Rc,
-};
+use std::io::{self, Write};
 
 use crate::{
     ast, lex, parse,
@@ -21,7 +18,7 @@ pub fn repl(m: ast::Module) {
         let tokens = lex::tokenize(&query_buf[..]);
 
         let query = match parse::tm(&tokens) {
-            Ok((_, tm)) => Rc::new(tm),
+            Ok((_, tm)) => tm.into(),
             Err(e) => {
                 eprintln!("{e}");
                 continue 'outer;
@@ -31,7 +28,9 @@ pub fn repl(m: ast::Module) {
         let solns = rt.solve_query(&query, UnifierSet::new());
 
         'soln_loop: for soln in solns {
-            println!("{soln:?}");
+            if let Ok(soln) = soln {
+                println!("{soln}");
+            }
 
             'inner_input_loop: loop {
                 io::stdout().flush().unwrap();

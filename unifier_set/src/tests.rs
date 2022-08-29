@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use std::{fmt, iter, vec};
+use std::{fmt, iter};
 
 use crate::*;
 
@@ -35,10 +35,8 @@ impl ClassifyTerm<&'static str> for Term {
             Pred(_, _) => TermKind::NonVar,
         }
     }
-}
 
-impl SameVariant for Term {
-    fn same_variant(&self, other: &Self) -> bool {
+    fn superficially_unifiable(&self, other: &Self) -> bool {
         match (self, other) {
             (Var(_), Var(_)) => true,
             (Pred(a, _), Pred(b, _)) if a == b => true,
@@ -47,18 +45,18 @@ impl SameVariant for Term {
     }
 }
 
-impl Children for Term {
-    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self> + 'a> {
+impl DirectChildren for Term {
+    fn direct_children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self> + 'a> {
         match self {
             Var(_) => Box::new(iter::empty()),
             Pred(_, cs) => Box::new(cs.iter()),
         }
     }
 
-    fn map_children(&self, f: impl FnMut(Self) -> Self) -> Self {
+    fn map_direct_children<'a>(&'a self, f: impl FnMut(&'a Self) -> Self + 'a) -> Self {
         match self {
             Var(_) => self.clone(),
-            Pred(h, cs) => Pred(h.clone(), cs.iter().cloned().map(f).collect()),
+            Pred(h, cs) => Pred(h.clone(), cs.iter().map(f).collect()),
         }
     }
 }

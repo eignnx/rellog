@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use nom::{
     branch::alt,
     combinator::{cut, opt},
@@ -11,10 +9,7 @@ use nom::{
 };
 
 use crate::{
-    ast::{
-        Item, Module, Rel,
-        Tm::{self},
-    },
+    ast::{Item, Module, RcTm, Rel, Tm},
     data_structures::{Map, Num, Sym, Var},
     tok::{
         At,
@@ -64,7 +59,7 @@ fn txt(ts: Toks) -> Res<String> {
     }
 }
 
-fn attr(ts: Toks) -> Res<(Sym, Rc<Tm>)> {
+fn attr(ts: Toks) -> Res<(Sym, RcTm)> {
     alt((
         // [name Value]
         tuple((sym, tm)),
@@ -77,7 +72,7 @@ fn attr(ts: Toks) -> Res<(Sym, Rc<Tm>)> {
         // [attr_sym_same_name]
         sym.map(|s| (s, Tm::Sym(s))),
     ))
-    .map(|(sym, tm)| (sym, Rc::new(tm)))
+    .map(|(sym, tm)| (sym, tm.into()))
     .parse(ts)
 }
 
@@ -105,7 +100,7 @@ fn block(ts: Toks) -> Res<Tm> {
         .into_iter()
         .map(|(functor, tm)| {
             if functor == first_functor {
-                Ok(Rc::new(tm))
+                Ok(tm.into())
             } else {
                 Err(nom::Err::Error(VerboseError {
                     errors: vec![(ts, VerboseErrorKind::Context("Block functor mismatch"))],
@@ -165,9 +160,9 @@ fn list(ts: Toks) -> Res<Tm> {
         }
     };
 
-    let xs = xs_reversed.into_iter().rfold(spread_element, |tail, x| {
-        Tm::Cons(Rc::new(x), Rc::new(tail))
-    });
+    let xs = xs_reversed
+        .into_iter()
+        .rfold(spread_element, |tail, x| Tm::Cons(x.into(), tail.into()));
 
     Ok((ts, xs))
 }
@@ -185,7 +180,7 @@ pub fn tm(ts: Toks) -> Res<Tm> {
 }
 
 fn rel_def(ts: Toks) -> Res<Item> {
-    let (ts, (r, b)) = tuple((rel, opt(block.map(Rc::new))))(ts)?;
+    let (ts, (r, b)) = tuple((rel, opt(block.map(Into::into))))(ts)?;
     Ok((ts, Item::RelDef(r, b)))
 }
 
@@ -235,17 +230,18 @@ mod tests {
             vec![
                 (
                     "goal".into(),
-                    Rc::new(Tm::Rel(
+                    Tm::Rel(
                         vec![
-                            ("list".into(), Rc::new(Tm::Var("List".into()))),
-                            ("pred".into(), Rc::new(Tm::Var("Pred".into()))),
+                            ("list".into(), Tm::Var("List".into()).into()),
+                            ("pred".into(), Tm::Var("Pred".into()).into()),
                         ]
                         .into_iter()
                         .collect(),
-                    )),
+                    )
+                    .into(),
                 ),
-                ("initial".into(), Rc::new(Tm::Var("Sublist".into()))),
-                ("final".into(), Rc::new(Tm::Sym("empty_list".into()))),
+                ("initial".into(), Tm::Var("Sublist".into()).into()),
+                ("final".into(), Tm::Sym("empty_list".into()).into()),
             ]
             .into_iter()
             .collect(),
@@ -263,11 +259,12 @@ mod tests {
 
         let actual = parse_to_tm(src);
 
-        let blah = Rc::new(Tm::Rel(
-            vec![("blah".into(), Rc::new(Tm::Var("Blah".into())))]
+        let blah: RcTm = Tm::Rel(
+            vec![("blah".into(), Tm::Var("Blah".into()).into())]
                 .into_iter()
                 .collect(),
-        ));
+        )
+        .into();
 
         let expected = Tm::Block(Dash, vec![blah.clone(), blah.clone(), blah.clone()]);
 
@@ -285,17 +282,18 @@ mod tests {
 
         let actual = parse_to_tm(src);
 
-        let blah = Rc::new(Tm::Rel(
-            vec![("blah".into(), Rc::new(Tm::Var("Blah".into())))]
+        let blah: RcTm = Tm::Rel(
+            vec![("blah".into(), Tm::Var("Blah".into()).into())]
                 .into_iter()
                 .collect(),
-        ));
+        )
+        .into();
 
         let expected = Tm::Block(
             Dash,
             vec![
                 blah.clone(),
-                Rc::new(Tm::Block(Pipe, vec![blah.clone(), blah.clone()])),
+                Tm::Block(Pipe, vec![blah.clone(), blah.clone()]).into(),
                 blah.clone(),
             ],
         );
@@ -312,7 +310,7 @@ mod tests {
     fn singleton_list() {
         assert_eq!(
             parse_to_tm("{123}"),
-            Tm::Cons(Rc::new(Tm::Num(123)), Rc::new(Tm::Nil))
+            Tm::Cons(Tm::Num(123).into(), Tm::Nil.into())
         );
     }
 
@@ -320,7 +318,7 @@ mod tests {
     fn singleton_list_trailing_comma() {
         assert_eq!(
             parse_to_tm("{123,}"),
-            Tm::Cons(Rc::new(Tm::Num(123)), Rc::new(Tm::Nil))
+            Tm::Cons(Tm::Num(123).into(), Tm::Nil.into())
         );
     }
 

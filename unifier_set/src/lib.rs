@@ -29,6 +29,13 @@ pub enum TermKind<Var> {
 pub trait ClassifyTerm<Var> {
     fn classify_term(&self) -> TermKind<&Var>;
 
+    /// Without looking at any children of `self` or `other`, determine whether
+    /// or not they represent a unifiable pair of terms.
+    ///
+    /// Note that this is a different distinction than that of `classify_term`. Two values
+    /// could be `!superficially_unifiable` but have the same `TermKind`.
+    fn superficially_unifiable(&self, other: &Self) -> bool;
+
     fn is_var(&self) -> bool {
         matches!(self.classify_term(), TermKind::Var(_))
     }
@@ -38,23 +45,14 @@ pub trait ClassifyTerm<Var> {
     }
 }
 
-pub trait Children: Sized {
+pub trait DirectChildren: Sized {
     /// All *direct* children (and *only* the *direct* children) of `Self` which are of
     /// type `Self` should be yielded.
-    fn children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self> + 'a>;
+    fn direct_children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self> + 'a>;
 
     /// Given a function, you need to create a new `Self` where your *direct* children
     /// have been replaced with the ones provided by the function.
-    fn map_children(&self, f: impl FnMut(Self) -> Self) -> Self;
-}
-
-pub trait SameVariant {
-    /// If `self` and `other` are not of the same "kind" (i.e. different enum variants),
-    /// then `false` should be returned.
-    ///
-    /// Note that this is a different distinction than that of `classify_term`. Two values
-    /// could be `!same_variant` but have the same `TermKind`.
-    fn same_variant(&self, other: &Self) -> bool;
+    fn map_direct_children<'a>(&'a self, f: impl FnMut(&'a Self) -> Self + 'a) -> Self;
 }
 
 #[derive(Clone)]
@@ -88,7 +86,7 @@ where
 impl<Var, Term> fmt::Display for UnifierSet<Var, Term>
 where
     Var: Clone + Eq + Hash + Into<Term> + fmt::Display + Ord,
-    Term: Clone + Eq + Hash + ClassifyTerm<Var> + Children + SameVariant + fmt::Display + Ord,
+    Term: Clone + Eq + Hash + ClassifyTerm<Var> + DirectChildren + fmt::Display + Ord,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (root_term, vars) in self.reified_forest().into_iter() {
@@ -119,7 +117,7 @@ where
 impl<Var, Term> UnifierSet<Var, Term>
 where
     Var: Clone + Eq + Hash + Into<Term>,
-    Term: Clone + Eq + Hash + ClassifyTerm<Var> + Children + SameVariant,
+    Term: Clone + Eq + Hash + ClassifyTerm<Var> + DirectChildren,
 {
     pub fn new() -> Self {
         HashTrieMap::new().into()
@@ -205,13 +203,13 @@ where
         debug_assert!(x.is_non_var() && y.is_non_var());
 
         // No way to unify two terms which are this different.
-        if !x.same_variant(y) {
+        if !x.superficially_unifiable(y) {
             return None;
         }
 
         let mut u = self.clone();
 
-        for (x_child, y_child) in x.children().zip(y.children()) {
+        for (x_child, y_child) in x.direct_children().zip(y.direct_children()) {
             u = u.unify(x_child, y_child)?;
         }
 
@@ -287,11 +285,11 @@ where
 
     pub fn reify_term(&self, term: &Term) -> Term {
         let term_kind = term.classify_term();
-        term.map_children(|child| match (&term_kind, child.classify_term()) {
+        term.map_direct_children(|child| match (&term_kind, child.classify_term()) {
             (TermKind::Var(var), TermKind::Var(var_child)) => {
                 if self.find(&var_child) == self.find(var) {
                     // The term occurs within itself. Leave this child alone.
-                    child
+                    child.clone()
                 } else {
                     // Otherwise, lookup the root term of the child variable.
                     self.find(var_child)
@@ -305,7 +303,7 @@ where
 impl<Var, Term> UnifierSet<Var, Term>
 where
     Var: Clone + Eq + Hash + Into<Term>,
-    Term: Clone + Eq + Hash + ClassifyTerm<Var> + Children + SameVariant,
+    Term: Clone + Eq + Hash + ClassifyTerm<Var> + DirectChildren,
     Var: Ord,
     Term: Ord,
 {

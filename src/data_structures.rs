@@ -1,20 +1,8 @@
-use std::{collections::BTreeMap, fmt};
+use rpds::RedBlackTreeMap;
 
-#[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
-pub struct Sym(pub(crate) lasso::Spur);
+use crate::interner::IStr;
 
-impl fmt::Debug for Sym {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Sym({})", self.to_str())
-    }
-}
-
-impl fmt::Display for Sym {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.to_str())
-    }
-}
-
-pub type Var = Sym;
+pub type Sym = IStr;
+pub type Var = IStr;
 pub type Num = i64;
-pub type Map<K, V> = BTreeMap<K, V>;
+pub type Map<K, V> = RedBlackTreeMap<K, V>;
