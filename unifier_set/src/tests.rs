@@ -6,7 +6,7 @@ use crate::*;
 
 use Term::*;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum Term {
     Var(&'static str),
     Pred(&'static str, Vec<Term>),
@@ -70,7 +70,7 @@ impl From<&'static str> for Term {
 }
 
 #[test]
-fn test_basic_socrates() {
+fn basic_socrates_example() {
     let u = UnifierSet::new();
 
     let p1 = Pred("mortal", vec![Pred("socrates", vec![])]);
@@ -82,15 +82,59 @@ fn test_basic_socrates() {
 }
 
 #[test]
-fn test_two_vars_unify() {
+fn expanded_socrates_example() {
     let u = UnifierSet::new();
-    let u = u.unify(&Var("X"), &Var("Y")).unwrap();
-    assert_eq!(format!("{u}"), "    - X = Y".to_string());
+
+    let p1 = Pred("mortal", vec![Pred("socrates", vec![])]);
+    let p2 = Pred("mortal", vec![Var("Who")]);
+
+    let u = u.unify(&p1, &p2).unwrap();
+    let u = u.unify(&Var("Person"), &Var("Who")).unwrap();
+    let u = u.unify(&Var("Other"), &Pred("john", vec![])).unwrap();
+    let u = u.unify(&Var("Singleton"), &Var("Singleton")).unwrap();
+
+    assert_eq!(
+        format!("{u}"),
+        [
+            "    - Other = john()\n",
+            "    - Person = Who = socrates()\n"
+        ]
+        .concat()
+    );
 }
 
 #[test]
-fn test_var_unifies_with_atomic_pred() {
+fn two_vars_unify() {
+    let u = UnifierSet::new();
+    let u = u.unify(&Var("X"), &Var("Y")).unwrap();
+    assert_eq!(format!("{u}"), "    - X = Y\n".to_string());
+}
+
+#[test]
+fn two_vars_unify_twice() {
+    let u = UnifierSet::new();
+    let u = u.unify(&Var("X"), &Var("Y")).unwrap();
+    let u = u.unify(&Var("Y"), &Var("X")).unwrap();
+    assert_eq!(format!("{u}"), "    - X = Y\n".to_string());
+}
+
+#[test]
+fn var_unifies_with_atomic_pred() {
     let u = UnifierSet::new();
     let u = u.unify(&Var("X"), &Pred("the_answer", vec![])).unwrap();
     assert_eq!(format!("{u}"), "    - X = the_answer()\n".to_string());
+}
+
+#[test]
+fn x_equals_x() {
+    let u = UnifierSet::new();
+    let u = u.unify(&Var("X"), &Var("X")).unwrap();
+    assert_eq!(format!("{u}"), "".to_string());
+}
+
+#[test]
+fn occurs_check_behavior() {
+    let u = UnifierSet::new();
+    let u = u.unify(&Var("X"), &Pred("shell", vec![Var("X")])).unwrap();
+    assert_eq!(format!("{u}"), "    - X = shell(X)\n".to_string());
 }

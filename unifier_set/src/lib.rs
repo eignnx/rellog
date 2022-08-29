@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet},
     fmt,
     hash::Hash,
 };
@@ -74,53 +74,30 @@ where
     Term: fmt::Debug,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut ds = &mut f.debug_struct("UnifierSet");
-        for (var, node) in self.map.borrow().iter() {
-            ds = ds.field(&format!("{var:?}"), node);
-        }
-        ds.finish()
+        f.debug_map()
+            .entries(
+                self.map
+                    .borrow()
+                    .iter()
+                    .map(|(var, node)| (format!("{var:?}"), node)),
+            )
+            .finish()
     }
 }
 
 impl<Var, Term> fmt::Display for UnifierSet<Var, Term>
 where
-    Var: Clone + Eq + Hash + Into<Term> + fmt::Debug + fmt::Display,
-    Term:
-        Clone + Eq + Hash + ClassifyTerm<Var> + Children + SameVariant + fmt::Debug + fmt::Display,
+    Var: Clone + Eq + Hash + Into<Term> + fmt::Display + Ord,
+    Term: Clone + Eq + Hash + ClassifyTerm<Var> + Children + SameVariant + fmt::Display + Ord,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let mut sets = HashMap::new();
-        for var in self.map.borrow().keys() {
-            let root = self.find_root(var);
-            let set = sets.entry(root).or_insert_with(HashSet::new);
-            set.insert(var.clone());
-        }
-
-        for (root, vars) in sets {
-            match root {
-                Root::OfVar(_) => {
-                    let mut vs = vars.iter();
-                    if let Some(first) = vs.next() {
-                        write!(f, "    - {first}")?;
-                    }
-                    for var in vs {
-                        write!(f, " = {var}")?;
-                    }
-
-                    if vars.len() > 2 {
-                        writeln!(f)?;
-                    }
+        for (root_term, vars) in self.reified_forest().into_iter() {
+            if !vars.is_empty() {
+                write!(f, "    - ")?;
+                for var in vars {
+                    write!(f, "{var} = ")?;
                 }
-                Root::ForNonVar(term, _) => {
-                    write!(f, "    - ")?;
-
-                    for var in &vars {
-                        write!(f, "{var} = ")?;
-                    }
-
-                    let term = self.reify_term(&term);
-                    writeln!(f, "{term}")?;
-                }
+                writeln!(f, "{root_term}")?;
             }
         }
 
@@ -148,33 +125,34 @@ where
         HashTrieMap::new().into()
     }
 
+    #[track_caller]
     fn insert(&self, var: Var, node: Node<Var, Term>) -> Self {
         self.map.borrow().insert(var, node).into()
     }
 
+    #[track_caller]
     fn hidden_update(&self, var: Var, node: Node<Var, Term>) {
         self.map.borrow_mut().insert_mut(var, node);
     }
 
     pub fn unify(&self, x: &Term, y: &Term) -> Option<Self> {
         use TermKind::*;
-
         match (x.classify_term(), y.classify_term()) {
             // If they're both compound terms, let's defer to a helper function.
             (NonVar, NonVar) => self.unify_non_vars(x, y),
 
             // This is an easy case. Just join the var's root to the term's root!
-            (Var(x), NonVar) => match self.find_root(x) {
+            (Var(x), NonVar) => match self.find_root_and_root_child(x) {
                 // We now know `x` and `y` are both non-var terms. Let's reuse the `unify`
                 // function! (We could also call `unify_non_vars`, but whatever.)
-                Root::ForNonVar(x, _size) => self.unify(&x, y),
+                (Root::ForNonVar(x, _size), _root_child) => self.unify(&x, y),
 
                 // We're sure `x` is an unsolved variable, and `y` is a non-var.
-                Root::OfVar(x_root_size) => {
-                    // Every var who pointed to `x`'s root now points to the non-var `y`.
+                (Root::OfVar(x_root_size), root_child) => {
+                    // Every var who pointed to `x` now points to the non-var `y`.
                     let new_root = Root::ForNonVar(y.clone(), x_root_size);
                     let new_node = Node::Root(new_root);
-                    Some(self.insert(x.clone(), new_node))
+                    Some(self.insert(root_child, new_node))
                 }
             },
 
@@ -184,8 +162,8 @@ where
             // At first glance, `x` and `y` both look like variables.
             (Var(x), Var(y)) => {
                 // But what do their roots have to say on the matter?
-                let (x, x_root_size) = self.find_root_and_size(x);
-                let (y, y_root_size) = self.find_root_and_size(y);
+                let (x, x_root_size) = self.find_root_term_and_size(x);
+                let (y, y_root_size) = self.find_root_term_and_size(y);
 
                 // Lets classify their roots.
                 match (x.classify_term(), y.classify_term()) {
@@ -196,7 +174,7 @@ where
                     // Ok, `x` and `y` are FOR REAL unknowns.
                     (Var(x), Var(y)) => {
                         // Weighting heuristic.
-                        let (small, large) = if x_root_size < y_root_size {
+                        let (small, large) = if x_root_size <= y_root_size {
                             (x, y)
                         } else {
                             (y, x)
@@ -241,22 +219,23 @@ where
     }
 
     fn find(&self, var: &Var) -> Term {
-        let (root, _) = self.find_root_and_size(var);
+        let (root, _) = self.find_root_term_and_size(var);
         root
     }
 
-    fn find_root_and_size(&self, var: &Var) -> (Term, usize) {
-        match self.find_root(var) {
-            Root::ForNonVar(term, size) => (term, size),
-            Root::OfVar(size) => (var.clone().into(), size),
+    fn find_root_term_and_size(&self, var: &Var) -> (Term, usize) {
+        match self.find_root_and_root_child(var) {
+            (Root::ForNonVar(root_term, size), _) => (root_term, size),
+            (Root::OfVar(size), root_child) => (root_child.into(), size),
         }
     }
 
+    #[track_caller]
     fn get_associated(&self, var: &Var) -> Option<Node<Var, Term>> {
         self.map.borrow().get(var).cloned()
     }
 
-    fn find_root(&self, var: &Var) -> Root<Term> {
+    fn find_root_and_root_child(&self, var: &Var) -> (Root<Term>, Var) {
         // NOTE: This is a load-bearing "extract to function" situation. Inlining the call
         // to `self.get_associated` causes a `RefCell` `BorrowMutError`.
         match self.get_associated(var) {
@@ -265,27 +244,41 @@ where
                 let root = Root::OfVar(1);
                 let node = Node::Root(root.clone());
                 self.hidden_update(var.clone(), node);
-                root
+                (root, var.clone())
             }
-            Some(Node::Root(root)) => root.clone(),
+            Some(Node::Root(root)) => (root.clone(), var.clone()),
             Some(Node::Child(parent_var)) => {
-                match self.find_root(&parent_var) {
-                    Root::OfVar(size) => {
+                match self.find_root_and_root_child(&parent_var) {
+                    (Root::OfVar(size), root_child) => {
                         // Path compression heuristic.
-                        let new_root = Root::OfVar(size + 1);
-                        let new_node = Node::Root(new_root.clone());
-                        self.hidden_update(var.clone(), new_node);
-                        new_root
+
+                        // First point `var` directly to the root's first child var.
+                        let var_parent_node = Node::Child(root_child.clone());
+                        self.hidden_update(var.clone(), var_parent_node);
+
+                        // Then update the root with it's new size.
+                        let updated_root = Root::OfVar(size + 1);
+                        let updated_root_node = Node::Root(updated_root.clone());
+                        self.hidden_update(root_child.clone(), updated_root_node);
+
+                        (updated_root, root_child)
                     }
 
-                    Root::ForNonVar(term, size) => {
+                    (Root::ForNonVar(term, size), root_child) => {
                         debug_assert!(term.is_non_var());
 
                         // Path compression heuristic.
-                        let new_root = Root::ForNonVar(term, size + 1);
-                        let new_node = Node::Root(new_root.clone());
-                        self.hidden_update(var.clone(), new_node);
-                        new_root
+
+                        // First point `var` directly to the root's first child var.
+                        let var_parent_node = Node::Child(root_child.clone());
+                        self.hidden_update(var.clone(), var_parent_node);
+
+                        // Then update the root with it's new size.
+                        let updated_root = Root::OfVar(size + 1);
+                        let updated_root_node = Node::Root(updated_root.clone());
+                        self.hidden_update(root_child.clone(), updated_root_node);
+
+                        (updated_root, root_child)
                     }
                 }
             }
@@ -293,9 +286,48 @@ where
     }
 
     pub fn reify_term(&self, term: &Term) -> Term {
-        term.map_children(|child| match child.classify_term() {
-            TermKind::NonVar => self.reify_term(&child),
-            TermKind::Var(var) => self.find(var),
+        let term_kind = term.classify_term();
+        term.map_children(|child| match (&term_kind, child.classify_term()) {
+            (TermKind::Var(var), TermKind::Var(var_child)) => {
+                if self.find(&var_child) == self.find(var) {
+                    // The term occurs within itself. Leave this child alone.
+                    child
+                } else {
+                    // Otherwise, lookup the root term of the child variable.
+                    self.find(var_child)
+                }
+            }
+            _ => self.reify_term(&child),
         })
+    }
+}
+
+impl<Var, Term> UnifierSet<Var, Term>
+where
+    Var: Clone + Eq + Hash + Into<Term>,
+    Term: Clone + Eq + Hash + ClassifyTerm<Var> + Children + SameVariant,
+    Var: Ord,
+    Term: Ord,
+{
+    pub fn reified_forest(&self) -> BTreeMap<Term, BTreeSet<Var>> {
+        let mut sets = BTreeMap::new();
+
+        // Clone here so borrow of `RefCell` can be dropped immediately.
+        let map = self.map.borrow().clone();
+        for var in map.keys() {
+            let root_term = self.find(&var);
+            let reified_root_term = self.reify_term(&root_term);
+
+            let entry = sets
+                .entry(reified_root_term.clone())
+                .or_insert_with(BTreeSet::new);
+
+            // If `reified_root_term` is `var`, we don't need to include it.
+            if var.clone().into() != reified_root_term {
+                entry.insert(var.clone());
+            }
+        }
+
+        sets
     }
 }
