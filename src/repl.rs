@@ -1,5 +1,7 @@
 use std::io::{self, Write};
 
+use nom::Finish;
+
 use crate::{
     ast, lex, parse,
     rt::{self, UnifierSet},
@@ -17,13 +19,12 @@ pub fn repl(m: ast::Module) {
 
         let tokens = lex::tokenize(&query_buf[..]);
 
-        let query = match parse::tm(&tokens) {
+        let query = match parse::tm(&tokens).finish() {
             Ok((_, tm)) => tm.into(),
-            Err(nom::Err::Error(e) | nom::Err::Failure(e)) => {
+            Err(e) => {
                 parse::display_parse_err(e);
                 continue 'outer;
             }
-            Err(nom::Err::Incomplete(_)) => unreachable!(),
         };
 
         let solns = rt.solve_query(&query, UnifierSet::new());
