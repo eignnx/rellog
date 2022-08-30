@@ -170,6 +170,16 @@ X in {Y ...Ys} if
     | X = Y
     | X in Ys
 
+[forwards {A ...As}][Backwards]
+    , [forwards As][backwards AsBackwards]
+    , [prefix AsBackwards][suffix {A}][compound Backwards]
+
+[forwards {A ...As}][Backwards]
+    [forwards As][backwards AsBackwards],
+    [prefix AsBackwards][suffix {A}][compound Backwards],
+
+[forwards {A ...As}][Backwards] ([forwards As][backwards AsBackwards], [prefix AsBackwards][suffix {A}][compound Backwards])
+
 ```
 
 ## Block Intro Symbols
@@ -188,7 +198,9 @@ Ideas:
 
 What if a block is sugar for:
 
+```
 <tm1> <block-functor> "{" ( <tm2>, )+ "}" --> <tm1> ( <block-functor> <tm2> )+
+```
 
 No this doesn't make sense.
 

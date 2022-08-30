@@ -20,6 +20,27 @@ use crate::{
 type Toks<'ts> = &'ts [At<Tok>];
 type Res<'ts, T> = IResult<Toks<'ts>, T, VerboseError<Toks<'ts>>>;
 
+pub fn display_parse_err(verbose_err: VerboseError<Toks>) {
+    eprintln!("Parse error:");
+    let (last, init) = verbose_err.errors.split_last().unwrap();
+    for (i, ekind) in init {
+        let loc = match i {
+            [t, ..] => format!("{}:{}", t.line, t.col),
+            [] => "eof".into(),
+        };
+
+        eprintln!("\t[{loc}] Parser {ekind:?} failed because...");
+    }
+    let (i, last) = last;
+    eprintln!(
+        "\t...{last:?}, got {}.",
+        i.first().map_or_else(
+            || "end of input".into(),
+            |tok| format!("token `{}` at [{}:{}]", tok.value, tok.line, tok.col)
+        )
+    );
+}
+
 fn verbose_error(ts: Toks, kind: ErrorKind) -> nom::Err<VerboseError<Toks>> {
     nom::Err::Error(VerboseError::from_error_kind(ts, kind))
 }

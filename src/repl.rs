@@ -19,10 +19,11 @@ pub fn repl(m: ast::Module) {
 
         let query = match parse::tm(&tokens) {
             Ok((_, tm)) => tm.into(),
-            Err(e) => {
-                eprintln!("{e}");
+            Err(nom::Err::Error(e) | nom::Err::Failure(e)) => {
+                parse::display_parse_err(e);
                 continue 'outer;
             }
+            Err(nom::Err::Incomplete(_)) => unreachable!(),
         };
 
         let solns = rt.solve_query(&query, UnifierSet::new());

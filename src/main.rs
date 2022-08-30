@@ -4,7 +4,7 @@ use std::io::{BufReader, Read};
 
 use nom::Finish;
 
-use crate::{interner::INTERNER, my_nom::Span, parse::module};
+use crate::{interner::INTERNER, my_nom::Span};
 
 mod ast;
 mod data_structures;
@@ -24,27 +24,12 @@ fn main() {
     let mut src = String::new();
     r.read_to_string(&mut src).unwrap();
     let tokens = lex::tokenize(Span::new(&src));
-    let (_, ast) = module(&tokens).finish().unwrap_or_else(|verbose_err| {
-        eprintln!("Parse error:");
-        let (last, init) = verbose_err.errors.split_last().unwrap();
-        for (i, ekind) in init {
-            let loc = match i {
-                [t, ..] => format!("{}:{}", t.line, t.col),
-                [] => "eof".into(),
-            };
-
-            eprintln!("\t[{loc}] Parser {ekind:?} failed because...");
-        }
-        let (i, last) = last;
-        eprintln!(
-            "\t...{last:?}, got {}.",
-            i.first().map_or_else(
-                || "end of input".into(),
-                |tok| format!("token `{}` at [{}:{}]", tok.value, tok.line, tok.col)
-            )
-        );
-        std::process::exit(1)
-    });
+    let (_, ast) = parse::module(&tokens)
+        .finish()
+        .unwrap_or_else(|verbose_err| {
+            parse::display_parse_err(verbose_err);
+            std::process::exit(1)
+        });
 
     repl::repl(ast);
 }
