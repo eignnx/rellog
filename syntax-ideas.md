@@ -208,3 +208,122 @@ How much do I care about homoiconicity?
 
 *Just define up-front which functors can be infix and which can be block functors.*
 *And have syntax sugar so that the `if` can be omitted*
+
+## Definite Clause Grammars
+
+Current idea: use template strings.
+
+```python
+[story]
+    """
+    When the old sailor finally spoke, he whispered only this: "[sentence]"
+    """
+
+[sentence]
+    "[noun_phrase] [verb_phrase]."
+
+[noun_phrase]
+    "[determiner] [noun]"
+
+[determiner]
+    | "the"
+    | "my"
+    | "our"
+
+[noun]
+    | "cabin boy"
+    | "first mate"
+    | "secret"
+
+[verb_phrase]
+    "[verb] [noun_phrase]"
+
+[verb]
+    | "knew"
+    | "didn't believe"
+```
+
+### Translation into DCGs
+
+```python
+[sentence]
+    "[noun_phrase] [verb_phrase]."
+```
+
+in prolog is
+
+```prolog
+sentence --> noun_phrase, " ", verb_phrase, ".".
+```
+
+which desugars to
+
+```prolog
+sentence(S0, S) :-
+    noun_phrase(S0, S1),
+    append(S1, " ", S2),
+    verb_phrase(S2, S3),
+    append(S3, ".", S).
+```
+
+Translating that into rellog gives
+
+```python
+[sentence][before S0][after S]
+    - [noun_phrase][before S0][after S1]
+    - [prefix S1][suffix " "][compound S2]
+    - [verb_phrase][before S2][after S3]
+    - [prefix S3][suffix "."][compound S]
+```
+
+### Example with Braced Goals
+
+```prolog
+positives([]) --> [].
+positives([A|As]) --> {A > 0}, [A], positives(As).
+```
+
+which gets desugared to
+
+```prolog
+positives([], S0, S) :-
+    append(S0, [], S).
+positives([A|As], S0, S) :-
+    A > 0,
+    append(S0, [A], S1),
+    positives(As, S1, S).
+```
+
+```ruby
+[positives {}] {}
+
+[positives {A ...As}]
+    - [unquoted A > 0]
+    - {A}
+    - [positives As]
+```
+
+which gets desugared to
+
+```ruby
+[positives {}][before S0][after S]
+    [prefix S0][suffix {}][compound S]
+
+[positives {A ...As}][before S0][after S]
+    - A > 0
+    - [prefix S0][suffix {A}][compound S1]
+    - [positives As][before S1][after S]
+```
+
+Alternative names for `unquoted`:
+- provided
+- when
+- condition
+- call
+
+If you don't wanna define it in the compiler, define it like this:
+
+```ruby
+[unquoted R][before S][after S]
+    R
+```
