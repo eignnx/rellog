@@ -1,11 +1,11 @@
 use nom::{
     branch::alt,
-    combinator::{cut, opt},
+    combinator::{all_consuming, cut, opt},
     error::{context, ParseError, VerboseErrorKind},
     error::{ErrorKind, VerboseError},
     multi::{many0, many1, separated_list1},
     sequence::{preceded, tuple},
-    IResult, Parser,
+    Finish, IResult, Parser,
 };
 
 use crate::{
@@ -19,6 +19,16 @@ use crate::{
 
 type Toks<'ts> = &'ts [At<Tok>];
 type Res<'ts, T> = IResult<Toks<'ts>, T, VerboseError<Toks<'ts>>>;
+
+pub fn entire_module(ts: Toks) -> Result<Module, VerboseError<Toks>> {
+    let (_ts, m) = all_consuming(module)(ts).finish()?;
+    Ok(m)
+}
+
+pub fn entire_term(ts: Toks) -> Result<RcTm, VerboseError<Toks>> {
+    let (_ts, t) = all_consuming(tm)(ts).finish()?;
+    Ok(t.into())
+}
 
 pub fn display_parse_err(verbose_err: VerboseError<Toks>) {
     eprintln!("Parse error:");

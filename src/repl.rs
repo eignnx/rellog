@@ -1,8 +1,6 @@
 use std::io::{self, Write};
 
-use nom::Finish;
-
-use crate::{
+use librellog::{
     ast, lex, parse,
     rt::{self, UnifierSet},
 };
@@ -19,8 +17,8 @@ pub fn repl(m: ast::Module) {
 
         let tokens = lex::tokenize(&query_buf[..]);
 
-        let query = match parse::tm(&tokens).finish() {
-            Ok((_, tm)) => tm.into(),
+        let query = match parse::entire_term(&tokens) {
+            Ok(tm) => tm.into(),
             Err(e) => {
                 parse::display_parse_err(e);
                 continue 'outer;

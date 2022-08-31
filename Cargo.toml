@@ -6,12 +6,5 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-nom = "7.1.1"
-nom_locate = "4.0.0"
-rpds = "0.12.0"
-lasso = "0.6.0"
-magic_static = "3.0.3"
-unifier_set = { path = "./unifier_set" }
-
-[dev-dependencies]
-pretty_assertions = "1.2.1"
+librellog = { path = "./librellog" }
+reedline = "0.10.0"
