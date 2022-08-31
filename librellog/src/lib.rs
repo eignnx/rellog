@@ -1,3 +1,5 @@
+#![deny(unused_must_use)]
+
 pub mod ast;
 pub mod data_structures;
 pub mod interner;

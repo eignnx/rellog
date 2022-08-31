@@ -230,11 +230,11 @@ impl fmt::Display for Item {
 }
 
 /// A single-file program (compilation unit).
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct Module(pub Vec<Item>);
 
 impl Module {
-    pub fn rel_defs(&self) -> impl Iterator<Item = (&Rel, &Option<RcTm>)> {
+    pub fn rel_defs<'m>(&'m self) -> impl Iterator<Item = (&'m Rel, &'m Option<RcTm>)> + 'm {
         self.0.iter().filter_map(|item| match item {
             Item::Directive(_) => None,
             Item::RelDef(head, body) => Some((head, body)),

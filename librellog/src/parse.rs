@@ -17,20 +17,36 @@ use crate::{
     },
 };
 
+type Res<'ts, T> = IResult<Toks<'ts>, T, Error<'ts>>;
+pub type Error<'ts> = VerboseError<Toks<'ts>>;
 type Toks<'ts> = &'ts [At<Tok>];
-type Res<'ts, T> = IResult<Toks<'ts>, T, VerboseError<Toks<'ts>>>;
 
-pub fn entire_module(ts: Toks) -> Result<Module, VerboseError<Toks>> {
+#[derive(Debug)]
+pub struct AllocError(VerboseError<Vec<At<Tok>>>);
+
+impl<'ts> From<Error<'ts>> for AllocError {
+    fn from(e: Error<'ts>) -> Self {
+        let errors: Vec<_> = e
+            .errors
+            .into_iter()
+            .map(|(i, e)| (i.to_owned(), e))
+            .collect();
+        let ve = VerboseError { errors };
+        Self(ve)
+    }
+}
+
+pub fn entire_module(ts: Toks) -> Result<Module, Error> {
     let (_ts, m) = all_consuming(module)(ts).finish()?;
     Ok(m)
 }
 
-pub fn entire_term(ts: Toks) -> Result<RcTm, VerboseError<Toks>> {
+pub fn entire_term(ts: Toks) -> Result<RcTm, Error> {
     let (_ts, t) = all_consuming(tm)(ts).finish()?;
     Ok(t.into())
 }
 
-pub fn display_parse_err(verbose_err: VerboseError<Toks>) {
+pub fn display_parse_err(verbose_err: &Error) {
     eprintln!("Parse error:");
     let (last, init) = verbose_err.errors.split_last().unwrap();
     for (i, ekind) in init {

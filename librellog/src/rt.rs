@@ -19,22 +19,22 @@ pub type UnifierSet = unifier_set::UnifierSet<Var, RcTm>;
 pub trait SolnStream: Iterator<Item = Res<UnifierSet>> {}
 impl<T> SolnStream for T where T: Iterator<Item = Res<UnifierSet>> {}
 
-pub struct Rt {
-    db: Module,
+pub struct Rt<'rt> {
+    db: &'rt Module,
 }
 
-impl Rt {
-    pub fn new(db: Module) -> Self {
+impl<'rt> Rt<'rt> {
+    pub fn new(db: &'rt Module) -> Self {
         Self { db }
     }
 
-    pub fn solve_query<'rt, 'q, 'it>(
-        &'rt self,
+    pub fn solve_query<'rtb, 'q, 'it>(
+        &'rtb self,
         query: &'q RcTm,
         u: UnifierSet,
     ) -> Box<dyn SolnStream + 'it>
     where
-        'rt: 'it,
+        'rtb: 'it,
         'q: 'it,
     {
         match query.as_ref() {
@@ -52,13 +52,13 @@ impl Rt {
         }
     }
 
-    fn solve_rel<'rt, 'q, 'it>(
-        &'rt self,
+    fn solve_rel<'rtb, 'q, 'it>(
+        &'rtb self,
         query: &'q RcTm,
         u: UnifierSet,
     ) -> Box<dyn SolnStream + 'it>
     where
-        'rt: 'it,
+        'rtb: 'it,
         'q: 'it,
     {
         Box::new(self.db.rel_defs().flat_map(move |(head, opt_body)| {
@@ -76,13 +76,13 @@ impl Rt {
         }))
     }
 
-    fn solve_or_block<'rt: 'it, 'it, 'q: 'it>(
-        &'rt self,
+    fn solve_or_block<'rtb, 'it, 'q: 'it>(
+        &'rtb self,
         members: &'q Vec<RcTm>,
         u: UnifierSet,
     ) -> Box<dyn SolnStream + 'it>
     where
-        'rt: 'it,
+        'rtb: 'it,
         'q: 'it,
     {
         Box::new(
@@ -92,13 +92,13 @@ impl Rt {
         )
     }
 
-    fn solve_and_block<'rt, 'q, 'it>(
-        &'rt self,
+    fn solve_and_block<'rtb, 'q, 'it>(
+        &'rtb self,
         members: &'q Vec<RcTm>,
         u: UnifierSet,
     ) -> Box<dyn SolnStream + 'it>
     where
-        'rt: 'it,
+        'rtb: 'it,
         'q: 'it,
     {
         let init: Box<dyn SolnStream> = Box::new(iter::once(Ok(u)));
