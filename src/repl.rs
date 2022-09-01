@@ -65,7 +65,7 @@ impl Repl {
                     continue;
                 }
                 ":reload" | ":r" => {
-                    println!("Reloading source file...");
+                    println!("Reloading source from {}...", self.current_file);
                     self.module = match load_module_from_file(&self.current_file) {
                         Ok(m) => {
                             println!("{} relation definitions loaded.", m.rel_defs().count());
