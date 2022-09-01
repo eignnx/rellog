@@ -52,7 +52,8 @@ impl Repl {
                 Ok(Signal::Success(s)) => s,
                 Ok(Signal::CtrlC | Signal::CtrlD) => exit(0),
                 Err(e) => {
-                    println!("{e}");
+                    println!("Unable to read line from terminal: {e}");
+                    println!("Exiting...");
                     exit(0);
                 }
             };
@@ -62,7 +63,7 @@ impl Repl {
                     println!("Enter a RELLOG TERM or one of these REPL COMMANDS:");
                     println!("  :h | :help | ?    Displays this help text.");
                     println!("  :r | :reload      Reloads the source file.");
-                    continue;
+                    continue 'outer;
                 }
                 ":reload" | ":r" => {
                     println!("Reloading source from {}...", self.current_file);
@@ -77,7 +78,7 @@ impl Repl {
                             Default::default()
                         }
                     };
-                    continue;
+                    continue 'outer;
                 }
                 _ => {}
             }
@@ -100,7 +101,10 @@ impl Repl {
             for soln in solns {
                 match soln {
                     Ok(soln) => println!("{soln}"),
-                    Err(e) => println!("{}", Color::Red.paint(format!("Exception: {e}"))),
+                    Err(e) => {
+                        println!("{}", Color::Red.paint(format!("Exception: {e}")));
+                        continue 'outer;
+                    }
                 }
 
                 match self.line_editor.read_line(&self.config).unwrap() {
