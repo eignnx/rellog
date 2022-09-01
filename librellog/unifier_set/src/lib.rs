@@ -66,6 +66,17 @@ where
     map: RefCell<HashTrieMap<Var, Node<Var, Term>>>,
 }
 
+impl<Var, Term> Default for UnifierSet<Var, Term>
+where
+    Var: Eq + Hash,
+{
+    fn default() -> Self {
+        Self {
+            map: RefCell::new(HashTrieMap::new()),
+        }
+    }
+}
+
 impl<Var, Term> fmt::Debug for UnifierSet<Var, Term>
 where
     Var: Eq + Hash + fmt::Debug,
