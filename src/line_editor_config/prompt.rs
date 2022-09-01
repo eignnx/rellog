@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use reedline::{DefaultPrompt, Prompt, PromptEditMode, PromptHistorySearch};
+use reedline::{DefaultPrompt, Prompt, PromptEditMode, PromptHistorySearch, PromptViMode};
 
 pub struct RellogPrompt {
     delegate: DefaultPrompt,
@@ -22,19 +22,26 @@ impl Default for RellogPrompt {
 
 impl Prompt for RellogPrompt {
     fn render_prompt_left(&self) -> Cow<str> {
-        self.delegate.render_prompt_left()
+        "".into()
     }
 
     fn render_prompt_right(&self) -> Cow<str> {
-        self.delegate.render_prompt_right()
+        "".into()
     }
 
     fn render_prompt_indicator(&self, edit_mode: PromptEditMode) -> Cow<str> {
-        self.delegate.render_prompt_indicator(edit_mode)
+        // self.delegate.render_prompt_indicator(edit_mode)
+        match edit_mode {
+            PromptEditMode::Default => "-- ".into(),
+            PromptEditMode::Emacs => "(emacs)-- ".into(),
+            PromptEditMode::Vi(PromptViMode::Normal) => "(vi:N)-- ".into(),
+            PromptEditMode::Vi(PromptViMode::Insert) => "-- ".into(),
+            PromptEditMode::Custom(c) => format!("{c}").into(),
+        }
     }
 
     fn render_prompt_multiline_indicator(&self) -> Cow<str> {
-        self.delegate.render_prompt_multiline_indicator()
+        ".. ".into()
     }
 
     fn render_prompt_history_search_indicator(

@@ -11,4 +11,5 @@ pub fn default_line_editor() -> reedline::Reedline {
         .with_validator(Box::new(validator::RellogReplValidator))
         .with_history(Box::new(FileBackedHistory::new(500)))
         .with_highlighter(Box::new(highlighter::RellogHighlighter::new()))
+        .with_edit_mode(Box::new(reedline::Vi::default()))
 }
