@@ -1,9 +1,9 @@
-use reedline::{ValidationResult, Validator};
+use reedline::{DefaultValidator, ValidationResult, Validator};
 
 pub struct RellogReplValidator;
 
 impl Validator for RellogReplValidator {
     fn validate(&self, line: &str) -> ValidationResult {
-        ValidationResult::Complete
+        DefaultValidator.validate(line)
     }
 }

@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 librellog = { path = "./librellog" }
 reedline = "0.10.0"
+nu-ansi-term = "0.46.0"
