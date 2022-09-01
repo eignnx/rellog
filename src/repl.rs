@@ -9,6 +9,7 @@ use librellog::{
     parse,
     rt::{self, UnifierSet},
 };
+use nu_ansi_term::Color;
 use reedline::{Reedline, Signal};
 
 use crate::{
@@ -73,7 +74,7 @@ impl Repl {
             for soln in solns {
                 match soln {
                     Ok(soln) => println!("{soln}"),
-                    Err(e) => println!("{e}"),
+                    Err(e) => println!("{}", Color::Red.paint(format!("Exception: {e}"))),
                 }
 
                 match self.line_editor.read_line(&self.config).unwrap() {
