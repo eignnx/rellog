@@ -1,9 +1,13 @@
 use std::{fmt, iter, ops::Deref, rc::Rc};
 
+use rpds::Vector;
 use unifier_set::{ClassifyTerm, DirectChildren, TermKind};
 
 use crate::{
     data_structures::{Map, Num, Sym, Var},
+    dup::Dup,
+    incr::Incr,
+    tm_displayer::TmDisplayer,
     tok::Tok,
 };
 
@@ -16,14 +20,41 @@ pub enum Tm {
     Var(Var),
     Num(Num),
     Txt(String),
-    Block(Tok, Vec<RcTm>),
+    Block(Tok, Vector<RcTm>),
     Rel(Rel),
     Cons(RcTm, RcTm),
     Nil,
 }
 
+impl Dup for Tm {
+    fn dup(&self, incr: &mut Incr) -> Self {
+        match self {
+            Tm::Var(v) => Tm::Var(v.dup(incr)),
+            Tm::Cons(h, t) => Tm::Cons(h.dup(incr), t.dup(incr)),
+            Tm::Block(f, ms) => {
+                let ms = ms.iter().map(|tm| tm.dup(incr)).collect();
+                Tm::Block(f.clone(), ms)
+            }
+            Tm::Rel(rel) => {
+                let rel = rel
+                    .iter()
+                    .map(|(name, tm)| (name.clone(), tm.dup(incr)))
+                    .collect();
+                Tm::Rel(rel)
+            }
+            Tm::Sym(_) | Tm::Num(_) | Tm::Txt(_) | Tm::Nil => self.clone(),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct RcTm(Rc<Tm>);
+
+impl Dup for RcTm {
+    fn dup(&self, incr: &mut Incr) -> Self {
+        self.0.dup(incr).into()
+    }
+}
 
 impl AsRef<Tm> for RcTm {
     fn as_ref(&self) -> &Tm {
@@ -98,102 +129,6 @@ impl DirectChildren for RcTm {
             }
             Tm::Rel(rel) => Tm::Rel(rel.iter().map(|(k, v)| (*k, f(v))).collect()).into(),
             Tm::Cons(head, tail) => Tm::Cons(f(head), f(tail)).into(),
-        }
-    }
-}
-
-#[derive(Default)]
-pub struct TmDisplayer<'tm> {
-    indent: usize,
-    tm: Option<&'tm Tm>,
-}
-
-impl<'tm> TmDisplayer<'tm> {
-    fn indented(&self, tm: impl Into<Option<&'tm Tm>>) -> Self {
-        Self {
-            indent: self.indent + 1,
-            tm: tm.into(),
-        }
-    }
-
-    pub fn with_tm(&self, tm: &'tm Tm) -> Self {
-        Self {
-            tm: Some(tm),
-            ..*self
-        }
-    }
-
-    fn fmt_block(
-        &self,
-        functor: &Tok,
-        members: &Vec<RcTm>,
-        f: &mut fmt::Formatter,
-    ) -> Result<(), fmt::Error> {
-        for member in members {
-            writeln!(f)?;
-            for _ in 0..self.indent {
-                f.write_str("    ")?;
-            }
-            write!(f, "{functor} {}", self.indented(member.as_ref()))?;
-        }
-        Ok(())
-    }
-
-    fn fmt_rel(&self, map: &Rel, f: &mut fmt::Formatter) -> fmt::Result {
-        for (sym, tm) in map {
-            match (sym, tm.as_ref()) {
-                (s1, Tm::Sym(s2)) if s1 == s2 => {
-                    write!(f, "[{sym}]")?;
-                }
-                (s, Tm::Var(v)) if s.to_str().eq_ignore_ascii_case(v.to_str().as_ref()) => {
-                    write!(f, "[{v}]")?;
-                }
-                _ => write!(f, "[{sym} {}]", self.with_tm(tm.as_ref()))?,
-            }
-        }
-        Ok(())
-    }
-
-    fn fmt_list(&self, mut x: RcTm, mut xs: RcTm, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{{")?;
-
-        loop {
-            write!(f, "{}", self.indented(&*x))?;
-
-            match &*xs {
-                // xs = {y, ...{}} = {y}
-                Tm::Cons(y, ys) if matches!(**ys, Tm::Nil) => {
-                    return write!(f, ", {}}}", self.indented(&**y))
-                }
-                // xs = {y, ...ys} (continue loop)
-                Tm::Cons(y, ys) => (x, xs) = (y.clone(), ys.clone()),
-                // xs = {x}
-                Tm::Nil => return write!(f, "}}"),
-                // Malformed list like: {1, 2, ...3} (instead of {1, 2, 3, ...{}})
-                xs => return write!(f, " {}{}}}", Tok::Spread, self.indented(&*xs)),
-            }
-
-            write!(f, ", ")?;
-        }
-    }
-}
-
-impl<'tm> fmt::Display for TmDisplayer<'tm> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let tm = self
-            .tm
-            .as_ref()
-            .expect("fmt::Display::fmt will not be called on empty TmDisplayer");
-
-        match tm {
-            Tm::Sym(s) => write!(f, "{s}"),
-            Tm::Var(v) => write!(f, "{v}"),
-            Tm::Num(i) => write!(f, "{i}"),
-            Tm::Txt(s) => write!(f, "\"{s}\""),
-            Tm::Block(functor, members) => self.fmt_block(functor, members, f),
-            Tm::Rel(map) => self.fmt_rel(map, f),
-            Tm::Cons(x, xs) => self.fmt_list(x.clone(), xs.clone(), f),
-            Tm::Nil => write!(f, "{{}}"),
         }
     }
 }

@@ -6,7 +6,7 @@ use std::{
 };
 
 use crate::{
-    data_structures::Sym,
+    interner::IStr,
     my_nom::{PErr, Res, Span},
     tok::{At, MakeAt, Tok},
 };
@@ -95,7 +95,11 @@ fn insert_indent_dedent_tokens<'i>(
             out
         })
         .chain(
-            repeat_with(move || SimpleTok::Dedent.at(end.get().unwrap())).take_while(move |_| {
+            repeat_with(move || {
+                let end = end.get().unwrap_or("".into());
+                SimpleTok::Dedent.at(end)
+            })
+            .take_while(move |_| {
                 let old = prev.get();
                 if old > 0 {
                     prev.replace(old - 1);
@@ -118,7 +122,7 @@ fn text_literal(i: Span) -> Res<String> {
     Ok((i, text.to_string()))
 }
 
-fn any_symbol(i: Span) -> Res<Sym> {
+fn any_symbol(i: Span) -> Res<IStr> {
     recognize(tuple((
         verify(anychar::<Span, _>, |&c| c.is_alphabetic() || c == '_'),
         take_while(|c: char| c.is_alphanumeric() || c == '_'),
@@ -151,7 +155,7 @@ fn tokenize_line<'st, 'i: 'st>(
         if let Ok((rem, sym)) = any_symbol(line) {
             line = rem;
             if sym.to_str().starts_with(char::is_uppercase) {
-                return Some(Tok::Var(sym).at(old_line));
+                return Some(Tok::Var(sym.into()).at(old_line));
             } else if sym.to_str().starts_with(char::is_lowercase) {
                 return Some(Tok::Sym(sym).at(old_line));
             } else {

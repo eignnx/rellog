@@ -7,6 +7,7 @@ use nom::{
     sequence::{preceded, tuple},
     Finish, IResult, Parser,
 };
+use rpds::Vector;
 
 use crate::{
     ast::{Item, Module, RcTm, Rel, Tm},
@@ -154,7 +155,7 @@ fn block(ts: Toks) -> Res<Tm> {
                 }))
             }
         })
-        .collect::<Result<Vec<_>, nom::Err<_>>>()?;
+        .collect::<Result<Vector<_>, nom::Err<_>>>()?;
 
     let (ts, _) = cut(tok(Dedent))(ts)?;
     Ok((ts, Tm::Block(first_functor, members)))

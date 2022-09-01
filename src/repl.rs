@@ -94,7 +94,7 @@ impl Repl {
             };
 
             let rt = rt::Rt::new(&self.module);
-            let solns = rt.solve_query(&query, UnifierSet::new());
+            let solns = rt.solve_query(query, UnifierSet::new());
 
             self.config.set_repl_mode(ReplMode::PrintingSolns);
             for soln in solns {

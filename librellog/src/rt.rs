@@ -1,14 +1,20 @@
-use std::{fmt, iter};
+use std::{cell::RefCell, fmt, iter};
+
+use rpds::Vector;
 
 use crate::{
     ast::{Module, RcTm, Tm},
+    cloning_iter::CloningIterator,
     data_structures::Var,
+    dup::Dup,
+    incr::Incr,
     tok::Tok,
 };
 
 #[derive(Debug, Clone)]
 pub enum Err {
     AttemptToQueryNonCallable(RcTm),
+    InstantiationError(RcTm),
 }
 
 impl fmt::Display for Err {
@@ -16,6 +22,9 @@ impl fmt::Display for Err {
         match self {
             Err::AttemptToQueryNonCallable(tm) => {
                 write!(f, "The term {tm} is not callable.")
+            }
+            Err::InstantiationError(tm) => {
+                write!(f, "The term {tm} is not sufficiently instantiated.")
             }
         }
     }
@@ -31,51 +40,59 @@ impl<T> SolnStream for T where T: Iterator<Item = Res<UnifierSet>> {}
 
 pub struct Rt<'rt> {
     db: &'rt Module,
+    incr: RefCell<Incr>,
 }
 
 impl<'rt> Rt<'rt> {
     pub fn new(db: &'rt Module) -> Self {
-        Self { db }
-    }
-
-    pub fn solve_query<'rtb, 'q, 'it>(
-        &'rtb self,
-        query: &'q RcTm,
-        u: UnifierSet,
-    ) -> Box<dyn SolnStream + 'it>
-    where
-        'rtb: 'it,
-        'q: 'it,
-    {
-        match query.as_ref() {
-            Tm::Rel(_) => self.solve_rel(query, u),
-            Tm::Block(Tok::Pipe, members) => self.solve_or_block(members, u),
-            Tm::Block(Tok::Dash, members) => self.solve_and_block(members, u),
-            Tm::Block(_, _) => Box::new(iter::once(Err(Err::AttemptToQueryNonCallable(
-                query.clone(),
-            )))),
-            Tm::Sym(_) | Tm::Var(_) | Tm::Num(_) | Tm::Txt(_) | Tm::Cons(_, _) | Tm::Nil => {
-                Box::new(iter::once(Err(Err::AttemptToQueryNonCallable(
-                    query.clone(),
-                ))))
-            }
+        Self {
+            db,
+            incr: RefCell::new(Incr::default()),
         }
     }
 
-    fn solve_rel<'rtb, 'q, 'it>(
+    pub fn solve_query<'rtb, 'it>(
         &'rtb self,
-        query: &'q RcTm,
+        query: RcTm,
         u: UnifierSet,
     ) -> Box<dyn SolnStream + 'it>
     where
         'rtb: 'it,
-        'q: 'it,
+    {
+        match query.as_ref() {
+            Tm::Rel(_) => self.solve_rel(query.clone(), u),
+            Tm::Block(Tok::Pipe, members) => self.solve_or_block(members.clone(), u),
+            Tm::Block(Tok::Dash, members) => self.solve_and_block(members.clone(), u),
+            Tm::Block(_, _) => Box::new(iter::once(Err(Err::AttemptToQueryNonCallable(
+                query.clone(),
+            )))),
+            Tm::Var(_) => {
+                let reified = u.reify_term(&query);
+                if query == reified {
+                    Box::new(iter::once(Err(Err::InstantiationError(query.clone()))))
+                } else {
+                    self.solve_query(reified, u)
+                }
+            }
+            Tm::Sym(_) | Tm::Num(_) | Tm::Txt(_) | Tm::Cons(_, _) | Tm::Nil => Box::new(
+                iter::once(Err(Err::AttemptToQueryNonCallable(query.clone()))),
+            ),
+        }
+    }
+
+    fn solve_rel<'rtb, 'it>(&'rtb self, query: RcTm, u: UnifierSet) -> Box<dyn SolnStream + 'it>
+    where
+        'rtb: 'it,
     {
         Box::new(self.db.rel_defs().flat_map(move |(head, opt_body)| {
-            let head = Tm::Rel(head.clone()).into(); // TODO use rpds for Rel.
+            let head = Tm::Rel(head.clone())
+                .dup(&mut *self.incr.borrow_mut())
+                .into();
+
             match u.unify(&head, &query) {
                 Some(u) => {
                     if let Some(body) = opt_body {
+                        let body = body.dup(&mut *self.incr.borrow_mut());
                         self.solve_query(body, u)
                     } else {
                         Box::new(iter::once(Ok(u)))
@@ -86,42 +103,36 @@ impl<'rt> Rt<'rt> {
         }))
     }
 
-    fn solve_or_block<'rtb, 'it, 'q: 'it>(
+    fn solve_or_block<'rtb, 'it>(
         &'rtb self,
-        members: &'q Vec<RcTm>,
+        members: Vector<RcTm>,
         u: UnifierSet,
     ) -> Box<dyn SolnStream + 'it>
     where
         'rtb: 'it,
-        'q: 'it,
     {
         Box::new(
             members
-                .iter()
-                .flat_map(move |q| self.clone().solve_query(q, u.clone())),
+                .cloning_iter()
+                .flat_map(move |q| self.clone().solve_query(q.clone(), u.clone())),
         )
     }
 
-    fn solve_and_block<'rtb, 'q, 'it>(
+    fn solve_and_block<'rtb, 'it>(
         &'rtb self,
-        members: &'q Vec<RcTm>,
+        members: Vector<RcTm>,
         u: UnifierSet,
     ) -> Box<dyn SolnStream + 'it>
     where
         'rtb: 'it,
-        'q: 'it,
     {
         let init: Box<dyn SolnStream> = Box::new(iter::once(Ok(u)));
-        Box::new(
-            members
-                .iter() //
-                .fold(init, |solns, q| {
-                    Box::new(
-                        solns
-                            .map(Res::unwrap) //
-                            .flat_map(|u| self.solve_query(q, u)),
-                    )
-                }),
-        )
+        Box::new(members.cloning_iter().fold(init, |solns, q| {
+            Box::new(
+                solns
+                    .map(Res::unwrap)
+                    .flat_map(move |u| self.solve_query(q.clone(), u)),
+            )
+        }))
     }
 }
