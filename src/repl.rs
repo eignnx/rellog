@@ -18,6 +18,7 @@ use crate::{
 };
 
 pub struct Repl {
+    current_file: String,
     module: ast::Module,
     config: RellogReplConfigHandle,
     line_editor: Reedline,
@@ -26,21 +27,21 @@ pub struct Repl {
 impl Repl {
     pub fn loading_file(fname: &str) -> Self {
         let config = RellogReplConfigHandle::default();
-        match load_module_from_file(fname) {
-            Ok(module) => Self {
-                module,
-                line_editor: config.create_editor(),
-                config,
-            },
+
+        let module = match load_module_from_file(fname) {
+            Ok(module) => module,
             Err(e) => {
                 println!("{e}");
                 println!("Loading default module.");
-                Self {
-                    module: ast::Module::default(),
-                    line_editor: config.create_editor(),
-                    config,
-                }
+                ast::Module::default()
             }
+        };
+
+        Self {
+            current_file: fname.to_owned(),
+            module,
+            line_editor: config.create_editor(),
+            config,
         }
     }
 
@@ -55,6 +56,31 @@ impl Repl {
                     exit(0);
                 }
             };
+
+            match query_buf.trim() {
+                "help" | ":help" | ":h" | "?" => {
+                    println!("Enter a RELLOG TERM or one of these REPL COMMANDS:");
+                    println!("  :h | :help | ?    Displays this help text.");
+                    println!("  :r | :reload      Reloads the source file.");
+                    continue;
+                }
+                ":reload" | ":r" => {
+                    println!("Reloading source file...");
+                    self.module = match load_module_from_file(&self.current_file) {
+                        Ok(m) => {
+                            println!("{} relation definitions loaded.", m.rel_defs().count());
+                            m
+                        }
+                        Err(e) => {
+                            println!("Error loading file: {e}");
+                            println!("Defaulting to empty module.");
+                            Default::default()
+                        }
+                    };
+                    continue;
+                }
+                _ => {}
+            }
 
             let tokens = lex::tokenize(&query_buf[..]);
 

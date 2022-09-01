@@ -6,6 +6,8 @@
     - [man X]
 
 [man socrates]
+[man sammy]
+[man ferdinand]
 
 [prefix {}][Suffix][compound Suffix]
 [prefix {A ...As}][Suffix][Compound]
