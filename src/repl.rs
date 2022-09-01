@@ -1,4 +1,7 @@
-use std::io::{self, Read, Write};
+use std::{
+    io::{self, Read},
+    process::exit,
+};
 
 use librellog::{
     ast, lex,
@@ -6,66 +9,60 @@ use librellog::{
     parse,
     rt::{self, UnifierSet},
 };
+use reedline::{Reedline, Signal};
 
-use crate::app_err::{AppErr, AppRes};
+use crate::{
+    app_err::{AppErr, AppRes},
+    line_editor_config::{default_line_editor, PROMPT},
+};
 
 pub struct Repl {
     module: ast::Module,
+    line_editor: Reedline,
 }
 
 impl Repl {
-    pub(crate) fn loading_file(fname: &str) -> Self {
-        match Self::load_file(fname) {
-            Ok(module) => Self { module },
+    pub fn loading_file(fname: &str) -> Self {
+        match load_module_from_file(fname) {
+            Ok(module) => Self {
+                module,
+                line_editor: default_line_editor(),
+            },
             Err(e) => {
-                eprintln!("{e}");
+                println!("{e}");
+                println!("Loading default module.");
                 Self {
                     module: ast::Module::default(),
+                    line_editor: default_line_editor(),
                 }
             }
         }
     }
 
-    fn load_file(fname: &str) -> AppRes<ast::Module> {
-        let f = std::fs::File::open(fname).map_err(|e| AppErr::FileOpenErr(fname.into(), e))?;
-        let mut r = io::BufReader::new(f);
-        let mut src = String::new();
-        r.read_to_string(&mut src)
-            .map_err(|e| AppErr::FileReadErr(fname.into(), e))?;
-
-        let tokens = lex::tokenize(Span::new(&src));
-
-        let m = match parse::entire_module(&tokens) {
-            Ok(m) => m,
-            Err(verbose_err) => {
-                parse::display_parse_err(&verbose_err);
-                return Err(AppErr::ParseErr(verbose_err.into()));
-            }
-        };
-
-        Ok(m)
-    }
-
-    pub fn run(&mut self) {
-        let rt = rt::Rt::new(&self.module);
-        let mut query_buf = String::with_capacity(80);
+    pub fn run(&mut self) -> ! {
         'outer: loop {
-            print!("\n-- ");
-            io::stdout().flush().unwrap();
-
-            query_buf.clear();
-            io::stdin().read_line(&mut query_buf).unwrap();
+            let query_buf = match self.line_editor.read_line(&PROMPT) {
+                Ok(Signal::Success(s)) => s,
+                Ok(Signal::CtrlC) => continue 'outer,
+                Ok(Signal::CtrlD) => exit(0),
+                Err(e) => {
+                    println!("{e}");
+                    exit(0);
+                }
+            };
 
             let tokens = lex::tokenize(&query_buf[..]);
 
             let query = match parse::entire_term(&tokens) {
-                Ok(tm) => tm.into(),
+                Ok(q) => q.into(),
                 Err(e) => {
+                    println!("Parse error:");
                     parse::display_parse_err(&e);
                     continue 'outer;
                 }
             };
 
+            let rt = rt::Rt::new(&self.module);
             let solns = rt.solve_query(&query, UnifierSet::new());
 
             'soln_loop: for soln in solns {
@@ -74,9 +71,11 @@ impl Repl {
                 }
 
                 'inner_input_loop: loop {
-                    io::stdout().flush().unwrap();
-                    let mut buf = String::new();
-                    io::stdin().read_line(&mut buf).unwrap();
+                    let buf = match self.line_editor.read_line(&PROMPT).unwrap() {
+                        Signal::Success(s) => s,
+                        Signal::CtrlC => break 'soln_loop,
+                        Signal::CtrlD => exit(0),
+                    };
 
                     match buf.chars().nth(0).unwrap() {
                         ' ' => continue 'soln_loop,
@@ -92,4 +91,24 @@ impl Repl {
             println!("false.");
         }
     }
+}
+
+fn load_module_from_file(fname: &str) -> AppRes<ast::Module> {
+    let f = std::fs::File::open(fname).map_err(|e| AppErr::FileOpenErr(fname.into(), e))?;
+    let mut r = io::BufReader::new(f);
+    let mut src = String::new();
+    r.read_to_string(&mut src)
+        .map_err(|e| AppErr::FileReadErr(fname.into(), e))?;
+
+    let tokens = lex::tokenize(Span::new(&src));
+
+    let m = match parse::entire_module(&tokens) {
+        Ok(m) => m,
+        Err(verbose_err) => {
+            parse::display_parse_err(&verbose_err);
+            return Err(AppErr::ParseErr(verbose_err.into()));
+        }
+    };
+
+    Ok(m)
 }

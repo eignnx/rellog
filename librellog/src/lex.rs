@@ -58,7 +58,7 @@ fn indent_count(indent_text: Span) -> usize {
     }
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 enum SimpleTok<'i> {
     Text(Span<'i>),
     Indent,
@@ -66,7 +66,7 @@ enum SimpleTok<'i> {
 }
 
 fn insert_indent_dedent_tokens<'i>(
-    lines: impl Iterator<Item = (usize, Span<'i>)>,
+    lines: impl Iterator<Item = (usize, Span<'i>)>, // Needs to be non-empty!
 ) -> impl Iterator<Item = At<SimpleTok<'i>>> {
     let prev = Rc::new(Cell::new(0usize));
     let end = Rc::new(Cell::new(None));
@@ -247,13 +247,17 @@ fn span_lines(mut src: Span) -> impl Iterator<Item = Span> {
             src = src.slice(idx + 1..);
             Some(old.slice(0..idx))
         } else {
-            Some(src)
+            let old_src = src;
+            src = src.slice(src.len()..src.len()); // Next time `src` will be empty
+            Some(old_src)
         }
     })
 }
 
 pub fn tokenize<'i>(src: impl Into<Span<'i>> + 'i) -> Vec<At<Tok>> {
-    let lines = span_lines(src.into())
+    let src: Span = src.into();
+
+    let lines = span_lines(src)
         .filter_map(|line| split_indent_text(line).ok())
         .map(|(text, ws)| (indent_count(ws), text));
 
