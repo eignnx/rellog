@@ -1,8 +1,8 @@
 use reedline::{DefaultValidator, ValidationResult, Validator};
 
-pub struct RellogReplValidator;
+use super::RellogReplConfigHandle;
 
-impl Validator for RellogReplValidator {
+impl Validator for RellogReplConfigHandle {
     fn validate(&self, line: &str) -> ValidationResult {
         DefaultValidator.validate(line)
     }

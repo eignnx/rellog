@@ -1,4 +1,4 @@
-use std::iter;
+use std::{fmt, iter};
 
 use crate::{
     ast::{Module, RcTm, Tm},
@@ -9,6 +9,16 @@ use crate::{
 #[derive(Debug, Clone)]
 pub enum Err {
     AttemptToQueryNonCallable(RcTm),
+}
+
+impl fmt::Display for Err {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Err::AttemptToQueryNonCallable(tm) => {
+                write!(f, "The term {tm} is not callable.")
+            }
+        }
+    }
 }
 
 pub type Res<T> = Result<T, Err>;

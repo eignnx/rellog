@@ -2,41 +2,30 @@ use std::borrow::Cow;
 
 use reedline::{DefaultPrompt, Prompt, PromptEditMode, PromptHistorySearch, PromptViMode};
 
-pub struct RellogPrompt {
-    delegate: DefaultPrompt,
-}
+use super::{RellogReplConfigHandle, ReplMode};
 
-impl RellogPrompt {
-    pub const fn new() -> Self {
-        Self {
-            delegate: DefaultPrompt,
-        }
-    }
-}
-
-impl Default for RellogPrompt {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl Prompt for RellogPrompt {
+impl Prompt for RellogReplConfigHandle {
     fn render_prompt_left(&self) -> Cow<str> {
         "".into()
     }
 
     fn render_prompt_right(&self) -> Cow<str> {
-        "".into()
+        let cfg = self.read().unwrap();
+        match &cfg.prompt_edit_mode {
+            PromptEditMode::Default => "".into(),
+            PromptEditMode::Emacs => "(emacs)".into(),
+            PromptEditMode::Vi(PromptViMode::Insert) => "(vi:insert)".into(),
+            PromptEditMode::Vi(PromptViMode::Normal) => "(vi:normal)".into(),
+            PromptEditMode::Custom(c) => format!("({c})").into(),
+        }
     }
 
     fn render_prompt_indicator(&self, edit_mode: PromptEditMode) -> Cow<str> {
-        // self.delegate.render_prompt_indicator(edit_mode)
-        match edit_mode {
-            PromptEditMode::Default => "-- ".into(),
-            PromptEditMode::Emacs => "(emacs)-- ".into(),
-            PromptEditMode::Vi(PromptViMode::Normal) => "(vi:N)-- ".into(),
-            PromptEditMode::Vi(PromptViMode::Insert) => "-- ".into(),
-            PromptEditMode::Custom(c) => format!("{c}").into(),
+        let mut cfg = self.write().unwrap();
+        cfg.prompt_edit_mode = edit_mode.clone();
+        match &cfg.repl_mode {
+            ReplMode::TopLevel => "-- ".into(),
+            ReplMode::PrintingSolns => "[ENTER to show next solution, CTRL-C to break] ".into(),
         }
     }
 
@@ -48,7 +37,6 @@ impl Prompt for RellogPrompt {
         &self,
         history_search: PromptHistorySearch,
     ) -> Cow<str> {
-        self.delegate
-            .render_prompt_history_search_indicator(history_search)
+        DefaultPrompt.render_prompt_history_search_indicator(history_search)
     }
 }

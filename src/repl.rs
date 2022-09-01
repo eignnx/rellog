@@ -13,27 +13,31 @@ use reedline::{Reedline, Signal};
 
 use crate::{
     app_err::{AppErr, AppRes},
-    line_editor_config::{default_line_editor, PROMPT},
+    line_editor_config::{RellogReplConfigHandle, ReplMode},
 };
 
 pub struct Repl {
     module: ast::Module,
+    config: RellogReplConfigHandle,
     line_editor: Reedline,
 }
 
 impl Repl {
     pub fn loading_file(fname: &str) -> Self {
+        let config = RellogReplConfigHandle::default();
         match load_module_from_file(fname) {
             Ok(module) => Self {
                 module,
-                line_editor: default_line_editor(),
+                line_editor: config.create_editor(),
+                config,
             },
             Err(e) => {
                 println!("{e}");
                 println!("Loading default module.");
                 Self {
                     module: ast::Module::default(),
-                    line_editor: default_line_editor(),
+                    line_editor: config.create_editor(),
+                    config,
                 }
             }
         }
@@ -41,10 +45,10 @@ impl Repl {
 
     pub fn run(&mut self) -> ! {
         'outer: loop {
-            let query_buf = match self.line_editor.read_line(&PROMPT) {
+            self.config.set_repl_mode(ReplMode::TopLevel);
+            let query_buf = match self.line_editor.read_line(&self.config) {
                 Ok(Signal::Success(s)) => s,
-                Ok(Signal::CtrlC) => continue 'outer,
-                Ok(Signal::CtrlD) => exit(0),
+                Ok(Signal::CtrlC | Signal::CtrlD) => exit(0),
                 Err(e) => {
                     println!("{e}");
                     exit(0);
@@ -65,27 +69,21 @@ impl Repl {
             let rt = rt::Rt::new(&self.module);
             let solns = rt.solve_query(&query, UnifierSet::new());
 
-            'soln_loop: for soln in solns {
-                if let Ok(soln) = soln {
-                    println!("{soln}");
+            self.config.set_repl_mode(ReplMode::PrintingSolns);
+            for soln in solns {
+                match soln {
+                    Ok(soln) => println!("{soln}"),
+                    Err(e) => println!("{e}"),
                 }
 
-                'inner_input_loop: loop {
-                    let buf = match self.line_editor.read_line(&PROMPT).unwrap() {
-                        Signal::Success(s) => s,
-                        Signal::CtrlC => break 'soln_loop,
-                        Signal::CtrlD => exit(0),
-                    };
-
-                    match buf.chars().nth(0).unwrap() {
-                        ' ' => continue 'soln_loop,
-                        '\n' => break 'soln_loop,
-                        _ => {
-                            println!("Unknown input. Type SPACE to view more solutions, ENTER to return to query prompt.");
-                            continue 'inner_input_loop;
-                        }
+                match self.line_editor.read_line(&self.config).unwrap() {
+                    Signal::Success(_) => {}
+                    Signal::CtrlC => {
+                        println!("...");
+                        continue 'outer;
                     }
-                }
+                    Signal::CtrlD => exit(0),
+                };
             }
 
             println!("false.");

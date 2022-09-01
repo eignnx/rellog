@@ -1,15 +1,9 @@
 use nu_ansi_term::{Color, Style};
 use reedline::{Highlighter, StyledText};
 
-pub struct RellogHighlighter;
+use super::RellogReplConfigHandle;
 
-impl RellogHighlighter {
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Highlighter for RellogHighlighter {
+impl Highlighter for RellogReplConfigHandle {
     fn highlight(&self, mut input: &str, _cursor: usize) -> reedline::StyledText {
         let mut out = StyledText::new();
         let mut stack: Vec<(usize, char)> = vec![];
