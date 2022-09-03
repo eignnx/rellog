@@ -131,8 +131,47 @@ fn x_equals_x() {
 }
 
 #[test]
-fn occurs_check_behavior() {
+fn recursive_term_behavior() {
+    let u = UnifierSet::new();
+    let res = u.unify(&Var("X"), &Pred("shell", vec![Var("X")]));
+    assert!(res.is_some());
+}
+
+#[test]
+#[ignore] // TODO: Print recursive terms nicely.
+fn recursive_term_display_behavior() {
     let u = UnifierSet::new();
     let u = u.unify(&Var("X"), &Pred("shell", vec![Var("X")])).unwrap();
     assert_eq!(format!("{u}"), "    - X = shell(X)\n".to_string());
+}
+
+#[test]
+fn reify_simple_term() {
+    let u = UnifierSet::new();
+
+    let v = Var("V");
+    let w = Var("W");
+    let x = Var("X");
+    let y = Var("Y");
+    let z = Var("Z");
+    let object = Pred("my_sofa", vec![]);
+
+    let u = u.unify(&v, &w).unwrap();
+    u.print_to_dot_file("after_unify_1.gv").unwrap();
+    let u = u.unify(&w, &x).unwrap();
+    u.print_to_dot_file("after_unify_2.gv").unwrap();
+    let u = u.unify(&x, &y).unwrap();
+    u.print_to_dot_file("after_unify_3.gv").unwrap();
+    let u = u.unify(&y, &z).unwrap();
+    u.print_to_dot_file("after_unify_4.gv").unwrap();
+    let u = u.unify(&x, &object).unwrap();
+    u.print_to_dot_file("after_unify_5.gv").unwrap();
+
+    // This one had BETTER work.
+    assert_eq!(&u.reify_term(&x), &object);
+
+    assert_eq!(&u.reify_term(&v), &object);
+    assert_eq!(&u.reify_term(&w), &object);
+    assert_eq!(&u.reify_term(&y), &object);
+    assert_eq!(&u.reify_term(&z), &object);
 }

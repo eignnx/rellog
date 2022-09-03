@@ -7,12 +7,13 @@ use std::{
 
 use rpds::HashTrieMap;
 
+mod graph_viz;
 mod tests;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum Root<Term> {
-    ForNonVar(Term, usize),
-    OfVar(usize),
+    NonVar(Term, usize),
+    Var(usize),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -154,12 +155,12 @@ where
             (Var(x), NonVar) => match self.find_root_and_root_child(x) {
                 // We now know `x` and `y` are both non-var terms. Let's reuse the `unify`
                 // function! (We could also call `unify_non_vars`, but whatever.)
-                (Root::ForNonVar(x, _size), _root_child) => self.unify(&x, y),
+                (Root::NonVar(x, _size), _root_child) => self.unify(&x, y),
 
                 // We're sure `x` is an unsolved variable, and `y` is a non-var.
-                (Root::OfVar(x_root_size), root_child) => {
+                (Root::Var(x_root_size), root_child) => {
                     // Every var who pointed to `x` now points to the non-var `y`.
-                    let new_root = Root::ForNonVar(y.clone(), x_root_size);
+                    let new_root = Root::NonVar(y.clone(), x_root_size);
                     let new_node = Node::Root(new_root);
                     Some(self.insert(root_child, new_node))
                 }
@@ -201,7 +202,7 @@ where
                         // a little longer now.)
                         let new_self = self
                             .insert(small.clone(), Node::Child(large.clone()))
-                            .insert(large.clone(), Node::Root(Root::OfVar(new_size)));
+                            .insert(large.clone(), Node::Root(Root::Var(new_size)));
 
                         Some(new_self)
                     }
@@ -228,14 +229,14 @@ where
     }
 
     fn find(&self, var: &Var) -> Term {
-        let (root, _) = self.find_root_term_and_size(var);
-        root
+        let (root_term, _) = self.find_root_term_and_size(var);
+        root_term
     }
 
     fn find_root_term_and_size(&self, var: &Var) -> (Term, usize) {
         match self.find_root_and_root_child(var) {
-            (Root::ForNonVar(root_term, size), _) => (root_term, size),
-            (Root::OfVar(size), root_child) => (root_child.into(), size),
+            (Root::NonVar(root_term, size), _) => (root_term, size),
+            (Root::Var(size), root_child) => (root_child.into(), size),
         }
     }
 
@@ -250,64 +251,48 @@ where
         match self.get_associated(var) {
             None => {
                 // Var has not been registered in the map yet, so put it in.
-                let root = Root::OfVar(1);
+                let root = Root::Var(1);
                 let node = Node::Root(root.clone());
                 self.hidden_update(var.clone(), node);
                 (root, var.clone())
             }
             Some(Node::Root(root)) => (root.clone(), var.clone()),
             Some(Node::Child(parent_var)) => {
-                match self.find_root_and_root_child(&parent_var) {
-                    (Root::OfVar(size), root_child) => {
-                        // Path compression heuristic.
+                let (root, root_child) = self.find_root_and_root_child(&parent_var);
 
-                        // First point `var` directly to the root's first child var.
-                        let var_parent_node = Node::Child(root_child.clone());
-                        self.hidden_update(var.clone(), var_parent_node);
+                // Path compression heuristic:
+                // Point `var` directly to the root's first child var.
+                let var_parent_node = Node::Child(root_child.clone());
+                self.hidden_update(var.clone(), var_parent_node);
 
-                        // Then update the root with it's new size.
-                        let updated_root = Root::OfVar(size + 1);
-                        let updated_root_node = Node::Root(updated_root.clone());
-                        self.hidden_update(root_child.clone(), updated_root_node);
-
-                        (updated_root, root_child)
-                    }
-
-                    (Root::ForNonVar(term, size), root_child) => {
-                        debug_assert!(term.is_non_var());
-
-                        // Path compression heuristic.
-
-                        // First point `var` directly to the root's first child var.
-                        let var_parent_node = Node::Child(root_child.clone());
-                        self.hidden_update(var.clone(), var_parent_node);
-
-                        // Then update the root with it's new size.
-                        let updated_root = Root::OfVar(size + 1);
-                        let updated_root_node = Node::Root(updated_root.clone());
-                        self.hidden_update(root_child.clone(), updated_root_node);
-
-                        (updated_root, root_child)
-                    }
-                }
+                (root, root_child)
             }
         }
     }
 
     pub fn reify_term(&self, term: &Term) -> Term {
-        let term_kind = term.classify_term();
-        term.map_direct_children(|child| match (&term_kind, child.classify_term()) {
-            (TermKind::Var(var), TermKind::Var(var_child)) => {
-                if self.find(&var_child) == self.find(var) {
-                    // The term occurs within itself. Leave this child alone.
+        use TermKind::*;
+
+        // If the term is a variable, that's easy: just return what it maps to.
+        if let Var(var) = term.classify_term() {
+            return self.find(var);
+        }
+
+        term.map_direct_children(
+            |child| match (term.classify_term(), child.classify_term()) {
+                // If `term` and one of it's children `child_var` have the same root term,
+                // (i.e. `var_child` points to `term`), this is a recursive term. In that
+                // case just return child as-is.
+                (Var(var), Var(child_var)) if self.find(var) == self.find(&child_var) => {
                     child.clone()
-                } else {
-                    // Otherwise, lookup the root term of the child variable.
-                    self.find(var_child)
                 }
-            }
-            _ => self.reify_term(&child),
-        })
+                // Otherwise, when child is a var, look it up in the map.
+                (_, Var(child_var)) => self.find(child_var),
+                // If child is a non-var, its reification is when its children are
+                // recursively reified.
+                (_, NonVar) => self.reify_term(&child),
+            },
+        )
     }
 }
 
