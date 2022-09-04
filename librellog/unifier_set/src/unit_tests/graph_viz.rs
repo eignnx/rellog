@@ -1,6 +1,4 @@
-#![cfg(test)]
-
-use crate::{Node, Root, UnifierSet};
+use super::{Node, Root, UnifierSet};
 use dot_graph as dg;
 use std::{
     collections::hash_map::DefaultHasher,

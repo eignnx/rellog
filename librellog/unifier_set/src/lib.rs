@@ -8,9 +8,10 @@ use std::{
 
 pub use crate::traits::{ClassifyTerm, DirectChildren, TermKind};
 
-mod graph_viz;
-mod tests;
 mod traits;
+
+#[cfg(test)]
+mod unit_tests;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum Root<Term> {

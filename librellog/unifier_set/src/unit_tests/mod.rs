@@ -1,16 +1,15 @@
-#![cfg(test)]
-
+use super::*;
 use std::{fmt, iter};
 
-use crate::*;
-
-use Term::*;
+mod graph_viz;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 enum Term {
     Var(&'static str),
     Pred(&'static str, Vec<Term>),
 }
+
+use Term::*;
 
 impl fmt::Display for Term {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -76,7 +75,10 @@ fn basic_socrates_example() {
 
     let u = u.unify(&p1, &p2).unwrap();
 
-    assert_eq!(format!("{u}"), "    - Who = socrates()\n".to_string());
+    assert_eq!(
+        format!("{u:?}"),
+        r#"{{Pred("socrates", []), "Who"}}"#.to_string()
+    );
 }
 
 #[test]
@@ -92,12 +94,8 @@ fn expanded_socrates_example() {
     let u = u.unify(&Var("Singleton"), &Var("Singleton")).unwrap();
 
     assert_eq!(
-        format!("{u}"),
-        [
-            "    - Other = john()\n",
-            "    - Person = Who = socrates()\n"
-        ]
-        .concat()
+        format!("{u:?}"),
+        r#"{{Var("Singleton")}{Pred("john", []), "Other"}{Pred("socrates", []), "Person", "Who"}}"#
     );
 }
 
@@ -105,7 +103,7 @@ fn expanded_socrates_example() {
 fn two_vars_unify() {
     let u = UnifierSet::new();
     let u = u.unify(&Var("X"), &Var("Y")).unwrap();
-    assert_eq!(format!("{u}"), "    - X = Y\n".to_string());
+    assert_eq!(format!("{u:?}"), r#"{{Var("Y"), "X"}}"#.to_string());
 }
 
 #[test]
@@ -113,21 +111,24 @@ fn two_vars_unify_twice() {
     let u = UnifierSet::new();
     let u = u.unify(&Var("X"), &Var("Y")).unwrap();
     let u = u.unify(&Var("Y"), &Var("X")).unwrap();
-    assert_eq!(format!("{u}"), "    - X = Y\n".to_string());
+    assert_eq!(format!("{u:?}"), r#"{{Var("Y"), "X"}}"#.to_string());
 }
 
 #[test]
 fn var_unifies_with_atomic_pred() {
     let u = UnifierSet::new();
     let u = u.unify(&Var("X"), &Pred("the_answer", vec![])).unwrap();
-    assert_eq!(format!("{u}"), "    - X = the_answer()\n".to_string());
+    assert_eq!(
+        format!("{u:?}"),
+        r#"{{Pred("the_answer", []), "X"}}"#.to_string()
+    );
 }
 
 #[test]
 fn x_equals_x() {
     let u = UnifierSet::new();
     let u = u.unify(&Var("X"), &Var("X")).unwrap();
-    assert_eq!(format!("{u}"), "".to_string());
+    assert_eq!(format!("{u:?}"), r#"{{Var("X")}}"#.to_string());
 }
 
 #[test]
@@ -142,7 +143,7 @@ fn recursive_term_behavior() {
 fn recursive_term_display_behavior() {
     let u = UnifierSet::new();
     let u = u.unify(&Var("X"), &Pred("shell", vec![Var("X")])).unwrap();
-    assert_eq!(format!("{u}"), "    - X = shell(X)\n".to_string());
+    assert_eq!(format!("{u:?}"), r#"{{"X", shell("X")}}"#.to_string());
 }
 
 #[test]
