@@ -105,7 +105,7 @@ impl Repl {
             self.config.set_repl_mode(ReplMode::PrintingSolns);
             for soln in solns {
                 match soln {
-                    Ok(soln) => println!("{}", DisplayUnifierSet(soln)),
+                    Ok(soln) => print!("{}", DisplayUnifierSet(soln)),
                     Err(e) => {
                         println!("{}", Color::Red.paint(format!("Exception: {e}")));
                         continue 'outer;
