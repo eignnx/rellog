@@ -14,4 +14,5 @@ magic_static = "3.0.3"
 unifier_set = { path = "./unifier_set" }
 
 [dev-dependencies]
+assert2 = "0.3.6"
 pretty_assertions = "1.2.1"

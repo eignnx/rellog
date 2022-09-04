@@ -1,10 +1,13 @@
 use std::{
+    cell::RefCell,
     io::{self, Read},
     process::exit,
 };
 
 use librellog::{
-    ast, lex,
+    ast,
+    dup::TmDuplicator,
+    lex,
     my_nom::Span,
     parse,
     rt::{self, UnifierSet},
@@ -69,7 +72,7 @@ impl Repl {
                     println!("Reloading source from {}...", self.current_file);
                     self.module = match load_module_from_file(&self.current_file) {
                         Ok(m) => {
-                            println!("{} relation definitions loaded.", m.rel_defs().count());
+                            println!("{} relation definitions loaded.", m.relations.len());
                             m
                         }
                         Err(e) => {
@@ -95,7 +98,9 @@ impl Repl {
             };
 
             let rt = rt::Rt::new(&self.module);
-            let solns = rt.solve_query(query, UnifierSet::new());
+            let u = UnifierSet::new();
+            let td = RefCell::new(TmDuplicator::default());
+            let solns = rt.solve_query(query, u, &td);
 
             self.config.set_repl_mode(ReplMode::PrintingSolns);
             for soln in solns {

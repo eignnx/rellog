@@ -10,7 +10,7 @@ use nom::{
 use rpds::Vector;
 
 use crate::{
-    ast::{Item, Module, RcTm, Rel, Tm},
+    ast::{Clause, Item, Module, RcTm, Rel, Tm},
     data_structures::{Map, Num, Sym, Var},
     tok::{
         At,
@@ -242,14 +242,31 @@ pub fn item(ts: Toks) -> Res<Item> {
 }
 
 pub fn module(ts: Toks) -> Res<Module> {
-    many0(item).map(Module).parse(ts)
+    many0(item)
+        .map(|items| {
+            let mut m = Module::default();
+            for item in items {
+                match item {
+                    Item::Directive(rel) => m.directives.push(rel),
+                    Item::RelDef(head, body) => {
+                        m.relations
+                            .entry(head.clone().into())
+                            .or_default()
+                            .push(Clause { head, body });
+                    }
+                }
+            }
+            m
+        })
+        .parse(ts)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ast::TmDisplayer, lex::tokenize, my_nom::Span};
+    use crate::{lex::tokenize, my_nom::Span, tm_displayer::TmDisplayer};
     use pretty_assertions::assert_eq;
+    use rpds::vector;
 
     fn parse_to_tm(src: &'static str) -> Tm {
         let tokens = tokenize(Span::from(src));
@@ -271,6 +288,7 @@ mod tests {
 
     #[test]
     fn simple_nested_relation_tm() {
+        crate::init_interner();
         let src = r#"[goal [List][Pred]][initial Sublist][final empty_list]"#;
         let actual = parse_to_tm(src);
 
@@ -300,6 +318,7 @@ mod tests {
 
     #[test]
     fn simple_block() {
+        crate::init_interner();
         let src = "
     - [Blah]
     - [Blah]
@@ -314,13 +333,14 @@ mod tests {
         )
         .into();
 
-        let expected = Tm::Block(Dash, vec![blah.clone(), blah.clone(), blah.clone()]);
+        let expected = Tm::Block(Dash, vector![blah.clone(), blah.clone(), blah.clone()]);
 
         assert_eq!(actual, expected, "Input was {:?}", src);
     }
 
     #[test]
     fn nested_block() {
+        crate::init_interner();
         let src = "
     - [Blah]
     -
@@ -339,10 +359,10 @@ mod tests {
 
         let expected = Tm::Block(
             Dash,
-            vec![
+            vector![
                 blah.clone(),
-                Tm::Block(Pipe, vec![blah.clone(), blah.clone()]).into(),
-                blah.clone(),
+                Tm::Block(Pipe, vector![blah.clone(), blah.clone()]).into(),
+                blah.clone()
             ],
         );
 
@@ -351,11 +371,13 @@ mod tests {
 
     #[test]
     fn empty_list() {
+        crate::init_interner();
         assert_eq!(parse_to_tm("{}"), Tm::Nil);
     }
 
     #[test]
     fn singleton_list() {
+        crate::init_interner();
         assert_eq!(
             parse_to_tm("{123}"),
             Tm::Cons(Tm::Num(123).into(), Tm::Nil.into())
@@ -364,6 +386,7 @@ mod tests {
 
     #[test]
     fn singleton_list_trailing_comma() {
+        crate::init_interner();
         assert_eq!(
             parse_to_tm("{123,}"),
             Tm::Cons(Tm::Num(123).into(), Tm::Nil.into())
@@ -372,6 +395,7 @@ mod tests {
 
     #[test]
     fn multi_element_list() {
+        crate::init_interner();
         let src = r#"{123, "asdf", {}, [aardvark][Zebra], socrates, Unknown, {1, 2, 3}}"#;
 
         let formatted = TmDisplayer::default()
@@ -383,6 +407,7 @@ mod tests {
 
     #[test]
     fn list_with_spread() {
+        crate::init_interner();
         let src = r#"{X ...Xs}"#;
 
         let formatted = TmDisplayer::default()
@@ -394,6 +419,7 @@ mod tests {
 
     #[test]
     fn list_with_spread_and_1_comma() {
+        crate::init_interner();
         let src = r#"{X, ...Xs}"#;
 
         let formatted = TmDisplayer::default()
@@ -405,6 +431,7 @@ mod tests {
 
     #[test]
     fn list_with_spread_and_2_commas() {
+        crate::init_interner();
         let src = r#"{X, ...Xs,}"#;
 
         let formatted = TmDisplayer::default()

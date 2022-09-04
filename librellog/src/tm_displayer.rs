@@ -50,7 +50,9 @@ impl<'tm> TmDisplayer<'tm> {
                 (s1, Tm::Sym(s2)) if s1 == s2 => {
                     write!(f, "[{sym}]")?;
                 }
-                (s, Tm::Var(v)) if s.to_str().eq_ignore_ascii_case(v.to_str().as_ref()) => {
+                (s, Tm::Var(v))
+                    if s.to_str().eq_ignore_ascii_case(v.to_str().as_ref()) && v.is_original() =>
+                {
                     write!(f, "[{v}]")?;
                 }
                 _ => write!(f, "[{sym} {}]", self.with_tm(tm.as_ref()))?,

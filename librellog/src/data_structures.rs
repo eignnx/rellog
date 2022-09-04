@@ -2,7 +2,10 @@ use std::{fmt, num::NonZeroUsize, ops::Deref};
 
 use rpds::RedBlackTreeMap;
 
-use crate::{dup::Dup, incr::Incr, interner::IStr};
+use crate::{
+    dup::{Dup, TmDuplicator},
+    interner::IStr,
+};
 
 pub type Sym = IStr;
 pub type Num = i64;
@@ -14,12 +17,28 @@ pub struct Var {
     gen: Option<NonZeroUsize>,
 }
 
-impl Dup for Var {
-    fn dup(&self, incr: &mut Incr) -> Self {
+impl Var {
+    pub(crate) fn with_gen(&self, gen: NonZeroUsize) -> Self {
         Self {
-            istr: self.istr,
-            gen: Some(incr.next()),
+            istr: self.istr.clone(),
+            gen: Some(gen),
         }
+    }
+
+    pub(crate) fn is_original(&self) -> bool {
+        self.gen.is_none()
+    }
+}
+
+impl Dup for Var {
+    fn dup(&self, duper: &mut TmDuplicator) -> Self {
+        duper.dup_var(self)
+    }
+}
+
+impl From<&str> for Var {
+    fn from(s: &str) -> Self {
+        IStr::from(s).into()
     }
 }
 

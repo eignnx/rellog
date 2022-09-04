@@ -1,12 +1,11 @@
-use std::{fmt, iter, ops::Deref, rc::Rc};
+use std::{collections::BTreeMap, fmt, iter, ops::Deref, rc::Rc};
 
 use rpds::Vector;
 use unifier_set::{ClassifyTerm, DirectChildren, TermKind};
 
 use crate::{
     data_structures::{Map, Num, Sym, Var},
-    dup::Dup,
-    incr::Incr,
+    dup::{Dup, TmDuplicator},
     tm_displayer::TmDisplayer,
     tok::Tok,
 };
@@ -27,18 +26,18 @@ pub enum Tm {
 }
 
 impl Dup for Tm {
-    fn dup(&self, incr: &mut Incr) -> Self {
+    fn dup(&self, duper: &mut TmDuplicator) -> Self {
         match self {
-            Tm::Var(v) => Tm::Var(v.dup(incr)),
-            Tm::Cons(h, t) => Tm::Cons(h.dup(incr), t.dup(incr)),
+            Tm::Var(v) => Tm::Var(v.dup(duper)),
+            Tm::Cons(h, t) => Tm::Cons(h.dup(duper), t.dup(duper)),
             Tm::Block(f, ms) => {
-                let ms = ms.iter().map(|tm| tm.dup(incr)).collect();
+                let ms = ms.iter().map(|tm| tm.dup(duper)).collect();
                 Tm::Block(f.clone(), ms)
             }
             Tm::Rel(rel) => {
                 let rel = rel
                     .iter()
-                    .map(|(name, tm)| (name.clone(), tm.dup(incr)))
+                    .map(|(name, tm)| (name.clone(), tm.dup(duper)))
                     .collect();
                 Tm::Rel(rel)
             }
@@ -51,8 +50,8 @@ impl Dup for Tm {
 pub struct RcTm(Rc<Tm>);
 
 impl Dup for RcTm {
-    fn dup(&self, incr: &mut Incr) -> Self {
-        self.0.dup(incr).into()
+    fn dup(&self, duper: &mut TmDuplicator) -> Self {
+        self.0.dup(duper).into()
     }
 }
 
@@ -164,27 +163,90 @@ impl fmt::Display for Item {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Sig(Vector<Sym>);
+
+impl From<Rel> for Sig {
+    fn from(rel: Rel) -> Self {
+        Self(rel.keys().cloned().collect())
+    }
+}
+
+impl From<&Rel> for Sig {
+    fn from(rel: &Rel) -> Self {
+        Self(rel.keys().cloned().collect())
+    }
+}
+
+impl fmt::Display for Sig {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        for key in &self.0 {
+            write!(f, "[{key}]")?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct Clause {
+    pub head: Rel,
+    pub body: Option<RcTm>,
+}
+
+impl Dup for Clause {
+    fn dup(&self, duper: &mut TmDuplicator) -> Self {
+        let head = self
+            .head
+            .iter()
+            .map(|(name, tm)| (name.clone(), tm.dup(duper)))
+            .collect();
+
+        let body = match &self.body {
+            Some(body) => Some(body.dup(duper)),
+            None => None,
+        };
+
+        Self { head, body }
+    }
+}
+
 /// A single-file program (compilation unit).
 #[derive(Debug, Default)]
-pub struct Module(pub Vec<Item>);
+pub struct Module {
+    pub directives: Vec<Rel>,
+    pub relations: BTreeMap<Sig, Vec<Clause>>,
+}
 
 impl Module {
-    pub fn rel_defs<'m>(&'m self) -> impl Iterator<Item = (&'m Rel, &'m Option<RcTm>)> + 'm {
-        self.0.iter().filter_map(|item| match item {
-            Item::Directive(_) => None,
-            Item::RelDef(head, body) => Some((head, body)),
-        })
+    /// Returns an `ExactSizeIterator` of all the clauses that could match the given Rel.
+    /// Eventually this ought to perform smart argument-indexing.
+    /// If the relation does not exist, `None` is returned.
+    pub fn index_match<'m>(
+        &'m self,
+        rel: &Rel,
+    ) -> Option<impl ExactSizeIterator<Item = &'m Clause> + 'm> {
+        let sig = rel.into();
+        self.relations.get(&sig).map(|clauses| clauses.iter())
     }
 }
 
 impl fmt::Display for Module {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Module(items) = self;
-        for (idx, item) in items.iter().enumerate() {
-            if idx > 0 {
-                writeln!(f)?;
+        for dir in self.directives.iter() {
+            writeln!(f, "{dir}")?;
+        }
+
+        writeln!(f)?;
+
+        for (_sig, rel_defs) in self.relations.iter() {
+            for Clause { head, body } in rel_defs {
+                if let Some(body) = body {
+                    writeln!(f, "{head}{body}")?;
+                } else {
+                    writeln!(f, "{head}")?;
+                }
             }
-            writeln!(f, "{item}")?;
+            writeln!(f)?;
         }
         Ok(())
     }

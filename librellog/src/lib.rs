@@ -4,7 +4,6 @@ pub mod ast;
 pub mod cloning_iter;
 pub mod data_structures;
 pub mod dup;
-pub mod incr;
 pub mod interner;
 pub mod lex;
 pub mod my_nom;
