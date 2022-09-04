@@ -7,10 +7,9 @@ use std::{
 use librellog::{
     ast,
     dup::TmDuplicator,
-    lex,
-    my_nom::Span,
-    parse,
+    lex, parse,
     rt::{self, DisplayUnifierSet, UnifierSet},
+    utils::my_nom::Span,
 };
 use nu_ansi_term::Color;
 use reedline::{Reedline, Signal};

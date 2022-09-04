@@ -2,7 +2,7 @@ use core::fmt;
 
 use crate::{
     data_structures::{Num, Sym, Var},
-    my_nom::Span,
+    utils::my_nom::Span,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]

@@ -5,10 +5,10 @@ use unifier_set::{ClassifyTerm, TermKind};
 
 use crate::{
     ast::{Module, RcTm, Sig, Tm},
-    cloning_iter::CloningIterator,
     data_structures::Var,
     dup::TmDuplicator,
     tok::Tok,
+    utils::cloning_iter::CloningIterator,
 };
 
 #[derive(Debug, Clone)]
