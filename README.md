@@ -26,8 +26,8 @@ in Rellog you could write any of
 ## Example
 ```ruby
 [prefix {}][Suffix][compound Suffix]
-[prefix {A ...As}][Suffix][Compound]
-    - [prefix As][suffix {A ...Suffix}][Compound]
+[prefix {A ...As}][Suffix][compound {A ...Compound}]
+    - [prefix As][suffix Suffix][Compound]
 
 [forwards {}][backwards {}]
 [forwards {A ...As}][Backwards]
