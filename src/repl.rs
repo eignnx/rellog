@@ -8,8 +8,8 @@ use librellog::{
     ast,
     dup::TmDuplicator,
     lex, parse,
-    rt::{self, DisplayUnifierSet, UnifierSet},
-    utils::my_nom::Span,
+    rt::{self, UnifierSet},
+    utils::{display_unifier_set::DisplayUnifierSet, my_nom::Span},
 };
 use nu_ansi_term::Color;
 use reedline::{Reedline, Signal};
