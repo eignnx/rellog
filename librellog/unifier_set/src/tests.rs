@@ -45,7 +45,7 @@ impl ClassifyTerm<&'static str> for Term {
     }
 }
 
-impl DirectChildren for Term {
+impl DirectChildren<&'static str> for Term {
     fn direct_children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self> + 'a> {
         match self {
             Var(_) => Box::new(iter::empty()),
@@ -209,4 +209,25 @@ fn reify_term() {
         &u.reify_term(&w).to_string(),
         "thing(one_var(Z), equiv(one_var(Z), one_var(Z)))"
     );
+}
+
+#[test]
+fn variables_of_var() {
+    let vs = Var("X").variables().copied().collect::<Vec<&str>>();
+    assert_eq!(&vs, &["X"]);
+}
+
+#[test]
+fn variables_of_compound_term() {
+    let x = Var("X");
+    let y = Var("Y");
+
+    let term = Pred(
+        "thing",
+        vec![x.clone(), Pred("equiv", vec![y.clone(), y.clone()])],
+    );
+
+    let vs = term.variables().copied().collect::<Vec<&str>>();
+
+    assert_eq!(&vs, &["X", "Y", "Y"]);
 }

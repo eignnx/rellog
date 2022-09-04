@@ -1,3 +1,4 @@
+use rpds::HashTrieMap;
 use std::{
     cell::RefCell,
     collections::{BTreeMap, BTreeSet},
@@ -5,10 +6,11 @@ use std::{
     hash::Hash,
 };
 
-use rpds::HashTrieMap;
+pub use crate::traits::{ClassifyTerm, DirectChildren, TermKind};
 
 mod graph_viz;
 mod tests;
+mod traits;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum Root<Term> {
@@ -20,40 +22,6 @@ enum Root<Term> {
 enum Node<Var, Term> {
     Root(Root<Term>),
     Child(Var),
-}
-
-pub enum TermKind<Var> {
-    Var(Var),
-    NonVar,
-}
-
-pub trait ClassifyTerm<Var> {
-    fn classify_term(&self) -> TermKind<&Var>;
-
-    /// Without looking at any children of `self` or `other`, determine whether
-    /// or not they represent a unifiable pair of terms.
-    ///
-    /// Note that this is a different distinction than that of `classify_term`. Two values
-    /// could be `!superficially_unifiable` but have the same `TermKind`.
-    fn superficially_unifiable(&self, other: &Self) -> bool;
-
-    fn is_var(&self) -> bool {
-        matches!(self.classify_term(), TermKind::Var(_))
-    }
-
-    fn is_non_var(&self) -> bool {
-        matches!(self.classify_term(), TermKind::NonVar)
-    }
-}
-
-pub trait DirectChildren: Sized {
-    /// All *direct* children (and *only* the *direct* children) of `Self` which are of
-    /// type `Self` should be yielded.
-    fn direct_children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self> + 'a>;
-
-    /// Given a function, you need to create a new `Self` where your *direct* children
-    /// have been replaced with the ones provided by the function.
-    fn map_direct_children<'a>(&'a self, f: impl FnMut(&'a Self) -> Self + 'a) -> Self;
 }
 
 #[derive(Clone)]
@@ -95,10 +63,11 @@ where
     }
 }
 
+// TODO: move this out of this crate. It's too specific to Rellog.
 impl<Var, Term> fmt::Display for UnifierSet<Var, Term>
 where
     Var: Clone + Eq + Hash + Into<Term> + fmt::Display + Ord,
-    Term: Clone + Eq + Hash + ClassifyTerm<Var> + DirectChildren + fmt::Display + Ord,
+    Term: Clone + Eq + Hash + ClassifyTerm<Var> + DirectChildren<Var> + fmt::Display + Ord,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for (root_term, vars) in self.reified_forest().into_iter() {
@@ -129,7 +98,7 @@ where
 impl<Var, Term> UnifierSet<Var, Term>
 where
     Var: Clone + Eq + Hash + Into<Term>,
-    Term: Clone + Eq + Hash + ClassifyTerm<Var> + DirectChildren,
+    Term: Clone + Eq + Hash + ClassifyTerm<Var> + DirectChildren<Var>,
 {
     pub fn new() -> Self {
         HashTrieMap::new().into()
@@ -293,7 +262,7 @@ where
 impl<Var, Term> UnifierSet<Var, Term>
 where
     Var: Clone + Eq + Hash + Into<Term>,
-    Term: Clone + Eq + Hash + ClassifyTerm<Var> + DirectChildren,
+    Term: Clone + Eq + Hash + ClassifyTerm<Var> + DirectChildren<Var>,
     Var: Ord,
     Term: Ord,
 {
