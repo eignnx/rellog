@@ -175,3 +175,38 @@ fn reify_simple_term() {
     assert_eq!(&u.reify_term(&y), &object);
     assert_eq!(&u.reify_term(&z), &object);
 }
+
+#[test]
+fn reify_term() {
+    let u = UnifierSet::new();
+
+    let v = Var("V");
+    let w = Var("W");
+    let x = Var("X");
+    let y = Var("Y");
+    let z = Var("Z");
+
+    let object = Pred("one_var", vec![z.clone()]);
+    let p1 = Pred(
+        "thing",
+        vec![v.clone(), Pred("equiv", vec![x.clone(), x.clone()])],
+    );
+    let p2 = Pred(
+        "thing",
+        vec![y.clone(), Pred("equiv", vec![y.clone(), object.clone()])],
+    );
+
+    let u = u.unify(&p1, &w).unwrap(); // thing(V, equiv(X, X)) = W.
+    let u = u.unify(&w, &p2).unwrap(); // W = thing(Y, equiv(Y, one_var(Z))).
+
+    u.print_to_dot_file("reify_term.after.gv").unwrap();
+
+    assert_eq!(&u.reify_term(&z).to_string(), "Z"); // Z is still a var.
+    assert_eq!(&u.reify_term(&x).to_string(), "one_var(Z)"); // X -> one_var(Z)
+    assert_eq!(&u.reify_term(&y).to_string(), "one_var(Z)"); // Y -> one_var(Z)
+    assert_eq!(&u.reify_term(&v).to_string(), "one_var(Z)"); // V -> one_var(Z)
+    assert_eq!(
+        &u.reify_term(&w).to_string(),
+        "thing(one_var(Z), equiv(one_var(Z), one_var(Z)))"
+    );
+}

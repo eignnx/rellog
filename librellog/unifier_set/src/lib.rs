@@ -271,28 +271,22 @@ where
     }
 
     pub fn reify_term(&self, term: &Term) -> Term {
-        use TermKind::*;
+        match term.classify_term() {
+            // If the term is a variable, return the reification of what it maps to.
+            TermKind::Var(var) => {
+                let root_term = self.find(var);
 
-        // If the term is a variable, that's easy: just return what it maps to.
-        if let Var(var) = term.classify_term() {
-            return self.find(var);
-        }
-
-        term.map_direct_children(
-            |child| match (term.classify_term(), child.classify_term()) {
-                // If `term` and one of it's children `child_var` have the same root term,
-                // (i.e. `var_child` points to `term`), this is a recursive term. In that
-                // case just return child as-is.
-                (Var(var), Var(child_var)) if self.find(var) == self.find(&child_var) => {
-                    child.clone()
+                // An unbound variable will `find` itself. Don't reify it again.
+                if &root_term == term {
+                    term.clone()
+                } else {
+                    return self.reify_term(&root_term);
                 }
-                // Otherwise, when child is a var, look it up in the map.
-                (_, Var(child_var)) => self.find(child_var),
-                // If child is a non-var, its reification is when its children are
-                // recursively reified.
-                (_, NonVar) => self.reify_term(&child),
-            },
-        )
+            }
+
+            // Otherwise, reify all direct children.
+            TermKind::NonVar => term.map_direct_children(|child| self.reify_term(child)),
+        }
     }
 }
 
