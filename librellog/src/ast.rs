@@ -110,7 +110,7 @@ impl ClassifyTerm<Var> for RcTm {
     }
 }
 
-impl DirectChildren for RcTm {
+impl DirectChildren<Var> for RcTm {
     fn direct_children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self> + 'a> {
         match self.as_ref() {
             Tm::Sym(_) | Tm::Var(_) | Tm::Num(_) | Tm::Txt(_) | Tm::Nil => Box::new(iter::empty()),

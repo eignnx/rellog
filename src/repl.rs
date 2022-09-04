@@ -10,7 +10,7 @@ use librellog::{
     lex,
     my_nom::Span,
     parse,
-    rt::{self, UnifierSet},
+    rt::{self, DisplayUnifierSet, UnifierSet},
 };
 use nu_ansi_term::Color;
 use reedline::{Reedline, Signal};
@@ -105,7 +105,7 @@ impl Repl {
             self.config.set_repl_mode(ReplMode::PrintingSolns);
             for soln in solns {
                 match soln {
-                    Ok(soln) => println!("{soln}"),
+                    Ok(soln) => println!("{}", DisplayUnifierSet(soln)),
                     Err(e) => {
                         println!("{}", Color::Red.paint(format!("Exception: {e}")));
                         continue 'outer;

@@ -48,37 +48,20 @@ where
 
 impl<Var, Term> fmt::Debug for UnifierSet<Var, Term>
 where
-    Var: Eq + Hash + fmt::Debug,
-    Term: fmt::Debug,
+    Var: Clone + Eq + Hash + Into<Term>,
+    Term: Clone + Eq + Hash + ClassifyTerm<Var> + DirectChildren<Var>,
+    Var: Ord + fmt::Debug,
+    Term: Ord + fmt::Debug,
 {
+    /// Outputs the `UnifierSet` as a forest (a set of sets).
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_map()
-            .entries(
-                self.map
-                    .borrow()
-                    .iter()
-                    .map(|(var, node)| (format!("{var:?}"), node)),
-            )
-            .finish()
-    }
-}
+        let forest = self.reified_forest();
 
-// TODO: move this out of this crate. It's too specific to Rellog.
-impl<Var, Term> fmt::Display for UnifierSet<Var, Term>
-where
-    Var: Clone + Eq + Hash + Into<Term> + fmt::Display + Ord,
-    Term: Clone + Eq + Hash + ClassifyTerm<Var> + DirectChildren<Var> + fmt::Display + Ord,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for (root_term, vars) in self.reified_forest().into_iter() {
-            if !vars.is_empty() {
-                write!(f, "    - ")?;
-                for var in vars {
-                    write!(f, "{var} = ")?;
-                }
-                writeln!(f, "{root_term}")?;
-            }
+        write!(f, "{{")?;
+        for (term, equiv_set) in forest {
+            f.debug_set().entry(&term).entries(equiv_set).finish()?;
         }
+        write!(f, "}}")?;
 
         Ok(())
     }

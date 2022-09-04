@@ -1,6 +1,7 @@
 use std::{cell::RefCell, fmt, iter};
 
 use rpds::Vector;
+use unifier_set::{ClassifyTerm, TermKind};
 
 use crate::{
     ast::{Module, RcTm, Sig, Tm},
@@ -114,21 +115,13 @@ impl<'rt> Rt<'rt> {
                 // If unification succeeds...
                 Some(u) => {
                     if let Some(body) = clause.body {
-                        println!(
-                            "Unify Success:\nquery={query}\n head={head}\nbody={body}\nwhere\n{u}"
-                        );
                         self.solve_query(body, u, td)
                     } else {
-                        println!("Unify Success:\nquery={query}\n head={head}\nwhere\n{u}");
                         Box::new(iter::once(Ok(u)))
                     }
                 }
                 // Unification failed, move on to test next clause.
-                None => {
-                    println!("Unify Failure:\nquery={query}\n head={head}\nwhere\n{u}");
-                    println!("{td:?}");
-                    Box::new(iter::empty())
-                }
+                None => Box::new(iter::empty()),
             }
         }))
     }
@@ -167,6 +160,36 @@ impl<'rt> Rt<'rt> {
                     .flat_map(move |u| self.solve_query(q.clone(), u, td)),
             )
         })
+    }
+}
+
+pub struct DisplayUnifierSet(pub UnifierSet);
+
+impl fmt::Display for DisplayUnifierSet {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let u = &self.0;
+        for (root_term, vars) in u.reified_forest().into_iter() {
+            // Skip this row if none of the variables are original (from the top-level).
+            if !vars.is_empty() && vars.iter().any(Var::is_original) {
+                write!(f, "    - ")?;
+                for (i, var) in vars.into_iter().filter(Var::is_original).enumerate() {
+                    if var.is_original() {
+                        if i == 0 {
+                            write!(f, "{var}")?;
+                        } else {
+                            write!(f, " = {var}")?;
+                        }
+                    }
+                }
+                match root_term.classify_term() {
+                    TermKind::NonVar => writeln!(f, " = {root_term}")?,
+                    TermKind::Var(v) if v.is_original() => writeln!(f, " = {v}")?,
+                    _ => {}
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
