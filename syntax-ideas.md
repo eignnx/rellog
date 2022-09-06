@@ -327,3 +327,123 @@ If you don't wanna define it in the compiler, define it like this:
 [unquoted R][before S][after S]
     R
 ```
+
+## Builtin Relations
+
+### Using special syntax?
+```python
+[%eq1 A][%eq2 B]
+[$eq1 A][$eq2 B]
+[@eq1 A][@eq2 B]
+[&eq1 A][&eq2 B]
+
+%[eq1 A][eq2 B]
+$[eq1 A][eq2 B]
+@[eq1 A][eq2 B]
+&[eq1 A][eq2 B]
+![eq1 A][eq2 B]
+
+[[eq1 A][eq2 B]]
+```
+
+### Or with special handling
+When a relation lookup fails, go to a special table of builtins. Then you can use the same syntax as for regular relations.
+
+
+## More Ideas for Substitution Text Literals
+
+```ruby
+[story]
+    """
+    If I ever set foot on that [Temperature] [v [Location]]{[real Location]}
+    again, I'll [v [Action]]{
+        Action .not_in. {"sing", "sleep"}
+        [possible Action]
+    }. But tomorrow I'll finally meet the wizard [WizNamePrefix]{}[WizNameSuffix].
+    """
+
+[temperature]
+    | "hot"
+    | "cold"
+    | "musty"
+    | "dank"
+
+
+[action]
+    | "die"
+    | "gag"
+    | "sleep"
+```
+
+### Definition of a `rule`
+A `rule` is a relation `Rel` that can be interpreted by the relation `[rule][before][after]`. Its full signature looks like this:
+
+```ruby
+[type [rule :: [rel][attrs _]][before :: {T}][after :: {T}]]
+[mode [rule :: in][before :: inout][after :: inout]]
+```
+
+It is a list-list relation representing a change in a list (or text string).
+
+The first attribute value will be a relation which can be translated into "DCG" notation, i.e. its body is a conjuction or disjunction of either lists/strings or other rules.
+
+#### Lists and Text Strings are Rules
+The following is true:
+
+```ruby
+[rule []][before S][after S]
+
+[rule Xs :: {_}][Before][After]
+    # Speed up with list differences rather than `append`?
+    [prefix Before][suffix Xs][compound After]
+```
+
+### The `v` rule
+The `v` rule is defined like this:
+
+```ruby
+[rule [v Rel]][Before][After] # Rel = [Action]
+    [Rel][Attrs] # Attrs = {[Action]}
+    [elementwise [var_ed Attrs][unvar_ed NewAttrs]] # NewAttrs = {[action]}
+    [rel NewRel][attrs NewAttrs] # NewRel = [action]
+    [rule NewRel][Before][After]
+
+[unvar_ed U][var_ed V] # U = [action action]
+    [attr U][Key][Value] # Key = action, Value = action
+    [symbol Value][Variable] # Variable = Action (the uppercased version of `action`)
+    [attr V][Key][value Variable] # V = [action Action]
+```
+
+### Relation Contexts
+Inside substitution text, top-level *relation*-structs are interpreted as *rules*. To escape into a context where a relation-struct will be interpreted as a *relation*, use braces:
+
+```ruby
+[my_rule]
+    "Asdf [some_rule Arg] adlk jadsf lkhja adsf { [some_relation Arg] } bsdf."
+```
+
+This will be translated like so:
+
+```ruby
+[rule [my_rule]][before S0][after S]
+    [rule "Asdf "][before S0][after S1]
+    [rule [some_rule Arg]][before S1][after S2]
+    [rule " adlk jadsf lkhja adsf "][before S2][after S3]
+    [some_relation Arg]
+    [rule " bsdf."][before S3][after S]
+```
+
+### Separating Rules within Substitution Text
+The syntax can't distinguish between two rules appearing side-by-side in the text:
+
+```ruby
+"[rule1][rule1_arg1][rule2][rule2_arg2]" # Does not have the desired effect
+```
+
+A space could be inserted between the two, but often you don't want an extra space to appear in your output.
+
+To solve this, insert an empty Relational Context between the two rules:
+
+```ruby
+"[rule1][rule1_arg1]{}[rule2][rule2_arg2]"
+```
