@@ -16,5 +16,5 @@ use nom::{
     error::{VerboseError, VerboseErrorKind},
     IResult,
 };
-use nom_indentation::{AtCol, I9nParser};
+use nom_indentation::{I9nParser, WithI9n};
 use nom_locate::LocatedSpan;

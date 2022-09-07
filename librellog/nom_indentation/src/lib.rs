@@ -41,17 +41,19 @@
 
 use nom::{AsBytes, IResult};
 
-pub struct RefI9n<Extra> {
-    ref_i9n: usize,
-    pub extra: Extra,
+pub struct GroupI9n<Extra> {
+    group_i9n: usize,
+    extra: Extra,
 }
 
-/// We keep track of the reference indentation in the extra argument.
-pub type LocatedSpan<Input, Extra = ()> = nom_locate::LocatedSpan<Input, RefI9n<Extra>>;
+/// This is a type alias. For detailed documentation see [`nom_locate::LocatedSpan`](https://docs.rs/nom_locate/latest/nom_locate/struct.LocatedSpan.html)
+///
+/// We keep track of the reference indentation in the `X`-tra type argument.
+pub type LocatedSpan<Input, Extra = ()> = nom_locate::LocatedSpan<Input, GroupI9n<Extra>>;
 
 pub trait LocatedSpanExt<I, X> {
-    fn ref_i9n(&self) -> usize;
-    fn ref_i9n_mut(&mut self) -> &mut usize;
+    fn group_i9n(&self) -> usize;
+    fn group_i9n_mut(&mut self) -> &mut usize;
     fn extra(self) -> X;
     fn extra_ref(&self) -> &X;
     fn extra_mut(&mut self) -> &mut X;
@@ -59,13 +61,13 @@ pub trait LocatedSpanExt<I, X> {
 
 impl<I, X> LocatedSpanExt<I, X> for LocatedSpan<I, X> {
     #[inline]
-    fn ref_i9n(&self) -> usize {
-        self.extra.ref_i9n
+    fn group_i9n(&self) -> usize {
+        self.extra.group_i9n
     }
 
     #[inline]
-    fn ref_i9n_mut(&mut self) -> &mut usize {
-        &mut self.extra.ref_i9n
+    fn group_i9n_mut(&mut self) -> &mut usize {
+        &mut self.extra.group_i9n
     }
 
     #[inline]
@@ -85,18 +87,23 @@ impl<I, X> LocatedSpanExt<I, X> for LocatedSpan<I, X> {
 }
 
 #[derive(Debug, Clone)]
-pub struct AtCol<T> {
+pub struct WithI9n<T> {
     /// The indentation of the beginning of `self.value`.
-    pub start_column: usize,
+    pub start_i9n: usize,
+    /// The wrapped inner value.
     pub value: T,
 }
 
+/// This is essentially a trait alias which specializes `nom::Parser`.
 pub trait I9nParser<Input, Output, Error, Extra = ()>:
-    nom::Parser<LocatedSpan<Input, Extra>, AtCol<Output>, Error>
+    nom::Parser<LocatedSpan<Input, Extra>, WithI9n<Output>, Error>
 {
 }
 
-impl<I, O, E, P, X> I9nParser<I, O, E, X> for P where P: nom::Parser<LocatedSpan<I, X>, AtCol<O>, E> {}
+impl<I, O, E, P, X> I9nParser<I, O, E, X> for P where
+    P: nom::Parser<LocatedSpan<I, X>, WithI9n<O>, E>
+{
+}
 
 pub fn i9n_group<Input, Output, Error, Extra>(
     mut p: impl I9nParser<Input, Output, Error, Extra>,
@@ -106,11 +113,11 @@ where
     LocatedSpan<Input, Extra>: Clone,
 {
     move |mut i: LocatedSpan<Input, Extra>| -> IResult<_, _, Error> {
-        let old_ref_i9n = i.ref_i9n();
+        let old_ref_i9n = i.group_i9n();
         let new_ref_i9n = i.get_column();
-        *i.ref_i9n_mut() = new_ref_i9n;
+        *i.group_i9n_mut() = new_ref_i9n;
         let (mut i, o) = p.parse(i)?;
-        *i.ref_i9n_mut() = old_ref_i9n;
+        *i.group_i9n_mut() = old_ref_i9n;
         Ok((i, o))
     }
 }
@@ -154,27 +161,27 @@ pub mod relations {
 pub enum I9nError<'rel> {
     BadI9nRelativeToRefI9n {
         rel: &'rel dyn I9nRelation<usize>,
-        ref_i9n: usize,
+        group_i9n: usize,
         actual_i9n: usize,
     },
 }
 
 pub fn ind_rel<'rel, Input, Output, Error, Extra>(
     mut p: impl I9nParser<Input, Output, Error, Extra> + 'rel,
-    rel: &'rel impl I9nRelation<usize>,
+    rel: &'rel dyn I9nRelation<usize>,
 ) -> impl I9nParser<Input, Output, Error, Extra> + 'rel
 where
     Input: AsBytes,
     LocatedSpan<Input, Extra>: Clone,
     Error: From<(LocatedSpan<Input, Extra>, I9nError<'rel>)>,
 {
-    move |i: LocatedSpan<Input, Extra>| match (p.parse(i.clone()), i.ref_i9n()) {
-        (Ok((i, o)), ref_i9n) if rel.partial_cmp(&o.start_column, &ref_i9n) => Ok((i, o)),
-        (Ok((_, o)), ref_i9n) => {
+    move |i: LocatedSpan<Input, Extra>| match (p.parse(i.clone()), i.group_i9n()) {
+        (Ok((i, o)), group_i9n) if rel.partial_cmp(&o.start_i9n, &group_i9n) => Ok((i, o)),
+        (Ok((_, o)), group_i9n) => {
             let ie = I9nError::BadI9nRelativeToRefI9n {
-                rel: rel as &dyn I9nRelation<usize>,
-                ref_i9n,
-                actual_i9n: o.start_column,
+                rel,
+                group_i9n,
+                actual_i9n: o.start_i9n,
             };
             Err(nom::Err::Error((i, ie).into()))
         }
