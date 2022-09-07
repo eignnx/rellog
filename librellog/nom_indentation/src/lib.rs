@@ -159,7 +159,7 @@ pub mod relations {
 }
 
 pub enum I9nError<'rel> {
-    BadI9nRelativeToRefI9n {
+    BadI9nRelativeToGroupI9n {
         rel: &'rel dyn I9nRelation<usize>,
         group_i9n: usize,
         actual_i9n: usize,
@@ -178,7 +178,7 @@ where
     move |i: LocatedSpan<Input, Extra>| match (p.parse(i.clone()), i.group_i9n()) {
         (Ok((i, o)), group_i9n) if rel.partial_cmp(&o.start_i9n, &group_i9n) => Ok((i, o)),
         (Ok((_, o)), group_i9n) => {
-            let ie = I9nError::BadI9nRelativeToRefI9n {
+            let ie = I9nError::BadI9nRelativeToGroupI9n {
                 rel,
                 group_i9n,
                 actual_i9n: o.start_i9n,
