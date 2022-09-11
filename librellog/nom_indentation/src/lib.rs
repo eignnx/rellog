@@ -6,17 +6,44 @@
 //! Throughout the crate, the word **indentation** has been abbreviated **i9n**
 //! (in the word *indentation*, there are nine letters between the *i* and the *n*).
 
-use std::{cmp::Ordering, marker::PhantomData, ops::Index};
+use std::{
+    cmp::Ordering,
+    fmt::{self, Debug},
+    marker::PhantomData,
+    ops::Index,
+};
 
 use nom::{IResult, InputLength, Parser};
 mod trait_impls;
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct I9nInput<Input, TokenFinder> {
     input: Input,
     at_start_of_line: bool,
     stack: rpds::Stack<usize>,
     _token_finder: PhantomData<TokenFinder>,
+}
+
+impl<I, Tf> fmt::Debug for I9nInput<I, Tf>
+where
+    I: fmt::Debug,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("I9nInput")
+            .field("input", &self.input)
+            .field("at_start_of_line", &self.at_start_of_line)
+            .field("stack", &self.stack)
+            .finish()
+    }
+}
+
+impl<I, Tf> fmt::Display for I9nInput<I, Tf>
+where
+    I: fmt::Display,
+{
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.input())
+    }
 }
 
 pub trait NextTokCol<I> {
@@ -27,12 +54,27 @@ pub trait StartCol {
     fn start_col(&self) -> usize;
 }
 
+/// Used as a [`I9nInput`]'s `TokenFinder` type parameter.
+///
+/// ## When to use?
+/// When your underlying input has already been tokenized into a stream of
+/// semantic tokens.
+///
+/// ## Why to use?
+/// This type implements the [`NextTokCol`] trait, which is needed by the
+/// indentation parsers in this crate.
+///
+/// Note that you'll also need to implement [`StartCol`] for your token type.
+/// This teaches the parsers how to pluck start-column information out of your
+/// tokens.
 #[derive(Debug, Clone)]
 pub struct FrontOfTokenizedInput<Input, Token> {
     _input: PhantomData<Input>,
     _token: PhantomData<Token>,
 }
 
+/// [`FrontOfTokenizedInput`] knows how to pluck the first token from the input
+/// and examine its column location.
 impl<Input, Token> NextTokCol<Input> for FrontOfTokenizedInput<Input, Token>
 where
     Input: Index<usize, Output = Token> + InputLength,
@@ -125,22 +167,24 @@ where
     }
 }
 
+impl<I, Tf> I9nInput<I, Tf> {
+    pub fn input(&self) -> &I {
+        &self.input
+    }
+
+    fn current_i9n(&self) -> usize {
+        self.stack.peek().copied().unwrap_or(1)
+    }
+}
+
 impl<I, Tf> I9nInput<I, Tf>
 where
     I: Clone,
     Tf: NextTokCol<I> + Clone,
 {
-    pub fn input(&self) -> &I {
-        &self.input
-    }
-
     pub fn current_col(&self) -> usize {
         const EOF_COLUMN: usize = 0; // Note: beginning of line is usually at column 1.
         Tf::next_tok_col(&self.input).unwrap_or(EOF_COLUMN)
-    }
-
-    fn current_i9n(&self) -> usize {
-        self.stack.peek().copied().unwrap_or(1)
     }
 
     fn push_i9n(&self, col: usize) -> Self {

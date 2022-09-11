@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 nom = "7.1.1"
 nom_locate = "4.0.0"
+rpds = "0.12.0"
