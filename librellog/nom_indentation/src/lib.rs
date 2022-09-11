@@ -8,10 +8,7 @@
 
 use std::{cmp::Ordering, marker::PhantomData, ops::Index};
 
-use nom::{
-    error::{ErrorKind, ParseError},
-    FindToken, IResult, InputLength, Parser, Slice,
-};
+use nom::{IResult, InputLength, Parser};
 mod trait_impls;
 
 #[derive(Debug, Clone)]
