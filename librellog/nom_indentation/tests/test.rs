@@ -23,7 +23,7 @@ use nom::{
     sequence::{preceded, tuple},
     IResult, Parser, Slice,
 };
-use nom_indentation::{begin_block, begin_line, end_block, tok, I9nError, I9nInput, NextTokCol};
+use nom_i9n::{begin_block, begin_line, end_block, tok, I9nError, I9nInput, NextTokCol};
 use nom_locate::LocatedSpan;
 
 struct Bad(String);

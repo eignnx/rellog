@@ -40,7 +40,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "nom_indentation"
+name = "nom_i9n"
 version = "0.1.0"
 dependencies = [
  "nom",

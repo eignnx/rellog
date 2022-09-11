@@ -1,6 +1,7 @@
-//! # `nom_indentation`
+//! # `nom_i9n`
 //!
-//! Provides an input type which allows for indentation sensitive parsing.
+//! Provides an input type and parser combinators which allow for indentation
+//! sensitive parsing with `nom`.
 //!
 //! ## Note: **I9n** Abbreviates **Indentation**
 //! Throughout the crate, the word **indentation** has been abbreviated **i9n**
