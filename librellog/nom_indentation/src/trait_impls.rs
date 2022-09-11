@@ -16,13 +16,13 @@ impl<I, Tf> Deref for I9nInput<I, Tf> {
     type Target = I;
 
     fn deref(&self) -> &Self::Target {
-        &self.input
+        self.input()
     }
 }
 
 impl<I: AsBytes, Tf> AsBytes for I9nInput<I, Tf> {
     fn as_bytes(&self) -> &[u8] {
-        self.input.as_bytes()
+        self.input().as_bytes()
     }
 }
 
@@ -63,7 +63,7 @@ where
     where
         P: Fn(Self::Item) -> bool,
     {
-        match self.input.position(predicate) {
+        match self.input().position(predicate) {
             Some(n) => Ok(self.take_split(n)),
             None => Err(nom::Err::Incomplete(nom::Needed::new(1))),
         }
@@ -77,7 +77,7 @@ where
     where
         P: Fn(Self::Item) -> bool,
     {
-        match self.input.position(predicate) {
+        match self.input().position(predicate) {
             Some(0) => Err(nom::Err::Error(E::from_error_kind(self.clone(), e))),
             Some(n) => Ok(self.take_split(n)),
             None => Err(nom::Err::Incomplete(nom::Needed::new(1))),
@@ -92,11 +92,11 @@ where
     where
         P: Fn(Self::Item) -> bool,
     {
-        match self.input.position(predicate) {
+        match self.input().position(predicate) {
             Some(0) => Err(nom::Err::Error(E::from_error_kind(self.clone(), e))),
             Some(n) => Ok(self.take_split(n)),
             None => {
-                if self.input.input_len() == 0 {
+                if self.input().input_len() == 0 {
                     Err(nom::Err::Error(E::from_error_kind(self.clone(), e)))
                 } else {
                     Ok(self.take_split(self.input_len()))
@@ -108,7 +108,7 @@ where
 
 impl<I: Offset, Tf> Offset for I9nInput<I, Tf> {
     fn offset(&self, second: &Self) -> usize {
-        self.input.offset(second)
+        self.input().offset(second)
     }
 }
 
@@ -118,7 +118,7 @@ where
     R: FromStr,
 {
     fn parse_to(&self) -> Option<R> {
-        self.input.parse_to()
+        self.input().parse_to()
     }
 }
 
@@ -129,7 +129,7 @@ where
 {
     fn slice(&self, range: R) -> Self {
         Self {
-            input: self.input.slice(range),
+            input: self.input().slice(range),
             ..I9nInput::clone(self)
         }
     }
@@ -140,7 +140,7 @@ where
     I: InputLength,
 {
     fn input_len(&self) -> usize {
-        self.input.input_len()
+        self.input().input_len()
     }
 }
 
@@ -150,11 +150,11 @@ where
     I2: Into<I9nInput<I2, Tf>>,
 {
     fn compare(&self, t: I2) -> nom::CompareResult {
-        self.input.compare(t)
+        self.input().compare(t)
     }
 
     fn compare_no_case(&self, t: I2) -> nom::CompareResult {
-        self.input.compare_no_case(t)
+        self.input().compare_no_case(t)
     }
 }
 
@@ -167,11 +167,11 @@ where
     type Extender = I::Extender;
 
     fn new_builder(&self) -> Self::Extender {
-        self.input.new_builder()
+        self.input().new_builder()
     }
 
     fn extend_into(&self, acc: &mut Self::Extender) {
-        self.input.extend_into(acc)
+        self.input().extend_into(acc)
     }
 }
 
@@ -180,7 +180,7 @@ where
     I1: FindSubstring<I2>,
 {
     fn find_substring(&self, substr: I2) -> Option<usize> {
-        self.input.find_substring(substr)
+        self.input().find_substring(substr)
     }
 }
 
@@ -189,7 +189,7 @@ where
     I: FindToken<Token>,
 {
     fn find_token(&self, token: Token) -> bool {
-        self.input.find_token(token)
+        self.input().find_token(token)
     }
 }
 
@@ -215,21 +215,21 @@ where
     type IterElem = I::IterElem;
 
     fn iter_indices(&self) -> Self::Iter {
-        self.input.iter_indices()
+        self.input().iter_indices()
     }
 
     fn iter_elements(&self) -> Self::IterElem {
-        self.input.iter_elements()
+        self.input().iter_elements()
     }
 
     fn position<P>(&self, predicate: P) -> Option<usize>
     where
         P: Fn(Self::Item) -> bool,
     {
-        self.input.position(predicate)
+        self.input().position(predicate)
     }
 
     fn slice_index(&self, count: usize) -> Result<usize, nom::Needed> {
-        self.input.slice_index(count)
+        self.input().slice_index(count)
     }
 }

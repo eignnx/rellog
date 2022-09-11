@@ -6,53 +6,14 @@
 //! Throughout the crate, the word **indentation** has been abbreviated **i9n**
 //! (in the word *indentation*, there are nine letters between the *i* and the *n*).
 
-use std::{
-    cmp::Ordering,
-    fmt::{self, Debug},
-    marker::PhantomData,
-    ops::Index,
-};
-
+pub use crate::{errors::*, i9n_input::*, traits::*};
 use nom::{IResult, InputLength, Parser};
+use std::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Index};
+
+mod errors;
+mod i9n_input;
 mod trait_impls;
-
-#[derive(Clone)]
-pub struct I9nInput<Input, TokenFinder> {
-    input: Input,
-    at_start_of_line: bool,
-    stack: rpds::Stack<usize>,
-    _token_finder: PhantomData<TokenFinder>,
-}
-
-impl<I, Tf> fmt::Debug for I9nInput<I, Tf>
-where
-    I: fmt::Debug,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("I9nInput")
-            .field("input", &self.input)
-            .field("at_start_of_line", &self.at_start_of_line)
-            .field("stack", &self.stack)
-            .finish()
-    }
-}
-
-impl<I, Tf> fmt::Display for I9nInput<I, Tf>
-where
-    I: fmt::Display,
-{
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.input())
-    }
-}
-
-pub trait NextTokCol<I> {
-    fn next_tok_col(input: &I) -> Option<usize>;
-}
-
-pub trait StartCol {
-    fn start_col(&self) -> usize;
-}
+mod traits;
 
 /// Used as a [`I9nInput`]'s `TokenFinder` type parameter.
 ///
@@ -165,85 +126,4 @@ where
             Err(nom::Err::Error(e.into()))
         }
     }
-}
-
-impl<I, Tf> I9nInput<I, Tf> {
-    pub fn input(&self) -> &I {
-        &self.input
-    }
-
-    fn current_i9n(&self) -> usize {
-        self.stack.peek().copied().unwrap_or(1)
-    }
-}
-
-impl<I, Tf> I9nInput<I, Tf>
-where
-    I: Clone,
-    Tf: NextTokCol<I> + Clone,
-{
-    pub fn current_col(&self) -> usize {
-        const EOF_COLUMN: usize = 0; // Note: beginning of line is usually at column 1.
-        Tf::next_tok_col(&self.input).unwrap_or(EOF_COLUMN)
-    }
-
-    fn push_i9n(&self, col: usize) -> Self {
-        Self {
-            stack: self.stack.push(col),
-            ..Clone::clone(self)
-        }
-    }
-
-    #[track_caller]
-    fn pop_i9n(&self) -> Self {
-        Self {
-            stack: self.stack.pop().unwrap(),
-            ..Clone::clone(self)
-        }
-    }
-
-    #[inline]
-    fn make_error(&self, relation: I9nRelation, ctx: I9nErrorCtx) -> I9nError<I> {
-        I9nError {
-            input: self.input.clone(),
-            situation: I9nErrorSituation {
-                relation,
-                expected: self.current_i9n(),
-                actual: self.current_col(),
-            },
-            ctx,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct I9nError<I> {
-    pub input: I,
-    pub situation: I9nErrorSituation,
-    pub ctx: I9nErrorCtx,
-}
-
-#[derive(Debug, Clone)]
-pub struct I9nErrorSituation {
-    pub relation: I9nRelation,
-    pub expected: usize,
-    pub actual: usize,
-}
-
-#[derive(Debug, Clone)]
-pub enum I9nRelation {
-    NotGt,
-    NotEq,
-    Gt,
-    Eq,
-    Lt,
-}
-
-#[derive(Debug, Clone, Copy)]
-pub enum I9nErrorCtx {
-    AtNewGroup,
-    WithinLine,
-    AtNewLine,
-    AtGroupEnd,
-    WithinLineButAfterStart,
 }
