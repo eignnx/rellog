@@ -1,4 +1,5 @@
 use std::{
+    marker::PhantomData,
     ops::{Deref, RangeFrom, RangeTo},
     str::FromStr,
 };
@@ -7,21 +8,11 @@ use nom::{
     error::ParseError, AsBytes, Compare, ExtendInto, FindSubstring, FindToken, IResult, InputIter,
     InputLength, InputTake, InputTakeAtPosition, Offset, ParseTo, Slice,
 };
-use nom_locate::LocatedSpan;
 use rpds::Stack;
 
-use crate::{I9nInput, NextTokCol};
+use crate::I9nInput;
 
-impl<I, X> NextTokCol for LocatedSpan<I, X>
-where
-    I: AsBytes,
-{
-    fn next_tok_col(&self) -> usize {
-        self.get_column()
-    }
-}
-
-impl<I> Deref for I9nInput<I> {
+impl<I, Tf> Deref for I9nInput<I, Tf> {
     type Target = I;
 
     fn deref(&self) -> &Self::Target {
@@ -29,13 +20,13 @@ impl<I> Deref for I9nInput<I> {
     }
 }
 
-impl<I: AsBytes> AsBytes for I9nInput<I> {
+impl<I: AsBytes, Tf> AsBytes for I9nInput<I, Tf> {
     fn as_bytes(&self) -> &[u8] {
         self.input.as_bytes()
     }
 }
 
-impl<I> InputTake for I9nInput<I>
+impl<I, Tf> InputTake for I9nInput<I, Tf>
 where
     Self: Slice<RangeFrom<usize>> + Slice<RangeTo<usize>>,
 {
@@ -48,12 +39,12 @@ where
     }
 }
 
-impl<T> InputTakeAtPosition for I9nInput<T>
+impl<I, Tf> InputTakeAtPosition for I9nInput<I, Tf>
 where
-    T: InputTakeAtPosition + InputLength + InputIter,
+    I: InputTakeAtPosition + InputLength + InputIter,
     Self: Slice<RangeFrom<usize>> + Slice<RangeTo<usize>> + Clone,
 {
-    type Item = <T as InputIter>::Item;
+    type Item = <I as InputIter>::Item;
 
     fn split_at_position_complete<P, E: ParseError<Self>>(
         &self,
@@ -115,15 +106,15 @@ where
     }
 }
 
-impl<I: Offset> Offset for I9nInput<I> {
+impl<I: Offset, Tf> Offset for I9nInput<I, Tf> {
     fn offset(&self, second: &Self) -> usize {
         self.input.offset(second)
     }
 }
 
-impl<R, T> ParseTo<R> for I9nInput<T>
+impl<R, I, Tf> ParseTo<R> for I9nInput<I, Tf>
 where
-    T: ParseTo<R>,
+    I: ParseTo<R>,
     R: FromStr,
 {
     fn parse_to(&self) -> Option<R> {
@@ -131,21 +122,20 @@ where
     }
 }
 
-// impl<'a, T, R, X: Clone> Slice<R> for LocatedSpan<T, X> where
-//     T: Slice<R> + Offset + AsBytes + Slice<RangeTo<usize>>,
-impl<'a, I, R> Slice<R> for I9nInput<I>
+impl<'a, I, Tf, R> Slice<R> for I9nInput<I, Tf>
 where
     I: Slice<R> + Offset + AsBytes + Slice<RangeTo<usize>> + Clone,
+    Tf: Clone,
 {
     fn slice(&self, range: R) -> Self {
         Self {
             input: self.input.slice(range),
-            ..self.clone()
+            ..I9nInput::clone(self)
         }
     }
 }
 
-impl<I> InputLength for I9nInput<I>
+impl<I, Tf> InputLength for I9nInput<I, Tf>
 where
     I: InputLength,
 {
@@ -154,10 +144,10 @@ where
     }
 }
 
-impl<I1, I2> Compare<I2> for I9nInput<I1>
+impl<I1, I2, Tf> Compare<I2> for I9nInput<I1, Tf>
 where
     I1: Compare<I2>,
-    I2: Into<I9nInput<I2>>,
+    I2: Into<I9nInput<I2, Tf>>,
 {
     fn compare(&self, t: I2) -> nom::CompareResult {
         self.input.compare(t)
@@ -168,7 +158,7 @@ where
     }
 }
 
-impl<'a, I> ExtendInto for I9nInput<I>
+impl<I, Tf> ExtendInto for I9nInput<I, Tf>
 where
     I: ExtendInto,
 {
@@ -185,7 +175,7 @@ where
     }
 }
 
-impl<I1, I2> FindSubstring<I2> for I9nInput<I1>
+impl<I1, I2, Tf> FindSubstring<I2> for I9nInput<I1, Tf>
 where
     I1: FindSubstring<I2>,
 {
@@ -194,7 +184,7 @@ where
     }
 }
 
-impl<I, Token> FindToken<Token> for I9nInput<I>
+impl<I, Token, Tf> FindToken<Token> for I9nInput<I, Tf>
 where
     I: FindToken<Token>,
 {
@@ -203,17 +193,18 @@ where
     }
 }
 
-impl<I> From<I> for I9nInput<I> {
+impl<I, Tf> From<I> for I9nInput<I, Tf> {
     fn from(input: I) -> Self {
         Self {
             input,
             at_start_of_line: true,
             stack: Stack::new(),
+            _token_finder: PhantomData,
         }
     }
 }
 
-impl<I> InputIter for I9nInput<I>
+impl<I, Tf> InputIter for I9nInput<I, Tf>
 where
     I: InputIter,
 {

@@ -6,38 +6,54 @@
 //! Throughout the crate, the word **indentation** has been abbreviated **i9n**
 //! (in the word *indentation*, there are nine letters between the *i* and the *n*).
 
-use std::cmp::Ordering;
+use std::{cmp::Ordering, marker::PhantomData, ops::Index};
 
-use nom::{IResult, Parser};
+use nom::{
+    error::{ErrorKind, ParseError},
+    FindToken, IResult, InputLength, Parser, Slice,
+};
 mod trait_impls;
 
 #[derive(Debug, Clone)]
-pub struct I9nInput<Input> {
+pub struct I9nInput<Input, TokenFinder> {
     input: Input,
     at_start_of_line: bool,
     stack: rpds::Stack<usize>,
+    _token_finder: PhantomData<TokenFinder>,
 }
 
-pub trait NextTokCol {
-    fn next_tok_col(&self) -> usize;
+pub trait NextTokCol<I> {
+    fn next_tok_col(input: &I) -> Option<usize>;
 }
 
-impl<I> NextTokCol for I9nInput<I>
+pub trait StartCol {
+    fn start_col(&self) -> usize;
+}
+
+#[derive(Debug, Clone)]
+pub struct FrontOfTokenizedInput<Input, Token> {
+    _input: PhantomData<Input>,
+    _token: PhantomData<Token>,
+}
+
+impl<Input, Token> NextTokCol<Input> for FrontOfTokenizedInput<Input, Token>
 where
-    I: NextTokCol,
+    Input: Index<usize, Output = Token> + InputLength,
+    Token: StartCol,
 {
-    fn next_tok_col(&self) -> usize {
-        self.input.next_tok_col()
+    fn next_tok_col(input: &Input) -> Option<usize> {
+        (input.input_len() > 0).then(|| input[0].start_col())
     }
 }
 
-pub fn begin_block<I, E>(i: I9nInput<I>) -> IResult<I9nInput<I>, (), E>
+pub fn begin_block<I, Tf, E>(i: I9nInput<I, Tf>) -> IResult<I9nInput<I, Tf>, (), E>
 where
-    I: NextTokCol + Clone,
+    I: Clone,
+    Tf: NextTokCol<I> + Clone,
     E: From<I9nError<I>>,
 {
-    if i.next_tok_col() > i.current_i9n() {
-        let i = i.push_i9n(i.next_tok_col());
+    if i.current_col() > i.current_i9n() {
+        let i = i.push_i9n(i.current_col());
         return Ok((i, ()));
     }
 
@@ -46,12 +62,13 @@ where
 }
 
 #[track_caller]
-pub fn end_block<I, E>(i: I9nInput<I>) -> IResult<I9nInput<I>, (), E>
+pub fn end_block<I, Tf, E>(i: I9nInput<I, Tf>) -> IResult<I9nInput<I, Tf>, (), E>
 where
-    I: NextTokCol + Clone,
+    I: Clone,
+    Tf: NextTokCol<I> + Clone,
     E: From<I9nError<I>>,
 {
-    let col = i.next_tok_col();
+    let col = i.current_col();
 
     if col < i.current_i9n() {
         let i = i.pop_i9n();
@@ -66,13 +83,14 @@ where
     Err(nom::Err::Error(e.into()))
 }
 
-pub fn begin_line<I, E>(i: I9nInput<I>) -> IResult<I9nInput<I>, (), E>
+pub fn begin_line<I, Tf, E>(i: I9nInput<I, Tf>) -> IResult<I9nInput<I, Tf>, (), E>
 where
-    I: NextTokCol + Clone,
+    I: Clone,
+    Tf: NextTokCol<I> + Clone,
     E: From<I9nError<I>>,
 {
-    if i.next_tok_col() == i.current_i9n() {
-        let mut i = i.clone();
+    if i.current_col() == i.current_i9n() {
+        let mut i = Clone::clone(&i);
         i.at_start_of_line = true;
         return Ok((i, ()));
     }
@@ -81,12 +99,15 @@ where
     Err(nom::Err::Error(e.into()))
 }
 
-pub fn tok<I, O, E>(mut p: impl Parser<I9nInput<I>, O, E>) -> impl Parser<I9nInput<I>, O, E>
+pub fn tok<I, Tf, O, E>(
+    mut p: impl Parser<I9nInput<I, Tf>, O, E>,
+) -> impl Parser<I9nInput<I, Tf>, O, E>
 where
-    I: NextTokCol + Clone,
+    I: Clone,
+    Tf: NextTokCol<I> + Clone,
     E: From<I9nError<I>>,
 {
-    move |i: I9nInput<I>| match i.next_tok_col().cmp(&i.current_i9n()) {
+    move |i: I9nInput<I, Tf>| match i.current_col().cmp(&i.current_i9n()) {
         Ordering::Equal if i.at_start_of_line => {
             let (mut i, o) = p.parse(i)?;
             i.at_start_of_line = false;
@@ -107,9 +128,18 @@ where
     }
 }
 
-impl<I: NextTokCol + Clone> I9nInput<I> {
+impl<I, Tf> I9nInput<I, Tf>
+where
+    I: Clone,
+    Tf: NextTokCol<I> + Clone,
+{
     pub fn input(&self) -> &I {
         &self.input
+    }
+
+    pub fn current_col(&self) -> usize {
+        const EOF_COLUMN: usize = 0; // Note: beginning of line is usually at column 1.
+        Tf::next_tok_col(&self.input).unwrap_or(EOF_COLUMN)
     }
 
     fn current_i9n(&self) -> usize {
@@ -119,7 +149,7 @@ impl<I: NextTokCol + Clone> I9nInput<I> {
     fn push_i9n(&self, col: usize) -> Self {
         Self {
             stack: self.stack.push(col),
-            ..self.clone()
+            ..Clone::clone(self)
         }
     }
 
@@ -127,7 +157,7 @@ impl<I: NextTokCol + Clone> I9nInput<I> {
     fn pop_i9n(&self) -> Self {
         Self {
             stack: self.stack.pop().unwrap(),
-            ..self.clone()
+            ..Clone::clone(self)
         }
     }
 
@@ -138,7 +168,7 @@ impl<I: NextTokCol + Clone> I9nInput<I> {
             situation: I9nErrorSituation {
                 relation,
                 expected: self.current_i9n(),
-                actual: self.next_tok_col(),
+                actual: self.current_col(),
             },
             ctx,
         }
