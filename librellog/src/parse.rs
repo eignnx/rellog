@@ -291,12 +291,14 @@ pub fn tm(ts: Toks) -> Res<Tm> {
 }
 
 fn rel_def(ts: Toks) -> Res<Item> {
-    let (ts, (r, b)) = tuple((rel, opt(block.map(Into::into))))(ts)?;
+    let mut p = tuple((nom_i9n::line(rel), opt(block.map(Into::into))));
+    let (ts, (r, b)) = p.parse(ts)?;
     Ok((ts, Item::RelDef(r, b)))
 }
 
 fn directive(ts: Toks) -> Res<Item> {
-    let (ts, (_, r, _)) = tuple((tok(OBrack), rel, tok(CBrack)))(ts)?;
+    let mut p = nom_i9n::line(tuple((tok(OBrack), rel, tok(CBrack))));
+    let (ts, (_, r, _)) = p.parse(ts)?;
     Ok((ts, Item::Directive(r)))
 }
 
