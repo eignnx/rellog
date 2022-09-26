@@ -1,119 +1,18 @@
-use std::{
-    cell::Cell,
-    cmp::Ordering,
-    iter::{once, repeat, repeat_with},
-    rc::Rc,
-};
-
 use crate::{
     interner::IStr,
     tok::{At, MakeAt, Tok},
-    utils::my_nom::{PErr, Res, Span},
+    utils::my_nom::{Res, Span},
 };
 use nom::{
-    bytes::complete::{tag, take_while, take_while1},
-    character::complete::{anychar, i64},
+    branch::alt,
+    bytes::complete::{tag, take_while},
+    character::complete::{anychar, i64, multispace0},
     combinator::{recognize, verify},
+    multi::many0,
     sequence::tuple,
     Parser,
 };
-
-fn split_indent_text(line: Span) -> Res<Span> {
-    take_while(char::is_whitespace)(line)
-}
-
-const INDENT_SIZE_IN_SPACES: usize = 4;
-
-fn indent_count(indent_text: Span) -> usize {
-    if indent_text.is_empty() {
-        return 0;
-    }
-
-    enum IndentChar {
-        Tabs,
-        Spaces,
-    }
-
-    use IndentChar::*;
-
-    let mut indent_char = None;
-
-    for ch in indent_text.chars() {
-        match (ch, &indent_char) {
-            (' ', &None) => indent_char = Some(Spaces),
-            ('\t', &None) => indent_char = Some(Tabs),
-            (' ', &Some(Spaces)) => {}
-            ('\t', &Some(Tabs)) => {}
-            _ => panic!("Mixed indentation characters!"),
-        }
-    }
-
-    match indent_char {
-        Some(Tabs) => indent_text.len(),
-        Some(Spaces) if indent_text.len() % INDENT_SIZE_IN_SPACES == 0 => {
-            indent_text.len() / INDENT_SIZE_IN_SPACES
-        }
-        Some(Spaces) => panic!("Indent is not a multiple of {INDENT_SIZE_IN_SPACES} spaces!"),
-        _ => unreachable!(),
-    }
-}
-
-#[derive(Debug, Clone)]
-enum SimpleTok<'i> {
-    Text(Span<'i>),
-    Indent,
-    Dedent,
-}
-
-fn insert_indent_dedent_tokens<'i>(
-    lines: impl Iterator<Item = (usize, Span<'i>)>, // Needs to be non-empty!
-) -> impl Iterator<Item = At<SimpleTok<'i>>> {
-    let prev = Rc::new(Cell::new(0usize));
-    let end = Rc::new(Cell::new(None));
-
-    let (fm_prev, fm_end) = (prev.clone(), end.clone());
-
-    lines
-        .flat_map(move |(curr, line)| {
-            let prev = fm_prev.clone();
-            let end = fm_end.clone();
-            let out: Box<dyn Iterator<Item = _>> = match curr.cmp(&prev.get()) {
-                Ordering::Equal => Box::new(once(SimpleTok::Text(line).at(line))),
-                Ordering::Greater => Box::new(
-                    repeat(SimpleTok::Indent.at(line))
-                        .take(curr - prev.get())
-                        .chain(once(SimpleTok::Text(line).at(line))),
-                ),
-                Ordering::Less => Box::new(
-                    repeat(SimpleTok::Dedent.at(line))
-                        .take(prev.get() - curr)
-                        .chain(once(SimpleTok::Text(line).at(line))),
-                ),
-            };
-            prev.replace(curr);
-            end.replace(Some(line));
-            out
-        })
-        .chain(
-            repeat_with(move || {
-                let end = end.get().unwrap_or("".into());
-                SimpleTok::Dedent.at(end)
-            })
-            .take_while(move |_| {
-                let old = prev.get();
-                if old > 0 {
-                    prev.replace(old - 1);
-                }
-                old > 0
-            }),
-        )
-}
-
-#[derive(Debug, Clone, Copy)]
-enum BlockCtx {
-    Block,
-    Bracketed,
-}
+use nom_i9n::{I9nInput, TokenizedInput};
 
 fn text_literal(i: Span) -> Res<String> {
     let (i, _) = tag("\"")(i)?;
@@ -131,155 +30,62 @@ fn any_symbol(i: Span) -> Res<IStr> {
     .parse(i)
 }
 
-fn tokenize_line<'st, 'i: 'st>(
-    mut line: Span<'i>,
-    state: &'st mut BlockCtx,
-) -> impl Iterator<Item = At<Tok>> + 'st {
-    std::iter::from_fn(move || loop {
-        if line.is_empty() {
-            return None;
-        }
-
-        let old_line = line;
-
-        if let Ok((rem, num)) = i64::<_, PErr<'i>>(line) {
-            line = rem;
-            return Some(Tok::Num(num).at(old_line));
-        }
-
-        if let Ok((rem, txt)) = text_literal(line) {
-            line = rem;
-            return Some(Tok::Txt(txt).at(old_line));
-        }
-
-        if let Ok((rem, sym)) = any_symbol(line) {
-            line = rem;
+fn var_or_sym(i: Span) -> Res<Tok> {
+    any_symbol
+        .map(|sym| {
             if sym.to_str().starts_with(char::is_uppercase) {
-                return Some(Tok::Var(sym.into()).at(old_line));
+                Tok::Var(sym.into())
             } else if sym.to_str().starts_with(char::is_lowercase) {
-                return Some(Tok::Sym(sym).at(old_line));
+                Tok::Sym(sym)
             } else {
-                todo!()
+                unreachable!()
             }
-        }
-
-        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("][")(line) {
-            line = rem;
-            return Some(Tok::COBrack.at(old_line));
-        }
-
-        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("[")(line) {
-            line = rem;
-            *state = BlockCtx::Bracketed;
-            return Some(Tok::OBrack.at(old_line));
-        }
-
-        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("]")(line) {
-            line = rem;
-            *state = BlockCtx::Block;
-            return Some(Tok::CBrack.at(old_line));
-        }
-
-        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("{")(line) {
-            line = rem;
-            *state = BlockCtx::Bracketed;
-            return Some(Tok::OBrace.at(old_line));
-        }
-
-        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("}")(line) {
-            line = rem;
-            *state = BlockCtx::Block;
-            return Some(Tok::CBrace.at(old_line));
-        }
-
-        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("(")(line) {
-            line = rem;
-            *state = BlockCtx::Bracketed;
-            return Some(Tok::OParen.at(old_line));
-        }
-
-        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>(")")(line) {
-            line = rem;
-            *state = BlockCtx::Block;
-            return Some(Tok::CParen.at(old_line));
-        }
-
-        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("-")(line) {
-            line = rem;
-            *state = BlockCtx::Block;
-            return Some(Tok::Dash.at(old_line));
-        }
-
-        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("|")(line) {
-            line = rem;
-            *state = BlockCtx::Block;
-            return Some(Tok::Pipe.at(old_line));
-        }
-
-        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>(",")(line) {
-            line = rem;
-            return Some(Tok::Comma.at(old_line));
-        }
-
-        if let Ok((rem, _)) = tag::<_, _, PErr<'i>>("...")(line) {
-            line = rem;
-            return Some(Tok::Spread.at(old_line));
-        }
-
-        if let Ok((rem, _)) = take_while1::<_, _, PErr<'i>>(char::is_whitespace)(line) {
-            line = rem;
-            continue;
-        }
-
-        panic!(
-            "[{}:{}] Unknown symbol encountered: {:?}",
-            line.location_line(),
-            line.get_column(),
-            line.chars().take(5).collect::<String>(),
-        )
-    })
+        })
+        .parse(i)
 }
 
-fn span_lines(mut src: Span) -> impl Iterator<Item = Span> {
-    use nom::Slice;
-    std::iter::from_fn(move || -> Option<Span> {
-        if src.is_empty() {
-            return None;
-        }
-        if let Some(idx) = src.find('\n') {
-            let old = src;
-            src = src.slice(idx + 1..);
-            Some(old.slice(0..idx))
-        } else {
-            let old_src = src;
-            src = src.slice(src.len()..src.len()); // Next time `src` will be empty
-            Some(old_src)
-        }
-    })
+fn one_token<'i>(i: Span) -> Res<At<Tok>> {
+    let (i, _) = multispace0(i)?;
+    alt((
+        i64.map(Tok::Num),
+        text_literal.map(Tok::Txt),
+        var_or_sym,
+        tag("][").map(|_| Tok::COBrack),
+        tag("[").map(|_| Tok::OBrack),
+        tag("]").map(|_| Tok::CBrack),
+        tag("{").map(|_| Tok::OBrace),
+        tag("}").map(|_| Tok::CBrace),
+        tag("(").map(|_| Tok::OParen),
+        tag(")").map(|_| Tok::CParen),
+        tag("-").map(|_| Tok::Dash),
+        tag("|").map(|_| Tok::Pipe),
+        tag(",").map(|_| Tok::Comma),
+        tag("...").map(|_| Tok::Spread),
+        anychar.map(move |_| {
+            panic!(
+                "[{}:{}] Unknown symbol encountered: {:?}",
+                i.location_line(),
+                i.get_column(),
+                i.chars().take(5).collect::<String>(),
+            );
+        }),
+    ))
+    .map(|t| t.at(i))
+    .parse(i)
 }
 
 pub fn tokenize<'i>(src: impl Into<Span<'i>> + 'i) -> Vec<At<Tok>> {
     let src: Span = src.into();
-
-    let lines = span_lines(src)
-        .filter_map(|line| split_indent_text(line).ok())
-        .map(|(text, ws)| (indent_count(ws), text));
-
-    let simple_toks = insert_indent_dedent_tokens(lines);
-
-    let mut state = BlockCtx::Block;
-    let mut tokens: Vec<At<Tok>> = vec![];
-
-    for stok in simple_toks {
-        match (&stok.value, state) {
-            (SimpleTok::Text(line), _) => tokens.extend(tokenize_line(*line, &mut state)),
-            (SimpleTok::Indent, BlockCtx::Block) => tokens.push(Tok::Indent.copy_loc(&stok)),
-            (SimpleTok::Dedent, BlockCtx::Block) => tokens.push(Tok::Dedent.copy_loc(&stok)),
-            _ => {}
-        }
-    }
-
+    let (_i, tokens) = many0(one_token).parse(src).unwrap();
     tokens
+}
+
+pub fn tokenize_into<'i, 'buf>(
+    buf: &'buf mut Vec<At<Tok>>,
+    src: impl Into<Span<'i>> + 'i,
+) -> I9nInput<&'buf [At<Tok>], TokenizedInput<&'buf [At<Tok>], At<Tok>>> {
+    *buf = tokenize(src);
+    I9nInput::from(&**buf)
 }
 
 #[cfg(test)]
@@ -291,13 +97,15 @@ mod block_tests {
 
     #[test]
     fn tokenize_basic_relation_def() {
+        crate::init_interner();
         let src = r"
-[A] if
+
+
+[A]
     - [blah]
     - [florp]
     - [glop]
-        "
-        .trim();
+";
 
         let actual = tokenize(src).into_iter().map(At::value).collect::<Vec<_>>();
 
@@ -305,8 +113,6 @@ mod block_tests {
             OBrack,
             Var("A".into()),
             CBrack,
-            Sym("if".into()),
-            Indent,
             Dash,
             OBrack,
             Sym("blah".into()),
@@ -319,7 +125,6 @@ mod block_tests {
             OBrack,
             Sym("glop".into()),
             CBrack,
-            Dedent,
         ];
 
         assert_eq!(actual, expected, "Input was {:?}", src);

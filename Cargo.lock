@@ -244,6 +244,7 @@ dependencies = [
  "lasso",
  "magic_static",
  "nom",
+ "nom_i9n",
  "nom_locate",
  "rpds",
  "unifier_set",
@@ -325,6 +326,15 @@ checksum = "a8903e5a29a317527874d0402f867152a3d21c908bb0b933e416c65e301d4c36"
 dependencies = [
  "memchr",
  "minimal-lexical",
+]
+
+[[package]]
+name = "nom_i9n"
+version = "0.1.0"
+dependencies = [
+ "nom",
+ "nom_locate",
+ "rpds",
 ]
 
 [[package]]
@@ -454,6 +464,7 @@ name = "rellog"
 version = "0.1.0"
 dependencies = [
  "librellog",
+ "nom_i9n",
  "nu-ansi-term",
  "reedline",
 ]

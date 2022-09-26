@@ -9,7 +9,8 @@ use librellog::{
     dup::TmDuplicator,
     lex, parse,
     rt::{self, UnifierSet},
-    utils::{display_unifier_set::DisplayUnifierSet, my_nom::Span},
+    tok::{At, Tok},
+    utils::display_unifier_set::DisplayUnifierSet,
 };
 use nu_ansi_term::Color;
 use reedline::{Reedline, Signal};
@@ -29,8 +30,9 @@ pub struct Repl {
 impl Repl {
     pub fn loading_file(fname: &str) -> Self {
         let config = RellogReplConfigHandle::default();
+        let mut tok_buf = Vec::new();
 
-        let module = match load_module_from_file(fname) {
+        let module = match load_module_from_file(&mut tok_buf, fname) {
             Ok(module) => module,
             Err(e) => {
                 println!("{e}");
@@ -48,6 +50,8 @@ impl Repl {
     }
 
     pub fn run(&mut self) -> ! {
+        let mut tok_buf = Vec::new();
+
         'outer: loop {
             self.config.set_repl_mode(ReplMode::TopLevel);
             let query_buf = match self.line_editor.read_line(&self.config) {
@@ -69,7 +73,7 @@ impl Repl {
                 }
                 ":reload" | ":r" => {
                     println!("Reloading source from {}...", self.current_file);
-                    self.module = match load_module_from_file(&self.current_file) {
+                    self.module = match load_module_from_file(&mut tok_buf, &self.current_file) {
                         Ok(m) => {
                             println!("{} relation definitions loaded.", m.relations.len());
                             m
@@ -85,9 +89,10 @@ impl Repl {
                 _ => {}
             }
 
-            let tokens = lex::tokenize(&query_buf[..]);
+            let mut buf = Vec::new();
+            let tokens = lex::tokenize_into(&mut buf, &query_buf[..]);
 
-            let query = match parse::entire_term(&tokens) {
+            let query = match parse::entire_term(tokens) {
                 Ok(q) => q.into(),
                 Err(e) => {
                     println!("Parse error:");
@@ -126,16 +131,19 @@ impl Repl {
     }
 }
 
-fn load_module_from_file(fname: &str) -> AppRes<ast::Module> {
+fn load_module_from_file<'ts>(
+    tok_buf: &'ts mut Vec<At<Tok>>,
+    fname: &str,
+) -> AppRes<'ts, ast::Module> {
     let f = std::fs::File::open(fname).map_err(|e| AppErr::FileOpenErr(fname.into(), e))?;
     let mut r = io::BufReader::new(f);
     let mut src = String::new();
     r.read_to_string(&mut src)
         .map_err(|e| AppErr::FileReadErr(fname.into(), e))?;
 
-    let tokens = lex::tokenize(Span::new(&src));
+    let tokens = lex::tokenize_into(tok_buf, &*src);
 
-    let m = match parse::entire_module(&tokens) {
+    let m = match parse::entire_module(tokens) {
         Ok(m) => m,
         Err(verbose_err) => {
             parse::display_parse_err(&verbose_err);

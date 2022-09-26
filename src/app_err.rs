@@ -2,16 +2,16 @@ use std::fmt;
 
 use librellog::parse;
 
-pub type AppRes<T> = Result<T, AppErr>;
+pub type AppRes<'ts, T> = Result<T, AppErr<'ts>>;
 
 #[derive(Debug)]
-pub enum AppErr {
+pub enum AppErr<'ts> {
     FileOpenErr(String, std::io::Error),
     FileReadErr(String, std::io::Error),
-    ParseErr(parse::AllocError),
+    ParseErr(parse::Error<'ts>),
 }
 
-impl fmt::Display for AppErr {
+impl<'ts> fmt::Display for AppErr<'ts> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{:?}", self) // Punt this off till later...
     }

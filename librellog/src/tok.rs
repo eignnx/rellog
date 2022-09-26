@@ -1,5 +1,7 @@
 use core::fmt;
 
+use nom_i9n::StartCol;
+
 use crate::{
     data_structures::{Num, Sym, Var},
     utils::my_nom::Span,
@@ -39,9 +41,6 @@ pub enum Tok {
     Var(Var),
     Num(Num),
     Txt(String),
-
-    Indent,
-    Dedent,
 }
 
 impl fmt::Display for Tok {
@@ -63,8 +62,6 @@ impl fmt::Display for Tok {
             Var(v) => write!(f, "{v}"),
             Num(i) => write!(f, "{i}"),
             Txt(s) => write!(f, "\"{s}\""),
-            Indent => write!(f, "<INDENT>"),
-            Dedent => write!(f, "<DEDENT>"),
         }
     }
 }
@@ -110,5 +107,11 @@ impl<T> MakeAt for T {
             line: other.line,
             col: other.col,
         }
+    }
+}
+
+impl<T> StartCol for At<T> {
+    fn start_col(&self) -> usize {
+        self.col
     }
 }

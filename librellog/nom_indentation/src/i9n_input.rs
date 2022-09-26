@@ -1,8 +1,10 @@
-use std::{fmt, marker::PhantomData};
+use std::{fmt, marker::PhantomData, ops::RangeFrom};
+
+use nom::Slice;
 
 use crate::{
     errors::{I9nError, I9nErrorCtx, I9nErrorSituation, I9nRelation},
-    NextTokCol,
+    First, NextTokCol, TokenizedInput,
 };
 
 #[derive(Clone)]
@@ -43,6 +45,21 @@ impl<I, Tf> I9nInput<I, Tf> {
 
     pub fn current_i9n(&self) -> usize {
         self.stack.peek().copied().unwrap_or(1)
+    }
+}
+impl<I, T> I9nInput<I, TokenizedInput<I, T>>
+where
+    Self: Slice<RangeFrom<usize>>,
+    I: First<Item = T>,
+{
+    pub fn split_first(&self) -> Option<(&T, Self)> {
+        match self.input().first() {
+            Some(first) => {
+                let rest = self.slice(1..);
+                Some((first, rest))
+            }
+            _ => None,
+        }
     }
 }
 

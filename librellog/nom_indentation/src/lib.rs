@@ -8,8 +8,8 @@
 //! (in the word *indentation*, there are nine letters between the *i* and the *n*).
 
 pub use crate::{errors::*, i9n_input::*, traits::*};
-use nom::{IResult, InputLength, Parser};
-use std::{cmp::Ordering, fmt::Debug, marker::PhantomData, ops::Index};
+use nom::{error::ParseError, multi::many1, sequence::preceded, IResult, InputLength, Parser};
+use std::{cmp::Ordering, fmt::Debug, marker::PhantomData};
 
 mod errors;
 mod i9n_input;
@@ -30,20 +30,20 @@ mod traits;
 /// This teaches the parsers how to pluck start-column information out of your
 /// tokens.
 #[derive(Debug, Clone)]
-pub struct FrontOfTokenizedInput<Input, Token> {
+pub struct TokenizedInput<Input, Token> {
     _input: PhantomData<Input>,
     _token: PhantomData<Token>,
 }
 
 /// [`FrontOfTokenizedInput`] knows how to pluck the first token from the input
 /// and examine its column location.
-impl<Input, Token> NextTokCol<Input> for FrontOfTokenizedInput<Input, Token>
+impl<Input, Token> NextTokCol<Input> for TokenizedInput<Input, Token>
 where
-    Input: Index<usize, Output = Token> + InputLength,
+    Input: InputLength + First<Item = Token>,
     Token: StartCol,
 {
     fn next_tok_col(input: &Input) -> Option<usize> {
-        (input.input_len() > 0).then(|| input[0].start_col())
+        input.first().map(StartCol::start_col)
     }
 }
 
@@ -127,4 +127,31 @@ where
             Err(nom::Err::Error(e.into()))
         }
     }
+}
+
+pub fn indented_block<'lp, I, Tf, O, E>(
+    line_parser: &'lp mut impl Parser<I9nInput<I, Tf>, O, E>,
+) -> impl Parser<I9nInput<I, Tf>, Vec<O>, E> + 'lp
+where
+    I: Clone + InputLength,
+    Tf: NextTokCol<I> + Clone,
+    E: From<I9nError<I>> + ParseError<I9nInput<I, Tf>>,
+{
+    move |i: I9nInput<I, Tf>| {
+        let (i, ()) = begin_block(i)?;
+        let line_parser = |ts| line_parser.parse(ts);
+        let (i, o) = many1(line_parser).parse(i)?;
+        let (i, ()) = end_block(i)?;
+        Ok((i, o))
+    }
+}
+
+pub fn line<I, Tf, P, O, E>(p: P) -> impl Parser<I9nInput<I, Tf>, O, E>
+where
+    I: Clone + InputLength,
+    Tf: NextTokCol<I> + Clone,
+    P: Parser<I9nInput<I, Tf>, O, E>,
+    E: From<I9nError<I>> + ParseError<I9nInput<I, Tf>>,
+{
+    preceded(begin_line, p)
 }

@@ -104,13 +104,13 @@ non_op_term --> symbol
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
-substitution_text --> *([C], {C != '['}), ("[", relation, "]" | "[", "(", term, ")", "]").
+substitution_text --> *([C], {C != '['}), (relation | "{", term, "}" | "{", "}").
 
 /*
 [story]
     """
-    If I ever set foot on that [Temperature] [Location]{[real Location]}
-    again, I'll [Action]{:
+    If I ever set foot on that [Temperature] [Location]{ [real Location] }
+    again, I'll [Action]{
         Action .not_in. {"die", "sleep"}
         [possible Action]
     }.

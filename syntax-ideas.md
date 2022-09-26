@@ -414,8 +414,8 @@ The `v` rule is defined like this:
     [attr V][Key][value Variable] # V = [action Action]
 ```
 
-### Relation Contexts
-Inside substitution text, top-level *relation*-structs are interpreted as *rules*. To escape into a context where a relation-struct will be interpreted as a *relation*, use braces:
+### Relational Contexts
+Inside substitution text, top-level attr-structs are interpreted as *rules*. To escape into a context where a attr-struct will be interpreted as a *relation*, use braces:
 
 ```ruby
 [my_rule]
@@ -442,7 +442,7 @@ The syntax can't distinguish between two rules appearing side-by-side in the tex
 
 A space could be inserted between the two, but often you don't want an extra space to appear in your output.
 
-To solve this, insert an empty Relational Context between the two rules:
+To solve this, insert an empty `relational context` between the two rules:
 
 ```ruby
 "[rule1][rule1_arg1]{}[rule2][rule2_arg2]"

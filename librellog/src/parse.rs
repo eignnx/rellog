@@ -1,12 +1,13 @@
 use nom::{
     branch::alt,
     combinator::{all_consuming, cut, opt},
-    error::{context, ParseError, VerboseErrorKind},
-    error::{ErrorKind, VerboseError},
-    multi::{many0, many1, separated_list1},
+    error::{context, ParseError},
+    error::{ContextError, ErrorKind},
+    multi::{many0, separated_list1},
     sequence::{preceded, tuple},
     Finish, IResult, Parser,
 };
+use nom_i9n::{I9nError, I9nInput, TokenizedInput};
 use rpds::Vector;
 
 use crate::{
@@ -19,21 +20,51 @@ use crate::{
 };
 
 type Res<'ts, T> = IResult<Toks<'ts>, T, Error<'ts>>;
-pub type Error<'ts> = VerboseError<Toks<'ts>>;
-type Toks<'ts> = &'ts [At<Tok>];
+type BaseInput<'ts> = &'ts [At<Tok>];
+type TokenFinder<'ts> = TokenizedInput<BaseInput<'ts>, At<Tok>>;
+type Toks<'ts> = I9nInput<BaseInput<'ts>, TokenFinder<'ts>>;
+
+/// TODO: Replace with Miette error type!
+#[derive(Debug)]
+pub struct Error<'ts> {
+    stack: Vec<(BaseInput<'ts>, Problem<'ts>)>,
+}
+
+impl<'ts> Error<'ts> {
+    fn with_message(ts: Toks, message: String) -> Error {
+        Error {
+            stack: vec![(ts.input(), Problem::CustomMessage(message))],
+        }
+    }
+}
+
+impl<'ts> ContextError<Toks<'ts>> for Error<'ts> {
+    fn add_context(input: Toks<'ts>, ctx: &'static str, mut other: Self) -> Self {
+        other.stack.push((input.input(), Problem::Context(ctx)));
+        other
+    }
+}
 
 #[derive(Debug)]
-pub struct AllocError(VerboseError<Vec<At<Tok>>>);
+pub enum Problem<'ts> {
+    /// TODO: replace with miette diagnostic or something
+    CustomMessage(String),
+    Context(&'static str),
+    Blah(Toks<'ts>),
+}
 
-impl<'ts> From<Error<'ts>> for AllocError {
-    fn from(e: Error<'ts>) -> Self {
-        let errors: Vec<_> = e
-            .errors
-            .into_iter()
-            .map(|(i, e)| (i.to_owned(), e))
-            .collect();
-        let ve = VerboseError { errors };
-        Self(ve)
+impl<'ts> ParseError<Toks<'ts>> for Error<'ts> {
+    fn from_error_kind(input: Toks<'ts>, kind: ErrorKind) -> Self {
+        Error {
+            stack: vec![(input.input(), Problem::CustomMessage(format!("{kind:?}")))],
+        }
+    }
+
+    fn append(input: Toks<'ts>, kind: ErrorKind, mut other: Self) -> Self {
+        other
+            .stack
+            .push((input.input(), Problem::CustomMessage(format!("{kind:?}"))));
+        other
     }
 }
 
@@ -43,20 +74,20 @@ pub fn entire_module(ts: Toks) -> Result<Module, Error> {
 }
 
 pub fn entire_term(ts: Toks) -> Result<RcTm, Error> {
-    let (_ts, t) = all_consuming(tm)(ts).finish()?;
+    let (_ts, t) = all_consuming(tm).parse(ts).finish()?;
     Ok(t.into())
 }
 
 pub fn display_parse_err(verbose_err: &Error) {
     eprintln!("Parse error:");
-    let (last, init) = verbose_err.errors.split_last().unwrap();
-    for (i, ekind) in init {
+    let (last, init) = verbose_err.stack.split_last().unwrap();
+    for (i, problem) in init {
         let loc = match i {
             [t, ..] => format!("{}:{}", t.line, t.col),
             [] => "eof".into(),
         };
 
-        eprintln!("\t[{loc}] Parser {ekind:?} failed because...");
+        eprintln!("\t[{loc}] {problem:?} because...");
     }
     let (i, last) = last;
     eprintln!(
@@ -68,42 +99,75 @@ pub fn display_parse_err(verbose_err: &Error) {
     );
 }
 
-fn verbose_error(ts: Toks, kind: ErrorKind) -> nom::Err<VerboseError<Toks>> {
-    nom::Err::Error(VerboseError::from_error_kind(ts, kind))
-}
-
-fn tok<'ts>(tgt: Tok) -> impl Fn(Toks<'ts>) -> Res<'ts, At<Tok>> {
-    move |ts| match ts.split_first() {
-        Some((t, rest)) if t.as_ref() == &tgt => Ok((rest, t.clone())),
-        _ => Err(verbose_error(ts, ErrorKind::Char)),
+impl<'ts> From<I9nError<BaseInput<'ts>>> for Error<'ts> {
+    fn from(e: I9nError<BaseInput<'ts>>) -> Self {
+        Error {
+            stack: vec![(e.input, Problem::CustomMessage(format!("{e:?}")))],
+        }
     }
 }
 
+fn tok<'ts>(tgt: Tok) -> impl Parser<Toks<'ts>, At<Tok>, Error<'ts>> {
+    let p = move |ts: Toks<'ts>| -> Res<'ts, At<Tok>> {
+        match ts.split_first() {
+            Some((t, rest)) if t.as_ref() == &tgt => Ok((rest, t.clone())),
+            Some((t, _)) => {
+                let e =
+                    Error::with_message(ts.clone(), format!("Expected {tgt:?}, got token {t:?}"));
+                Err(nom::Err::Error(e))
+            }
+            None => Err(eof_error(ts)),
+        }
+    };
+    nom_i9n::tok(p)
+}
+
+fn eof_error<'ts>(ts: Toks<'ts>) -> nom::Err<Error<'ts>> {
+    let e = Error::from_error_kind(ts, nom::error::ErrorKind::Eof);
+    nom::Err::Error(e)
+}
+
 fn sym(ts: Toks) -> Res<Sym> {
-    match ts.split_first().map(|(x, xs)| (x.as_ref(), xs)) {
+    match I9nInput::split_first(&ts).map(|(x, xs)| (x.clone().value(), xs)) {
         Some((Tok::Sym(s), rest)) => Ok((rest, s.clone())),
-        _ => Err(verbose_error(ts, ErrorKind::Char)),
+        Some((t, _)) => Err(nom::Err::Error(Error::with_message(
+            ts,
+            format!("Expected symbol, found {t:?}"),
+        ))),
+        None => Err(eof_error(ts)),
     }
 }
 
 fn var(ts: Toks) -> Res<Var> {
-    match ts.split_first().map(|(x, xs)| (x.as_ref(), xs)) {
-        Some((Var(v), rest)) => Ok((rest, v.clone())),
-        _ => Err(verbose_error(ts, ErrorKind::Char)),
+    match I9nInput::split_first(&ts).map(|(x, xs)| (x.clone().value(), xs)) {
+        Some((Tok::Var(v), rest)) => Ok((rest, v.clone())),
+        Some((t, _)) => Err(nom::Err::Error(Error::with_message(
+            ts,
+            format!("Expected variable, found {t:?}"),
+        ))),
+        None => Err(eof_error(ts)),
     }
 }
 
 fn num(ts: Toks) -> Res<Num> {
-    match ts.split_first().map(|(x, xs)| (x.as_ref(), xs)) {
-        Some((Num(i), rest)) => Ok((rest, *i)),
-        _ => Err(verbose_error(ts, ErrorKind::Char)),
+    match I9nInput::split_first(&ts).map(|(x, xs)| (x.clone().value(), xs)) {
+        Some((Tok::Num(n), rest)) => Ok((rest, n)),
+        Some((t, _)) => Err(nom::Err::Error(Error::with_message(
+            ts,
+            format!("Expected number, found {t:?}"),
+        ))),
+        None => Err(eof_error(ts)),
     }
 }
 
 fn txt(ts: Toks) -> Res<String> {
-    match ts.split_first().map(|(x, xs)| (x.as_ref(), xs)) {
-        Some((Txt(s), rest)) => Ok((rest, s.clone())),
-        _ => Err(verbose_error(ts, ErrorKind::Char)),
+    match I9nInput::split_first(&ts).map(|(x, xs)| (x.clone().value(), xs)) {
+        Some((Tok::Txt(s), rest)) => Ok((rest, s)),
+        Some((t, _)) => Err(nom::Err::Error(Error::with_message(
+            ts,
+            format!("Expected text literal, found {t:?}"),
+        ))),
+        None => Err(eof_error(ts)),
     }
 }
 
@@ -125,23 +189,22 @@ fn attr(ts: Toks) -> Res<(Sym, RcTm)> {
 }
 
 fn rel(ts: Toks) -> Res<Rel> {
-    let (ts, _) = tok(OBrack)(ts)?;
+    let (ts, _) = tok(OBrack).parse(ts)?;
     let (ts, attrs) = separated_list1(
         tok(COBrack),
         context("Expected relation attribute", cut(attr)),
     )(ts)?;
-    let (ts, _) = tok(CBrack)(ts)?;
+    let (ts, _) = tok(CBrack).parse(ts)?;
     let map = attrs.into_iter().collect::<Map<_, _>>();
     Ok((ts, map))
 }
 
 fn block_member(ts: Toks) -> Res<(Tok, Tm)> {
-    tuple((alt((tok(Dash), tok(Pipe))).map(At::value), tm))(ts)
+    tuple((alt((tok(Dash), tok(Pipe))).map(At::value), tm)).parse(ts)
 }
 
 fn block(ts: Toks) -> Res<Tm> {
-    let (ts, _) = tok(Indent)(ts)?;
-    let (ts, pairs) = many1(block_member)(ts)?;
+    let (ts, pairs) = nom_i9n::indented_block(&mut nom_i9n::line(block_member)).parse(ts)?;
 
     let first_functor = pairs[0].0.clone();
     let members = pairs
@@ -150,21 +213,21 @@ fn block(ts: Toks) -> Res<Tm> {
             if functor == first_functor {
                 Ok(tm.into())
             } else {
-                Err(nom::Err::Error(VerboseError {
-                    errors: vec![(ts, VerboseErrorKind::Context("Block functor mismatch"))],
-                }))
+                Err(nom::Err::Error(Error::with_message(
+                    ts.clone(),
+                    "Block functor mismatch".to_owned(),
+                )))
             }
         })
         .collect::<Result<Vector<_>, nom::Err<_>>>()?;
 
-    let (ts, _) = cut(tok(Dedent))(ts)?;
     Ok((ts, Tm::Block(first_functor, members)))
 }
 
 fn list(ts: Toks) -> Res<Tm> {
-    let (ts, _) = tok(OBrace)(ts)?;
+    let (ts, _) = tok(OBrace).parse(ts)?;
 
-    if let Ok((ts, _)) = tok(CBrace)(ts) {
+    if let Ok((ts, _)) = tok(CBrace).parse(ts.clone()) {
         return Ok((ts, Tm::Nil));
     }
 
@@ -264,10 +327,11 @@ pub fn module(ts: Toks) -> Res<Module> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex::tokenize, my_nom::Span, tm_displayer::TmDisplayer};
+    use crate::{lex::tokenize, tm_displayer::TmDisplayer, utils::my_nom::Span};
     use pretty_assertions::assert_eq;
     use rpds::vector;
 
+    #[track_caller]
     fn parse_to_tm(src: &'static str) -> Tm {
         let tokens = tokenize(Span::from(src));
         let (rest, t) = tm(&tokens).unwrap();

@@ -124,7 +124,7 @@ where
 
 impl<'a, I, Tf, R> Slice<R> for I9nInput<I, Tf>
 where
-    I: Slice<R> + Offset + AsBytes + Slice<RangeTo<usize>> + Clone,
+    I: Slice<R> + Slice<RangeTo<usize>> + Clone,
     Tf: Clone,
 {
     fn slice(&self, range: R) -> Self {
