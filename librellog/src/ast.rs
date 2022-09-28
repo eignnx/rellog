@@ -166,6 +166,18 @@ impl fmt::Display for Item {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Sig(Vector<Sym>);
 
+impl Sig {
+    pub fn arity(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl From<Vector<Sym>> for Sig {
+    fn from(v: Vector<Sym>) -> Self {
+        Self(v)
+    }
+}
+
 impl From<Rel> for Sig {
     fn from(rel: Rel) -> Self {
         Self(rel.keys().cloned().collect())

@@ -6,6 +6,7 @@ use crate::{
     ast::{Module, RcTm, Sig, Tm},
     data_structures::Var,
     dup::TmDuplicator,
+    intrinsics::IntrinsicsMap,
     tok::Tok,
     utils::cloning_iter::CloningIterator,
 };
@@ -43,11 +44,15 @@ impl<T> SolnStream for T where T: Iterator<Item = Res<UnifierSet>> {}
 
 pub struct Rt<'rt> {
     db: &'rt Module,
+    intrs: IntrinsicsMap,
 }
 
 impl<'rt> Rt<'rt> {
     pub fn new(db: &'rt Module) -> Self {
-        Self { db }
+        Self {
+            db,
+            intrs: IntrinsicsMap::initialize(),
+        }
     }
 
     pub fn solve_query<'rtb, 'td, 'it>(
@@ -100,7 +105,12 @@ impl<'rt> Rt<'rt> {
         // Perform "argument indexing", get all potientially-matching clauses.
         let clauses = match self.db.index_match(rel) {
             Some(clauses) => clauses,
-            None => return Box::new(iter::once(Err(Err::NoSuchRelation(rel.into())))),
+            None => {
+                return match self.intrs.index_match(rel) {
+                    Some(intr) => intr.apply(u, rel.clone()),
+                    None => Box::new(iter::once(Err(Err::NoSuchRelation(rel.into())))),
+                }
+            }
         };
 
         Box::new(clauses.flat_map(move |clause| {

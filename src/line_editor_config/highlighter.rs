@@ -68,10 +68,7 @@ impl Highlighter for RellogReplConfigHandle {
 }
 
 fn matching_brackets(open: char, close: char) -> bool {
-    match (open, close) {
-        ('(', ')') | ('[', ']') | ('{', '}') => true,
-        _ => false,
-    }
+    matches!((open, close), ('(', ')') | ('[', ']') | ('{', '}'))
 }
 
 fn error_style() -> Style {

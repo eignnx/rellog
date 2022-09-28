@@ -4,6 +4,7 @@ pub mod ast;
 pub mod data_structures;
 pub mod dup;
 pub mod interner;
+mod intrinsics;
 pub mod lex;
 pub mod parse;
 pub mod rt;
