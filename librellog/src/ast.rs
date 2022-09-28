@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, fmt, iter, ops::Deref, rc::Rc};
 
-use rpds::Vector;
+use rpds::{vector, Vector};
 use unifier_set::{ClassifyTerm, DirectChildren, TermKind};
 
 use crate::{
@@ -48,6 +48,67 @@ impl Dup for Tm {
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct RcTm(Rc<Tm>);
+
+impl RcTm {
+    pub fn as_list(&self) -> Option<(Vector<RcTm>, Option<Var>)> {
+        let mut vec = vector![];
+        let mut current = self;
+
+        while let Tm::Cons(x, xs) = current.as_ref() {
+            vec.push_back_mut(x.clone());
+            current = xs;
+        }
+
+        match current.as_ref() {
+            Tm::Nil => Some((vec, None)),
+            Tm::Var(var) => Some((vec, Some(var.clone()))),
+            _ => None,
+        }
+    }
+
+    pub fn as_sym(&self) -> Option<Sym> {
+        match self.as_ref() {
+            Tm::Sym(s) => Some(s.clone()),
+            _ => None,
+        }
+    }
+
+    pub fn list_from_iter(it: impl std::iter::DoubleEndedIterator<Item = RcTm>) -> Self {
+        let mut list = Tm::Nil;
+
+        for element in it.rev() {
+            list = Tm::Cons(element, Self::from(list));
+        }
+
+        Self::from(list)
+    }
+}
+
+#[macro_export]
+macro_rules! tm {
+    ($ident:ident) => {
+        {
+            let ident = stringify!($ident);
+            match ident.chars().next().unwrap() {
+                ch if ch.is_lowercase() => Tm::Sym(ident.into()),
+                ch if ch.is_uppercase() => Tm::Var(ident.into()),
+                _ => todo!(),
+            }
+        }
+    };
+
+    ( $([$attr:ident])+ ) => {
+        {
+            let mut rel = Rel::new();
+
+            $(
+                rel.insert_mut(stringify!($attr).into(), RcTm::from(tm!($attr)));
+            )+
+
+            Tm::Rel(rel)
+        }
+    };
+}
 
 impl Dup for RcTm {
     fn dup(&self, duper: &mut TmDuplicator) -> Self {
@@ -187,6 +248,18 @@ impl From<Rel> for Sig {
 impl From<&Rel> for Sig {
     fn from(rel: &Rel) -> Self {
         Self(rel.keys().cloned().collect())
+    }
+}
+
+impl From<&Sig> for Tm {
+    fn from(sig: &Sig) -> Self {
+        let rel = sig
+            .0
+            .iter()
+            .copied()
+            .map(|sym| (sym, RcTm::from(Tm::Sym(sym))))
+            .collect();
+        Tm::Rel(rel)
     }
 }
 
