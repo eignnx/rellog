@@ -245,12 +245,6 @@ impl From<Rel> for Sig {
     }
 }
 
-impl From<&Rel> for Sig {
-    fn from(rel: &Rel) -> Self {
-        Self(rel.keys().cloned().collect())
-    }
-}
-
 impl From<&Sig> for Tm {
     fn from(sig: &Sig) -> Self {
         let rel = sig
@@ -310,7 +304,7 @@ impl Module {
         &'m self,
         rel: &Rel,
     ) -> Option<impl ExactSizeIterator<Item = &'m Clause> + 'm> {
-        let sig = rel.into();
+        let sig = rel.clone().into();
         self.relations.get(&sig).map(|clauses| clauses.iter())
     }
 }

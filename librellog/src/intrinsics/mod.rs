@@ -83,7 +83,7 @@ impl IntrinsicsMap {
                     let var = rel;
                     let attrs: Vector<RcTm> = match attrs.as_list().unwrap() {
                         (vec, None) => vec,
-                        (_vec, Some(_tail_var)) => todo!("What happpens when list is partial?")
+                        (_vec, Some(_tail_var)) => todo!("What happens when list is partial?")
                     };
 
                     let rel: Rel = attrs.into_iter()
@@ -125,7 +125,7 @@ impl IntrinsicsMap {
     }
 
     pub(crate) fn index_match(&self, rel: &Rel) -> Option<&Intrinsic> {
-        self.0.get(&rel.into())
+        self.0.get(&rel.clone().into())
     }
 }
 

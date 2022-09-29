@@ -106,15 +106,16 @@ impl<'rt> Rt<'rt> {
         let clauses = match self.db.index_match(rel) {
             Some(clauses) => clauses,
             None => {
+                // If it can't be found in the loaded module, check the intrinsics.
                 return match self.intrs.index_match(rel) {
                     Some(intr) => intr.apply(u, rel.clone()),
-                    None => Box::new(iter::once(Err(Err::NoSuchRelation(rel.into())))),
-                }
+                    None => Box::new(iter::once(Err(Err::NoSuchRelation(rel.clone().into())))),
+                };
             }
         };
 
         Box::new(clauses.flat_map(move |clause| {
-            // Make a duplicate the clause.
+            // Make a duplicate of the clause.
             let clause = td.borrow_mut().duplicate(clause);
 
             let head = Tm::Rel(clause.head.into()).into();
