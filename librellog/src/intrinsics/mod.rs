@@ -99,7 +99,14 @@ impl IntrinsicsMap {
 
                     Box::new(u.unify(var, &rel).into_iter().map(Ok))
                 }
+
+                (Tm::Rel(rel), Tm::Var(_)) => {
+                    let list = RcTm::list_from_iter(rel.keys().map(|k| Tm::Sym(*k).into()));
+                    Box::new(u.unify(attrs, &list).into_iter().map(Ok))
+                }
+
                 (Tm::Var(_), Tm::Var(_)) => todo!("throw instantiation error"),
+
                 (_, _) => todo!("throw type error"),
             }
         });
