@@ -30,7 +30,7 @@ macro_rules! def_intrinsic {
             $(
             let $name = match rel.get(&stringify!($name).into()) {
                 Some(x) => x,
-                None => return empty_soln_stream(),
+                None => return soln_stream::failure(),
             };
             )+
 
@@ -74,7 +74,7 @@ impl IntrinsicsMap {
         let mut intrs = Self::new();
 
         def_intrinsic!(intrs, |u, [eq1][eq2]| {
-            Box::new(u.unify(eq1, eq2).into_iter().map(Ok))
+            soln_stream::unifying(u, eq1, eq2)
         });
 
         def_intrinsic!(intrs, |u, [rel][attrs]| {
@@ -102,12 +102,12 @@ impl IntrinsicsMap {
 
                     let rel = RcTm::from(Tm::Rel(rel));
 
-                    Box::new(u.unify(var, &rel).into_iter().map(Ok))
+                    soln_stream::unifying(u, var, &rel)
                 }
 
                 (Tm::Rel(rel), Tm::Var(_)) => {
                     let list = RcTm::list_from_iter(rel.iter().map(|(k, v)| Tm::Rel(Rel::new().insert(*k, v.clone())).into()));
-                    Box::new(u.unify(attrs, &list).into_iter().map(Ok))
+                    soln_stream::unifying(u, attrs, &list)
                 }
 
                 (Tm::Var(_), Tm::Var(_)) => todo!("throw instantiation error"),
@@ -130,29 +130,53 @@ impl IntrinsicsMap {
                     Box::new(u_opt.into_iter().map(Ok))
                 }
 
+                (Tm::Rel(_non_attr_rel), _, _) => {
+                    // Is this good advice?
+                    todo!("type error: use [rel][attr] instead")
+                }
+
                 // [[mode [attr inout][key in][value inout]]]
                 (_, Tm::Sym(key), _) => {
                     let a = Tm::Rel(Rel::new().insert(*key, value.clone())).into();
-                    Box::new(u.unify(attr, &a).into_iter().map(Ok))
+                    soln_stream::unifying(u, attr, &a)
                 }
 
                 (Tm::Var(_), Tm::Var(_), _) => todo!("instantiation error"),
 
                 _ => todo!("type error"),
             }
-            // match attr.as_ref() {
-            //                 Tm::Rel(r) if r.size() == 1 => r.clone(),
-            //                 Tm::Rel(_) => todo!("type error: only size-1 attributes accepted"),
-            //                 Tm::Var(_) => todo!("throw instantiation error"),
-            //                 _ => todo!("throw type error"),
-            //             }
+        });
 
+        def_intrinsic!(intrs, |u, [gt][lte]| {
+            match (gt.as_ref(), lte.as_ref()) {
+                (Tm::Num(gt), Tm::Num(lte)) => {
+                    if gt > lte {
+                        soln_stream::success(u)
+                    } else {
+                        soln_stream::failure()
+                    }
+                }
+                _ => todo!("type error: expected two numbers")
+            }
+        });
+
+        def_intrinsic!(intrs, |u, [lt][gte]| {
+            match (lt.as_ref(), gte.as_ref()) {
+                (Tm::Num(lt), Tm::Num(gte)) => {
+                    if lt > gte {
+                        soln_stream::success(u)
+                    } else {
+                        soln_stream::failure()
+                    }
+                }
+                _ => todo!("type error: expected two numbers")
+            }
         });
 
         def_intrinsic!(intrs, |u, [is_var]| {
             match u.reify_term(is_var).as_ref() {
-                Tm::Var(_) => Box::new(iter::once(Ok(u))),
-                _ => empty_soln_stream(),
+                Tm::Var(_) => soln_stream::success(u),
+                _ => soln_stream::failure(),
             }
         });
 
@@ -170,9 +194,9 @@ impl IntrinsicsMap {
             };
 
             if let Some(found) = rel.get(&key) {
-                Box::new(u.unify(value, found).into_iter().map(Ok))
+                soln_stream::unifying(u, value, found)
             }else{
-                empty_soln_stream()
+                soln_stream::failure()
             }
         });
 
@@ -181,7 +205,7 @@ impl IntrinsicsMap {
                 (Tm::Txt(prefix), Tm::Txt(suffix)) => {
                     let compound = prefix.to_owned() + suffix;
                     let compound = Tm::Txt(compound).into();
-                    Box::new(u.unify(txt_compound, &compound).into_iter().map(Ok))
+                    soln_stream::unifying(u, txt_compound, &compound)
                 }
                 _ => todo!("only mode supported: [[mode txt.[prefix in][suffix in][compound out]]]"),
             }
@@ -189,17 +213,17 @@ impl IntrinsicsMap {
 
         def_intrinsic!(intrs, |u, [yes]| {
             if yes.as_ref() == &tm!(yes) {
-                Box::new(iter::once(Ok(u)))
+                soln_stream::success(u)
             } else {
-                empty_soln_stream()
+                soln_stream::failure()
             }
         });
 
         def_intrinsic!(intrs, |u, [no]| {
             if no.as_ref() == &tm!(no) {
-                empty_soln_stream()
+                soln_stream::failure()
             } else {
-                Box::new(iter::once(Ok(u)))
+                soln_stream::success(u)
             }
         });
 
@@ -217,7 +241,7 @@ impl IntrinsicsMap {
 
         def_intrinsic!(intrs, |u, [builtins]| {
             let builtin_rel_sigs = builtin_rel_sigs.clone();
-            Box::new(u.unify(builtins, &builtin_rel_sigs).into_iter().map(Ok))
+            soln_stream::unifying(u, builtins, &builtin_rel_sigs)
         });
 
         intrs
@@ -228,6 +252,17 @@ impl IntrinsicsMap {
     }
 }
 
-fn empty_soln_stream() -> Box<dyn SolnStream> {
-    Box::new(iter::empty())
+mod soln_stream {
+    use super::*;
+
+    pub fn success(u: UnifierSet) -> Box<dyn SolnStream> {
+        Box::new(iter::once(Ok(u)))
+    }
+    pub fn failure() -> Box<dyn SolnStream> {
+        Box::new(iter::empty())
+    }
+
+    pub fn unifying(u: UnifierSet, x: &RcTm, y: &RcTm) -> Box<dyn SolnStream> {
+        Box::new(u.unify(x, y).into_iter().map(Ok))
+    }
 }
