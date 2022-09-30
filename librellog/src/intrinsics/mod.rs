@@ -150,7 +150,7 @@ impl IntrinsicsMap {
         });
 
         def_intrinsic!(intrs, |u, [is_var]| {
-            match is_var.as_ref() {
+            match u.reify_term(is_var).as_ref() {
                 Tm::Var(_) => Box::new(iter::once(Ok(u))),
                 _ => empty_soln_stream(),
             }
