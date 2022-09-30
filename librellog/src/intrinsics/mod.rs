@@ -26,13 +26,16 @@ impl Intrinsic {
 macro_rules! def_intrinsic {
     ($intrs:expr, |$u:ident, $([$name:ident])+| $body:expr) => {
         let sig = [$(stringify!($name),)+];
-        $intrs.def(&sig, move |$u, rel| {
+        $intrs.def(&sig, move |u, rel| {
             $(
             let $name = match rel.get(&stringify!($name).into()) {
-                Some(x) => x,
+                Some(x) => u.reify_term(x),
                 None => return soln_stream::failure(),
             };
+            let $name = &$name;
             )+
+
+            let $u = u;
 
             $body
         });
@@ -147,10 +150,10 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |u, [gt][lte]| {
-            match (gt.as_ref(), lte.as_ref()) {
-                (Tm::Num(gt), Tm::Num(lte)) => {
-                    if gt > lte {
+        def_intrinsic!(intrs, |u, [gt][lt]| {
+            match (gt.as_ref(), lt.as_ref()) {
+                (Tm::Num(gt), Tm::Num(lt)) => {
+                    if gt > lt {
                         soln_stream::success(u)
                     } else {
                         soln_stream::failure()
@@ -160,10 +163,10 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |u, [lt][gte]| {
-            match (lt.as_ref(), gte.as_ref()) {
-                (Tm::Num(lt), Tm::Num(gte)) => {
-                    if lt > gte {
+        def_intrinsic!(intrs, |u, [gte][lte]| {
+            match (gte.as_ref(), lte.as_ref()) {
+                (Tm::Num(gte), Tm::Num(lte)) => {
+                    if gte >= lte {
                         soln_stream::success(u)
                     } else {
                         soln_stream::failure()
@@ -208,6 +211,28 @@ impl IntrinsicsMap {
                     soln_stream::unifying(u, txt_compound, &compound)
                 }
                 _ => todo!("only mode supported: [[mode txt.[prefix in][suffix in][compound out]]]"),
+            }
+        });
+
+        def_intrinsic!(intrs, |u, [pred][succ]| {
+            match (pred.as_ref(), succ.as_ref()) {
+                (Tm::Var(_), Tm::Var(_)) => todo!("instantiation error"),
+                (Tm::Var(_), Tm::Num(s)) => {
+                    let p = Tm::Num(s - 1).into();
+                    soln_stream::unifying(u, pred, &p)
+                }
+                (Tm::Num(p), Tm::Var(_)) => {
+                    let s = Tm::Num(p + 1).into();
+                    soln_stream::unifying(u, succ, &s)
+                }
+                (Tm::Num(p), Tm::Num(s)) => {
+                    if p + 1 == *s {
+                        soln_stream::success(u)
+                    } else {
+                        soln_stream::failure()
+                    }
+                }
+                _ => todo!("type error"),
             }
         });
 
