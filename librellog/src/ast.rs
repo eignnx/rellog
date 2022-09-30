@@ -173,8 +173,8 @@ impl ClassifyTerm<Var> for RcTm {
         match (self.as_ref(), other.as_ref()) {
             (Tm::Sym(s1), Tm::Sym(s2)) => s1 == s2,
             (Tm::Var(_), Tm::Var(_)) => true,
-            (Tm::Num(_), Tm::Num(_)) => true,
-            (Tm::Txt(_), Tm::Txt(_)) => true,
+            (Tm::Num(n1), Tm::Num(n2)) => n1 == n2,
+            (Tm::Txt(t1), Tm::Txt(t2)) => t1 == t2,
             (Tm::Block(f1, _), Tm::Block(f2, _)) => f1 == f2,
             (Tm::Rel(r1), Tm::Rel(r2)) => r1.keys().eq(r2.keys()),
             (Tm::Cons(_, _), Tm::Cons(_, _)) => true,
