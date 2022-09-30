@@ -81,7 +81,7 @@ impl IntrinsicsMap {
             match (rel.as_ref(), attrs.as_ref()) {
                 (Tm::Var(_), Tm::Cons(_, _)) => {
                     let var = rel;
-                    let attrs: Vector<RcTm> = match attrs.as_list().unwrap() {
+                    let attrs: Vector<RcTm> = match attrs.try_as_list().unwrap() {
                         (vec, None) => vec,
                         (_vec, Some(_tail_var)) => todo!("What happens when list is partial?")
                     };
@@ -115,6 +115,26 @@ impl IntrinsicsMap {
             match is_var.as_ref() {
                 Tm::Var(_) => Box::new(iter::once(Ok(u))),
                 _ => empty_soln_stream(),
+            }
+        });
+
+        def_intrinsic!(intrs, |u, [rel][key][value]| {
+            let rel = match rel.as_ref() {
+                Tm::Rel(rel) => rel,
+                Tm::Var(_) => todo!("instantiation error"),
+                _ => todo!("type error"),
+            };
+
+            let key = match key.as_ref() {
+                Tm::Sym(key) => key,
+                Tm::Var(_) => todo!("instantiation error"),
+                _ => todo!("type error"),
+            };
+
+            if let Some(found) = rel.get(&key) {
+                Box::new(u.unify(value, found).into_iter().map(Ok))
+            }else{
+                empty_soln_stream()
             }
         });
 

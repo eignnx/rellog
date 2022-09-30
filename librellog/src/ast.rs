@@ -1,4 +1,10 @@
-use std::{collections::BTreeMap, fmt, iter, ops::Deref, rc::Rc};
+use std::{
+    collections::BTreeMap,
+    fmt,
+    iter::{self, DoubleEndedIterator},
+    ops::Deref,
+    rc::Rc,
+};
 
 use rpds::{vector, Vector};
 use unifier_set::{ClassifyTerm, DirectChildren, TermKind};
@@ -50,7 +56,7 @@ impl Dup for Tm {
 pub struct RcTm(Rc<Tm>);
 
 impl RcTm {
-    pub fn as_list(&self) -> Option<(Vector<RcTm>, Option<Var>)> {
+    pub fn try_as_list(&self) -> Option<(Vector<RcTm>, Option<Var>)> {
         let mut vec = vector![];
         let mut current = self;
 
@@ -66,14 +72,21 @@ impl RcTm {
         }
     }
 
-    pub fn as_sym(&self) -> Option<Sym> {
+    pub fn try_as_sym(&self) -> Option<Sym> {
         match self.as_ref() {
             Tm::Sym(s) => Some(s.clone()),
             _ => None,
         }
     }
 
-    pub fn list_from_iter(it: impl std::iter::DoubleEndedIterator<Item = RcTm>) -> Self {
+    pub fn try_as_rel(&self) -> Option<&Rel> {
+        match self.as_ref() {
+            Tm::Rel(r) => Some(r),
+            _ => None,
+        }
+    }
+
+    pub fn list_from_iter(it: impl DoubleEndedIterator<Item = RcTm>) -> Self {
         let mut list = Tm::Nil;
 
         for element in it.rev() {
