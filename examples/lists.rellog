@@ -1,0 +1,23 @@
+[prefix {}][Suffix][compound Suffix]
+[prefix {A ...As}][Suffix][compound {A ...Compound}]
+    - [prefix As][suffix Suffix][Compound]
+
+[forwards {}][backwards {}]
+[forwards {A ...As}][Backwards]
+    - [forwards As][backwards AsBackwards]
+    - [prefix AsBackwards][suffix {A}][compound Backwards]
+
+[list {Member, ...Rest}][Member]
+[list {Other, ...Rest}][Member]
+    - [list Rest][Member]
+
+[must_be [list {}]]
+[must_be [list {X, ...Xs}]]
+    - [must_be [list Xs]]
+
+[can_be [list {}]]
+[can_be [list {X, ...Xs}]]
+
+[list {Last}][Last]
+[list {X, ...Xs}][Last]
+    - [list Xs][Last]
