@@ -88,11 +88,16 @@ impl IntrinsicsMap {
 
                     let rel: Rel = attrs.into_iter()
                         .map(|attr| match attr.as_ref() {
-                            Tm::Sym(s) => s.clone(),
+                            Tm::Rel(r) if r.size() == 1 => r.clone(),
+                            Tm::Rel(_) => todo!("type error: only size-1 attributes accepted"),
                             Tm::Var(_) => todo!("throw instantiation error"),
                             _ => todo!("throw type error"),
                         })
-                        .map(|sym| (sym, Tm::Var(sym.into()).into()))
+                        .map(|attr| attr
+                            .iter()
+                            .map(|(k, v)| (k.clone(), v.clone()))
+                            .next()
+                            .expect("There's exactly one key-value pair in here"))
                         .collect();
 
                     let rel = RcTm::from(Tm::Rel(rel));
@@ -101,7 +106,7 @@ impl IntrinsicsMap {
                 }
 
                 (Tm::Rel(rel), Tm::Var(_)) => {
-                    let list = RcTm::list_from_iter(rel.keys().map(|k| Tm::Sym(*k).into()));
+                    let list = RcTm::list_from_iter(rel.iter().map(|(k, v)| Tm::Rel(Rel::new().insert(*k, v.clone())).into()));
                     Box::new(u.unify(attrs, &list).into_iter().map(Ok))
                 }
 
