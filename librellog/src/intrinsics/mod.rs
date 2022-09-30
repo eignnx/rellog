@@ -138,6 +138,17 @@ impl IntrinsicsMap {
             }
         });
 
+        def_intrinsic!(intrs, |u, [txt_prefix][txt_suffix][txt_compound]| {
+            match (txt_prefix.as_ref(), txt_suffix.as_ref()) {
+                (Tm::Txt(prefix), Tm::Txt(suffix)) => {
+                    let compound = prefix.to_owned() + suffix;
+                    let compound = Tm::Txt(compound).into();
+                    Box::new(u.unify(txt_compound, &compound).into_iter().map(Ok))
+                }
+                _ => todo!("only mode supported: [[mode txt.[prefix in][suffix in][compound out]]]"),
+            }
+        });
+
         def_intrinsic!(intrs, |u, [yes]| {
             if yes.as_ref() == &tm!(yes) {
                 Box::new(iter::once(Ok(u)))

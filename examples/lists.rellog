@@ -2,6 +2,9 @@
 [prefix {A ...As}][Suffix][compound {A ...Compound}]
     - [prefix As][suffix Suffix][Compound]
 
+[Prefix][Suffix][Compound]
+    - [txt_prefix Prefix][txt_suffix Suffix][txt_compound Compound]
+
 [forwards {}][backwards {}]
 [forwards {A ...As}][Backwards]
     - [forwards As][backwards AsBackwards]
