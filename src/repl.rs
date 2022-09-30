@@ -126,7 +126,7 @@ impl Repl {
                 };
             }
 
-            println!("false.");
+            println!("    - [false]");
         }
     }
 }

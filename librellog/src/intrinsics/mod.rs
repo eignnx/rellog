@@ -111,6 +111,29 @@ impl IntrinsicsMap {
             }
         });
 
+        def_intrinsic!(intrs, |u, [is_var]| {
+            match is_var.as_ref() {
+                Tm::Var(_) => Box::new(iter::once(Ok(u))),
+                _ => empty_soln_stream(),
+            }
+        });
+
+        def_intrinsic!(intrs, |u, [yes]| {
+            if yes.as_ref() == &tm!(yes) {
+                Box::new(iter::once(Ok(u)))
+            } else {
+                empty_soln_stream()
+            }
+        });
+
+        def_intrinsic!(intrs, |u, [no]| {
+            if no.as_ref() == &tm!(no) {
+                empty_soln_stream()
+            } else {
+                Box::new(iter::once(Ok(u)))
+            }
+        });
+
         let builtin_rel_sigs = {
             let mut builtin_rel_sigs = intrs
                 .iter()

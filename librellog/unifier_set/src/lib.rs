@@ -88,6 +88,10 @@ where
         HashTrieMap::new().into()
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.map.borrow().is_empty()
+    }
+
     #[track_caller]
     fn insert(&self, var: Var, node: Node<Var, Term>) -> Self {
         self.map.borrow().insert(var, node).into()

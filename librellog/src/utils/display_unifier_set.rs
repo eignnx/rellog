@@ -7,9 +7,11 @@ pub struct DisplayUnifierSet(pub UnifierSet<Var, RcTm>);
 impl fmt::Display for DisplayUnifierSet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let u = &self.0;
+        let mut nothing_written = true;
         for (root_term, vars) in u.reified_forest().into_iter() {
             // Skip this row if none of the variables are original (from the top-level).
             if !vars.is_empty() && vars.iter().any(Var::is_original) {
+                nothing_written = false;
                 write!(f, "    - ")?;
                 for (i, var) in vars.into_iter().filter(Var::is_original).enumerate() {
                     if var.is_original() {
@@ -26,6 +28,10 @@ impl fmt::Display for DisplayUnifierSet {
                     _ => {}
                 }
             }
+        }
+
+        if nothing_written {
+            write!(f, "    - [true]")?;
         }
 
         Ok(())
