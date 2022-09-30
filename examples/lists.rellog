@@ -11,6 +11,11 @@
 [list {Other, ...Rest}][Member]
     - [list Rest][Member]
 
+[List][members {}]
+[List][members {Member, ...Rest}]
+    - [List][members Rest]
+    - [List][Member]
+
 [must_be [list {}]]
 [must_be [list {X, ...Xs}]]
     - [must_be [list Xs]]
