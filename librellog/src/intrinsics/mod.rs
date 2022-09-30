@@ -116,6 +116,39 @@ impl IntrinsicsMap {
             }
         });
 
+        def_intrinsic!(intrs, |u, [attr][key][value]| {
+            match (attr.as_ref(), key.as_ref(), value.as_ref()) {
+
+                // [[mode [attr in][key inout][value inout]]]
+                (Tm::Rel(attr), _, _) if attr.size() == 1 => {
+                    let (k, v) = attr
+                        .iter()
+                        .map(|(k, v)| (Tm::Sym(*k).into(), v.clone()))
+                        .next()
+                        .expect("There's exactly one key-value pair in here");
+                    let u_opt = u.unify(key, &k).and_then(|u| u.unify(value, &v));
+                    Box::new(u_opt.into_iter().map(Ok))
+                }
+
+                // [[mode [attr inout][key in][value inout]]]
+                (_, Tm::Sym(key), _) => {
+                    let a = Tm::Rel(Rel::new().insert(*key, value.clone())).into();
+                    Box::new(u.unify(attr, &a).into_iter().map(Ok))
+                }
+
+                (Tm::Var(_), Tm::Var(_), _) => todo!("instantiation error"),
+
+                _ => todo!("type error"),
+            }
+            // match attr.as_ref() {
+            //                 Tm::Rel(r) if r.size() == 1 => r.clone(),
+            //                 Tm::Rel(_) => todo!("type error: only size-1 attributes accepted"),
+            //                 Tm::Var(_) => todo!("throw instantiation error"),
+            //                 _ => todo!("throw type error"),
+            //             }
+
+        });
+
         def_intrinsic!(intrs, |u, [is_var]| {
             match is_var.as_ref() {
                 Tm::Var(_) => Box::new(iter::once(Ok(u))),
