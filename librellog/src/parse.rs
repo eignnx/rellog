@@ -1,9 +1,11 @@
+use std::iter;
+
 use nom::{
     branch::alt,
     combinator::{all_consuming, cut, opt},
     error::{context, ParseError},
     error::{ContextError, ErrorKind},
-    multi::{many0, separated_list1},
+    multi::{many0, many1, separated_list1},
     sequence::{preceded, tuple},
     Finish, IResult, Parser,
 };
@@ -278,16 +280,41 @@ fn list(ts: Toks) -> Res<Tm> {
     Ok((ts, xs))
 }
 
-pub fn tm(ts: Toks) -> Res<Tm> {
+fn and_list(ts: Toks) -> Res<Tm> {
+    let (ts, (first, rest)) = tuple((
+        non_operator_tm,
+        many1(preceded(tok(Comma), non_operator_tm)),
+    ))
+    .parse(ts)?;
+
+    let terms = iter::once(first).chain(rest).map(RcTm::from).collect();
+    Ok((ts, Tm::Block(Dash, terms)))
+}
+
+fn non_operator_tm(ts: Toks) -> Res<Tm> {
     alt((
         sym.map(Tm::Sym),
         var.map(Tm::Var),
         num.map(Tm::Num),
         txt.map(Tm::Txt),
-        block,
         rel.map(Tm::Rel),
         list,
-    ))(ts)
+        block,
+        parenthesized_tm,
+    ))
+    .parse(ts)
+}
+fn parenthesized_tm(ts: Toks) -> Res<Tm> {
+    let (ts, (_, t, _)) = tuple((tok(OParen), tm, tok(CParen))).parse(ts)?;
+    Ok((ts, t))
+}
+
+fn operator_tm(ts: Toks) -> Res<Tm> {
+    and_list(ts)
+}
+
+pub fn tm(ts: Toks) -> Res<Tm> {
+    alt((operator_tm, non_operator_tm)).parse(ts)
 }
 
 fn rel_def(ts: Toks) -> Res<Item> {
