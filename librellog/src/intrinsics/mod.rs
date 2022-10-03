@@ -1,4 +1,4 @@
-use std::{collections::BTreeMap, iter};
+use std::{borrow::Cow, collections::BTreeMap, iter};
 
 use rpds::Vector;
 
@@ -251,6 +251,28 @@ impl IntrinsicsMap {
                 soln_stream::success(u)
             }
         });
+
+        def_intrinsic!(intrs, |u, [io_writeln]| {
+            let arg = io_writeln;
+            match arg.as_ref() {
+                Tm::Txt(txt) => println!("{}", txt),
+                _ => todo!("type error"),
+            }
+            soln_stream::success(u)
+        });
+
+        def_intrinsic!(intrs, |u, [term][text]| {
+            match (term.as_ref(), text.as_ref()) {
+                (Tm::Var(_), _) => todo!("instantiation error"),
+                (_, Tm::Var(_) | Tm::Txt(_)) => {
+                    let term = Tm::Txt(term.to_string()).into();
+                    soln_stream::unifying(u, &term, text)
+                }
+                _ => todo!("type error")
+            }
+        });
+
+        ////////////////////// Define `[builtins]` //////////////////////
 
         let builtin_rel_sigs = {
             let mut builtin_rel_sigs = intrs
