@@ -68,19 +68,19 @@ impl<'tm> TmDisplayer<'tm> {
             write!(f, "{}", self.indented(&*x))?;
 
             match &*xs {
-                // xs = {y, ...{}} = {y}
+                // xs = {y ...{}} = {y}
                 Tm::Cons(y, ys) if matches!(**ys, Tm::Nil) => {
-                    return write!(f, ", {}}}", self.indented(&**y))
+                    return write!(f, " {}}}", self.indented(&**y))
                 }
-                // xs = {y, ...ys} (continue loop)
+                // xs = {y ...ys} (continue loop)
                 Tm::Cons(y, ys) => (x, xs) = (y.clone(), ys.clone()),
                 // xs = {x}
                 Tm::Nil => return write!(f, "}}"),
-                // Malformed list like: {1, 2, ...3} (instead of {1, 2, 3, ...{}})
+                // Malformed list like: {1 2 ...3} (instead of {1 2 3 ...{}})
                 xs => return write!(f, " {}{}}}", Tok::Spread, self.indented(&*xs)),
             }
 
-            write!(f, ", ")?;
+            write!(f, " ")?;
         }
     }
 }

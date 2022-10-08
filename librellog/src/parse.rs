@@ -239,38 +239,20 @@ fn list(ts: Toks) -> Res<Tm> {
     let mut ts = ts;
     let mut xs_reversed = vec![first];
 
-    let spread_element = loop {
-        use ListSegment::*;
-        enum ListSegment {
-            CommaTm(Tm),
-            SpreadTmEnd(Tm),
-            CloseBrace,
+    let (ts, spread_element) = loop {
+        if let Ok((ts, _)) = tok(Spread).parse(ts.clone()) {
+            let (ts, spread_elemnt) = tm.parse(ts)?;
+            let (ts, _) = tok(CBrace).parse(ts)?;
+            break (ts, spread_elemnt);
         }
 
-        let spread_tm_end =
-            tuple((tok(Spread), tm, opt(tok(Comma)), tok(CBrace))).map(|(_, tm, _, _)| tm);
+        if let Ok((ts, _)) = tok(CBrace).parse(ts.clone()) {
+            break (ts, Tm::Nil);
+        }
 
-        let mut list_segment = alt((
-            preceded(tok(Comma), tm).map(CommaTm), // ts = ", tm"
-            preceded(
-                opt(tok(Comma)),
-                alt((
-                    tok(CBrace).map(|_| CloseBrace), // ts = ", }"
-                    spread_tm_end.map(SpreadTmEnd),  // ts = ", ...tm, }"
-                )),
-            ),
-        ));
-
-        // Parse the list segment.
-        let (new_ts, x) = list_segment(ts)?;
-
+        let (new_ts, element) = tm.parse(ts)?;
+        xs_reversed.push(element);
         ts = new_ts;
-
-        match x {
-            CommaTm(tm) => xs_reversed.push(tm),
-            SpreadTmEnd(tm) => break tm,
-            CloseBrace => break Tm::Nil,
-        }
     };
 
     let xs = xs_reversed
@@ -283,7 +265,7 @@ fn list(ts: Toks) -> Res<Tm> {
 fn and_list(ts: Toks) -> Res<Tm> {
     let (ts, (first, rest)) = tuple((
         non_operator_tm,
-        many1(preceded(tok(Comma), non_operator_tm)),
+        many1(preceded(tok(Semicolon), non_operator_tm)),
     ))
     .parse(ts)?;
 
@@ -363,7 +345,7 @@ mod tests {
     #[track_caller]
     fn parse_to_tm(src: &'static str) -> Tm {
         let tokens = tokenize(Span::from(src));
-        let (rest, t) = tm(&tokens).unwrap();
+        let (rest, t) = tm.parse(tokens[..].into()).unwrap();
 
         assert!(
             rest.is_empty(),
@@ -478,18 +460,9 @@ mod tests {
     }
 
     #[test]
-    fn singleton_list_trailing_comma() {
-        crate::init_interner();
-        assert_eq!(
-            parse_to_tm("{123,}"),
-            Tm::Cons(Tm::Num(123).into(), Tm::Nil.into())
-        );
-    }
-
-    #[test]
     fn multi_element_list() {
         crate::init_interner();
-        let src = r#"{123, "asdf", {}, [aardvark][Zebra], socrates, Unknown, {1, 2, 3}}"#;
+        let src = r#"{123 "asdf" {} [aardvark][Zebra] socrates Unknown {1 2 3}}"#;
 
         let formatted = TmDisplayer::default()
             .with_tm(&parse_to_tm(src))
@@ -502,35 +475,9 @@ mod tests {
     fn list_with_spread() {
         crate::init_interner();
         let src = r#"{X ...Xs}"#;
-
-        let formatted = TmDisplayer::default()
-            .with_tm(&parse_to_tm(src))
-            .to_string();
+        let tm = parse_to_tm(src);
+        let formatted = TmDisplayer::default().with_tm(&tm).to_string();
 
         assert_eq!(formatted, src);
-    }
-
-    #[test]
-    fn list_with_spread_and_1_comma() {
-        crate::init_interner();
-        let src = r#"{X, ...Xs}"#;
-
-        let formatted = TmDisplayer::default()
-            .with_tm(&parse_to_tm(src))
-            .to_string();
-
-        assert_eq!(formatted, "{X ...Xs}");
-    }
-
-    #[test]
-    fn list_with_spread_and_2_commas() {
-        crate::init_interner();
-        let src = r#"{X, ...Xs,}"#;
-
-        let formatted = TmDisplayer::default()
-            .with_tm(&parse_to_tm(src))
-            .to_string();
-
-        assert_eq!(formatted, "{X ...Xs}");
     }
 }

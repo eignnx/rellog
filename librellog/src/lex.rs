@@ -60,6 +60,7 @@ fn one_token<'i>(i: Span) -> Res<At<Tok>> {
         tag("-").map(|_| Tok::Dash),
         tag("|").map(|_| Tok::Pipe),
         tag(",").map(|_| Tok::Comma),
+        tag(";").map(|_| Tok::Semicolon),
         tag("...").map(|_| Tok::Spread),
         anychar.map(move |_| {
             panic!(

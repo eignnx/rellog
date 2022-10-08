@@ -185,13 +185,13 @@ fn test_runtime() {
 ";
 
     let tokens = lex::tokenize(src);
-    let module = parse::entire_module(&tokens[..]).unwrap();
+    let module = parse::entire_module(tokens[..].into()).unwrap();
 
     let rt = Rt::new(&module);
 
     let query = {
-        let tokens = lex::tokenize("[prefix {1,2,3}][suffix {4,5,6}][Compound]");
-        parse::entire_term(&tokens[..]).unwrap()
+        let tokens = lex::tokenize("[prefix {1 2 3}][suffix {4 5 6}][Compound]");
+        parse::entire_term(tokens[..].into()).unwrap()
     };
 
     let solns = rt
@@ -200,5 +200,5 @@ fn test_runtime() {
 
     assert2::let_assert!([Ok(u)] = &solns[..]);
     let answer_var = Tm::Var("Compound".into()).into();
-    assert2::check!(&u.reify_term(&answer_var).to_string() == "{1, 2, 3, 4, 5, 6}");
+    assert2::check!(&u.reify_term(&answer_var).to_string() == "{1 2 3 4 5 6}");
 }

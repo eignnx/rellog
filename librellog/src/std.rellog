@@ -1,3 +1,4 @@
+[sig [prefix][suffix][compound]][help "Relates a list `Compound` to some partitioning of itself into a `Prefix` and a `Suffix`. Also works for text strings."]
 [prefix {}][Suffix][compound Suffix]
 [prefix {A ...As}][Suffix][compound {A ...Compound}]
     - [prefix As][suffix Suffix][Compound]
@@ -5,35 +6,38 @@
 [Prefix][Suffix][Compound]
     - [txt_prefix Prefix][txt_suffix Suffix][txt_compound Compound]
 
+[sig [forwards][backwards]][help "Relates a list to its reversal."]
 [forwards {}][backwards {}]
 [forwards {A ...As}][Backwards]
     - [forwards As][backwards AsBackwards]
     - [prefix AsBackwards][suffix {A}][compound Backwards]
 
-[list {Member, ...Rest}][Member]
-[list {Other, ...Rest}][Member]
+[list {Member ...Rest}][Member]
+[list {Other ...Rest}][Member]
     - [list Rest][Member]
 
+[sig [list][members]][help "Relates a list to a (sub?)list of its members."]
 [List][members {}]
-[List][members {Member, ...Rest}]
+[List][members {Member ...Rest}]
     - [List][members Rest]
     - [List][Member]
 
 [must_be [list {}]]
-[must_be [list {X, ...Xs}]]
+[must_be [list {X ...Xs}]]
     - [must_be [list Xs]]
 
 [can_be [list {}]]
-[can_be [list {X, ...Xs}]]
+[can_be [list {X ...Xs}]]
 
+[sig [list][last]][help "Relates a list to its last element."]
 [list {Last}][Last]
-[list {X, ...Xs}][Last]
+[list {X ...Xs}][Last]
     - [list Xs][Last]
 
 [[todo "mode [list out][length in] is broken"]]
 [sig [list][length]][help "Relates a list to it's length."]
 [list {}][length 0]
-[list {X, ...Xs}][Length]
+[list {X ...Xs}][Length]
     - [list Xs][length XsLength]
     - [pred XsLength][succ Length]
 
@@ -48,4 +52,6 @@
 [sig [pred][succ]][help "Relates two adjacent integers: a predecessor and a successor."]
 [sig [yes]][help "Always succeeds."]
 [sig [no]][help "Always fails."]
+[sig [io_writeln]][help "Writes a text string to stdout, and then writes a newline character."]
+[sig [term][text]][help "Relates a term to its text string representation."]
 [sig [builtins]][help "Lists all builtin relations."]

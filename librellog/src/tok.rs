@@ -34,6 +34,8 @@ pub enum Tok {
     Pipe,
     Comma,
 
+    Semicolon,
+
     /// The "cons operator" which looks like `...`
     Spread,
 
@@ -57,6 +59,7 @@ impl fmt::Display for Tok {
             Dash => write!(f, "-"),
             Pipe => write!(f, "|"),
             Comma => write!(f, ","),
+            Semicolon => write!(f, ";"),
             Spread => write!(f, "..."),
             Sym(s) => write!(f, "{s}"),
             Var(v) => write!(f, "{v}"),
