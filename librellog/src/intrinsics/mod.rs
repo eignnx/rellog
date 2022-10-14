@@ -23,16 +23,36 @@ impl Intrinsic {
     }
 }
 
+macro_rules! name_of_binding {
+    ($ident:ident as $name:literal) => {
+        $name
+    };
+
+    ($ident:ident) => {
+        stringify!($ident)
+    };
+}
+
+macro_rules! ident_of_binding {
+    ($ident:ident as $name:literal) => {
+        $ident
+    };
+
+    ($ident:ident) => {
+        $ident
+    };
+}
+
 macro_rules! def_intrinsic {
-    ($intrs:expr, |$u:ident, $([$name:ident])+| $body:expr) => {
-        let sig = [$(stringify!($name),)+];
-        $intrs.def(&sig, move |u: UnifierSet, rel: Rel| {
+    ($intrs:expr, |$u:ident, $([$ident:ident $(as $name:literal)?])+| $body:expr) => {
+        let sig = [$(name_of_binding!($ident $(as $name)?),)+];
+        $intrs.def(&sig, move |u, rel| {
             $(
-            let $name = match rel.get(&stringify!($name).into()) {
+            let ident_of_binding!($ident $(as $name)?) = match rel.get(&name_of_binding!($ident $(as $name)?).into()) {
                 Some(x) => u.reify_term(x),
                 None => return soln_stream::failure(),
             };
-            let $name = &$name;
+            let ident_of_binding!($ident $(as $name)?) = &ident_of_binding!($ident $(as $name)?);
             )+
 
             let $u = u;
@@ -236,7 +256,7 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |u, [yes]| {
+        def_intrinsic!(intrs, |u, [yes as "true"]| {
             if yes.as_ref() == &tm!(yes) {
                 soln_stream::success(u)
             } else {
@@ -244,7 +264,7 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |u, [no]| {
+        def_intrinsic!(intrs, |u, [no as "false"]| {
             if no.as_ref() == &tm!(no) {
                 soln_stream::failure()
             } else {
