@@ -10,10 +10,10 @@ use rpds::{vector, Vector};
 use unifier_set::{ClassifyTerm, DirectChildren, TermKind};
 
 use crate::{
+    ast::tm_displayer::TmDisplayer,
     data_structures::{Map, Num, Sym, Var},
     dup::{Dup, TmDuplicator},
-    tm_displayer::TmDisplayer,
-    tok::Tok,
+    lex::tok::Tok,
 };
 
 pub type Rel = Map<Sym, RcTm>;

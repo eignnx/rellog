@@ -5,11 +5,12 @@ use std::{
 };
 
 use librellog::{
-    ast,
+    ast::ast,
     dup::TmDuplicator,
-    lex, parse,
+    lex::lex,
+    lex::tok::{At, Tok},
+    parse,
     rt::{self, UnifierSet},
-    tok::{At, Tok},
     utils::display_unifier_set::DisplayUnifierSet,
 };
 use nu_ansi_term::Color;

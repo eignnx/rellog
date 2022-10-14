@@ -3,11 +3,11 @@ use std::{cell::RefCell, fmt, iter};
 use rpds::Vector;
 
 use crate::{
-    ast::{Module, RcTm, Sig, Tm},
+    ast::ast::{Module, RcTm, Sig, Tm},
     data_structures::Var,
     dup::TmDuplicator,
     intrinsics::IntrinsicsMap,
-    tok::Tok,
+    lex::tok::Tok,
     utils::cloning_iter::CloningIterator,
 };
 

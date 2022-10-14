@@ -3,8 +3,8 @@ use std::fmt;
 use rpds::Vector;
 
 use crate::{
-    ast::{RcTm, Rel, Tm},
-    tok::Tok,
+    ast::ast::{RcTm, Rel, Tm},
+    lex::tok::Tok,
 };
 
 #[derive(Default)]

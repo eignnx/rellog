@@ -13,9 +13,9 @@ use nom_i9n::{I9nError, I9nInput, TokenizedInput};
 use rpds::Vector;
 
 use crate::{
-    ast::{Clause, Item, Module, RcTm, Rel, Tm},
+    ast::ast::{Clause, Item, Module, RcTm, Rel, Tm},
     data_structures::{Map, Num, Sym, Var},
-    tok::{
+    lex::tok::{
         At,
         Tok::{self, *},
     },

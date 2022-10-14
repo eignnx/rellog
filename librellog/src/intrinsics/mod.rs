@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, iter};
 use rpds::Vector;
 
 use crate::{
-    ast::{RcTm, Rel, Sig, Tm},
+    ast::ast::{RcTm, Rel, Sig, Tm},
     rt::{SolnStream, UnifierSet},
     tm,
 };
@@ -26,7 +26,7 @@ impl Intrinsic {
 macro_rules! def_intrinsic {
     ($intrs:expr, |$u:ident, $([$name:ident])+| $body:expr) => {
         let sig = [$(stringify!($name),)+];
-        $intrs.def(&sig, move |u, rel| {
+        $intrs.def(&sig, move |u: UnifierSet, rel: Rel| {
             $(
             let $name = match rel.get(&stringify!($name).into()) {
                 Some(x) => u.reify_term(x),

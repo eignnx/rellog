@@ -1,6 +1,6 @@
 use crate::{
     interner::IStr,
-    tok::{At, MakeAt, Tok},
+    lex::tok::{At, MakeAt, Tok},
     utils::my_nom::{Res, Span},
 };
 use nom::{

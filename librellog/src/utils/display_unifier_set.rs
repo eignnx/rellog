@@ -1,4 +1,4 @@
-use crate::{ast::RcTm, data_structures::Var};
+use crate::{ast::ast::RcTm, data_structures::Var};
 use std::fmt;
 use unifier_set::{ClassifyTerm, TermKind, UnifierSet};
 
