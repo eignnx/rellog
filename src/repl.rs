@@ -5,10 +5,11 @@ use std::{
 };
 
 use librellog::{
-    ast::ast,
-    dup::TmDuplicator,
-    lex::lex,
-    lex::tok::{At, Tok},
+    ast::{self, dup::TmDuplicator},
+    lex::{
+        self,
+        tok::{At, Tok},
+    },
     parse,
     rt::{self, UnifierSet},
     utils::display_unifier_set::DisplayUnifierSet,

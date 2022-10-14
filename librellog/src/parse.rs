@@ -13,7 +13,7 @@ use nom_i9n::{I9nError, I9nInput, TokenizedInput};
 use rpds::Vector;
 
 use crate::{
-    ast::ast::{Clause, Item, Module, RcTm, Rel, Tm},
+    ast::{Clause, Item, Module, RcTm, Rel, Tm},
     data_structures::{Map, Num, Sym, Var},
     lex::tok::{
         At,

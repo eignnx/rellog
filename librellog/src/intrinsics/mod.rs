@@ -3,7 +3,7 @@ use std::{collections::BTreeMap, iter};
 use rpds::Vector;
 
 use crate::{
-    ast::ast::{RcTm, Rel, Sig, Tm},
+    ast::{RcTm, Rel, Sig, Tm},
     rt::{SolnStream, UnifierSet},
     tm,
 };

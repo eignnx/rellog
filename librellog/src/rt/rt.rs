@@ -3,9 +3,9 @@ use std::{cell::RefCell, fmt, iter};
 use rpds::Vector;
 
 use crate::{
-    ast::ast::{Module, RcTm, Sig, Tm},
+    ast::dup::TmDuplicator,
+    ast::{Module, RcTm, Sig, Tm},
     data_structures::Var,
-    dup::TmDuplicator,
     intrinsics::IntrinsicsMap,
     lex::tok::Tok,
     utils::cloning_iter::CloningIterator,

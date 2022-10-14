@@ -3,7 +3,7 @@ use std::{fmt, num::NonZeroUsize, ops::Deref};
 use rpds::RedBlackTreeMap;
 
 use crate::{
-    dup::{Dup, TmDuplicator},
+    ast::dup::{Dup, TmDuplicator},
     interner::IStr,
 };
 
