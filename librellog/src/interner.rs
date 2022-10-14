@@ -9,6 +9,7 @@ use magic_static::magic_static;
 #[magic_static]
 pub static INTERNER: RefCell<Rodeo> = RefCell::new(Rodeo::default());
 
+/// An interned string.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Hash)]
 pub struct IStr(pub(crate) lasso::Spur);
 
