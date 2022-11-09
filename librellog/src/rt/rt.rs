@@ -111,7 +111,7 @@ impl<'rt> Rt<'rt> {
             // Make a duplicate of the clause.
             let clause = td.borrow_mut().duplicate(clause);
 
-            let head = Tm::Rel(clause.head.into()).into();
+            let head = Tm::Rel(clause.head).into();
 
             // Attempt to unify head and query.
             match u.unify(&query, &head) {
@@ -141,7 +141,7 @@ impl<'rt> Rt<'rt> {
     {
         members
             .cloning_iter()
-            .flat_map(move |q| self.clone().solve_query(q.clone(), u.clone(), td))
+            .flat_map(move |q| self.solve_query(q, u.clone(), td))
     }
 
     fn solve_and_block<'rtb, 'td, 'it>(

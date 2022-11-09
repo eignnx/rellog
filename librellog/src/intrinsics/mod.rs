@@ -81,11 +81,7 @@ impl IntrinsicsMap {
         sig: &[&str],
         func: impl Fn(UnifierSet, Rel) -> Box<dyn SolnStream> + 'static,
     ) {
-        let sig: Sig = sig
-            .into_iter()
-            .map(|s| s.into())
-            .collect::<Vector<_>>()
-            .into();
+        let sig: Sig = sig.iter().map(|s| s.into()).collect::<Vector<_>>().into();
 
         self.0.insert(
             sig.clone(),
@@ -121,7 +117,7 @@ impl IntrinsicsMap {
                         })
                         .map(|attr| attr
                             .iter()
-                            .map(|(k, v)| (k.clone(), v.clone()))
+                            .map(|(k, v)| (*k, v.clone()))
                             .next()
                             .expect("There's exactly one key-value pair in here"))
                         .collect();
@@ -219,7 +215,7 @@ impl IntrinsicsMap {
                 _ => todo!("type error"),
             };
 
-            if let Some(found) = rel.get(&key) {
+            if let Some(found) = rel.get(key) {
                 soln_stream::unifying(u, value, found)
             }else{
                 soln_stream::failure()
@@ -252,7 +248,7 @@ impl IntrinsicsMap {
                 // -- [prefix "abc"][Suffix][Compound]
                 //  - Compound = "abc[..Suffix]"
                 (Txt(cl, tl), Var(_), _) => {
-                    let Some(u) = u.unify(&tl, txt_suffix) else {
+                    let Some(u) = u.unify(tl, txt_suffix) else {
                         return soln_stream::failure();
                     };
 

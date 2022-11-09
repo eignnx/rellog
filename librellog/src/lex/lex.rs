@@ -45,7 +45,7 @@ fn var_or_sym(i: Span) -> Res<Tok> {
         .parse(i)
 }
 
-fn one_token<'i>(i: Span) -> Res<At<Tok>> {
+fn one_token(i: Span) -> Res<At<Tok>> {
     let (i, _) = multispace0(i)?;
     alt((
         i64.map(Tok::Num),

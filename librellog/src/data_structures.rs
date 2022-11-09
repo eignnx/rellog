@@ -20,7 +20,7 @@ pub struct Var {
 impl Var {
     pub(crate) fn with_gen(&self, gen: NonZeroUsize) -> Self {
         Self {
-            istr: self.istr.clone(),
+            istr: self.istr,
             gen: Some(gen),
         }
     }

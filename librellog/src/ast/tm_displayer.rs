@@ -77,7 +77,7 @@ impl<'tm> TmDisplayer<'tm> {
                 // xs = {x}
                 Tm::Nil => return write!(f, "}}"),
                 // Malformed list like: {1 2 ...3} (instead of {1 2 3 ...{}})
-                xs => return write!(f, " {}{}}}", Tok::Spread, self.indented(&*xs)),
+                xs => return write!(f, " {}{}}}", Tok::Spread, self.indented(xs)),
             }
 
             write!(f, " ")?;

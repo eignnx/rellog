@@ -125,14 +125,14 @@ fn tok<'ts>(tgt: Tok) -> impl Parser<Toks<'ts>, At<Tok>, Error<'ts>> {
     nom_i9n::tok(p)
 }
 
-fn eof_error<'ts>(ts: Toks<'ts>) -> nom::Err<Error<'ts>> {
+fn eof_error(ts: Toks) -> nom::Err<Error> {
     let e = Error::from_error_kind(ts, nom::error::ErrorKind::Eof);
     nom::Err::Error(e)
 }
 
 fn sym(ts: Toks) -> Res<Sym> {
     match I9nInput::split_first(&ts).map(|(x, xs)| (x.clone().value(), xs)) {
-        Some((Tok::Sym(s), rest)) => Ok((rest, s.clone())),
+        Some((Tok::Sym(s), rest)) => Ok((rest, s)),
         Some((t, _)) => Err(nom::Err::Error(Error::with_message(
             ts,
             format!("Expected symbol, found {t:?}"),
@@ -143,7 +143,7 @@ fn sym(ts: Toks) -> Res<Sym> {
 
 fn var(ts: Toks) -> Res<Var> {
     match I9nInput::split_first(&ts).map(|(x, xs)| (x.clone().value(), xs)) {
-        Some((Tok::Var(v), rest)) => Ok((rest, v.clone())),
+        Some((Tok::Var(v), rest)) => Ok((rest, v)),
         Some((t, _)) => Err(nom::Err::Error(Error::with_message(
             ts,
             format!("Expected variable, found {t:?}"),

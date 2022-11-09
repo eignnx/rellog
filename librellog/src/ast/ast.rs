@@ -44,7 +44,7 @@ impl Dup for Tm {
             Tm::Rel(rel) => {
                 let rel = rel
                     .iter()
-                    .map(|(name, tm)| (name.clone(), tm.dup(duper)))
+                    .map(|(name, tm)| (*name, tm.dup(duper)))
                     .collect();
                 Tm::Rel(rel)
             }
@@ -76,7 +76,7 @@ impl RcTm {
 
     pub fn try_as_sym(&self) -> Option<Sym> {
         match self.as_ref() {
-            Tm::Sym(s) => Some(s.clone()),
+            Tm::Sym(s) => Some(*s),
             _ => None,
         }
     }
@@ -294,13 +294,10 @@ impl Dup for Clause {
         let head = self
             .head
             .iter()
-            .map(|(name, tm)| (name.clone(), tm.dup(duper)))
+            .map(|(name, tm)| (*name, tm.dup(duper)))
             .collect();
 
-        let body = match &self.body {
-            Some(body) => Some(body.dup(duper)),
-            None => None,
-        };
+        let body = self.body.as_ref().map(|body| body.dup(duper));
 
         Self { head, body }
     }
