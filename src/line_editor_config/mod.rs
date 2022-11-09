@@ -32,10 +32,10 @@ pub struct RellogReplConfigHandle(Arc<RwLock<RellogReplConfig>>);
 impl RellogReplConfigHandle {
     pub fn create_editor(&self) -> reedline::Reedline {
         Reedline::create()
-            .with_history(Box::new(FileBackedHistory::default()))
+            .with_history(Box::<FileBackedHistory>::default())
             .with_validator(Box::new(self.clone()))
             .with_highlighter(Box::new(self.clone()))
-            .with_edit_mode(Box::new(reedline::Vi::default()))
+            .with_edit_mode(Box::<reedline::Vi>::default())
     }
 
     pub fn set_repl_mode(&self, mode: ReplMode) {

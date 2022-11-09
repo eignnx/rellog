@@ -22,7 +22,7 @@ impl Prompt for RellogReplConfigHandle {
 
     fn render_prompt_indicator(&self, edit_mode: PromptEditMode) -> Cow<str> {
         let mut cfg = self.write().unwrap();
-        cfg.prompt_edit_mode = edit_mode.clone();
+        cfg.prompt_edit_mode = edit_mode;
         match &cfg.repl_mode {
             ReplMode::TopLevel => "-- ".into(),
             ReplMode::PrintingSolns => "[ENTER to show next solution, CTRL-C to break] ".into(),

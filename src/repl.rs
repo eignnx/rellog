@@ -95,7 +95,7 @@ impl Repl {
             let tokens = lex::tokenize_into(&mut buf, &query_buf[..]);
 
             let query = match parse::entire_term(tokens) {
-                Ok(q) => q.into(),
+                Ok(q) => q,
                 Err(e) => {
                     println!("Parse error:");
                     parse::display_parse_err(&e);
@@ -137,11 +137,11 @@ fn load_module_from_file<'ts>(
     tok_buf: &'ts mut Vec<At<Tok>>,
     fname: &str,
 ) -> AppRes<'ts, ast::Module> {
-    let f = std::fs::File::open(fname).map_err(|e| AppErr::FileOpenErr(fname.into(), e))?;
+    let f = std::fs::File::open(fname).map_err(|e| AppErr::FileOpen(fname.into(), e))?;
     let mut r = io::BufReader::new(f);
     let mut src = String::new();
     r.read_to_string(&mut src)
-        .map_err(|e| AppErr::FileReadErr(fname.into(), e))?;
+        .map_err(|e| AppErr::FileRead(fname.into(), e))?;
 
     let tokens = lex::tokenize_into(tok_buf, &*src);
 
@@ -149,7 +149,7 @@ fn load_module_from_file<'ts>(
         Ok(m) => m,
         Err(verbose_err) => {
             parse::display_parse_err(&verbose_err);
-            return Err(AppErr::ParseErr(verbose_err.into()));
+            return Err(AppErr::Parse(verbose_err));
         }
     };
 

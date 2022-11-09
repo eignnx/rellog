@@ -6,9 +6,9 @@ pub type AppRes<'ts, T> = Result<T, AppErr<'ts>>;
 
 #[derive(Debug)]
 pub enum AppErr<'ts> {
-    FileOpenErr(String, std::io::Error),
-    FileReadErr(String, std::io::Error),
-    ParseErr(parse::Error<'ts>),
+    FileOpen(String, std::io::Error),
+    FileRead(String, std::io::Error),
+    Parse(parse::Error<'ts>),
 }
 
 impl<'ts> fmt::Display for AppErr<'ts> {
