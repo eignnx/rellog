@@ -252,10 +252,17 @@ impl IntrinsicsMap {
                 // -- [prefix "abc"][Suffix][Compound]
                 //  - Compound = "abc[..Suffix]"
                 (Txt(cl, tl), Var(_), _) => {
-                    Some(u)
-                        .and_then(|u| u.unify(&tl, txt_suffix))
-                        .and_then(|u| u.unify(&Tm::Txt(cl.clone(), txt_suffix.clone()).into(), txt_compound))
-                        .map_or_else(soln_stream::failure, soln_stream::success)
+                    let Some(u) = u.unify(&tl, txt_suffix) else {
+                        return soln_stream::failure();
+                    };
+
+                    let consed = Tm::Txt(cl.clone(), txt_suffix.clone()).into();
+
+                    let Some(u) = u.unify(&consed, txt_compound) else {
+                        return soln_stream::failure();
+                    };
+
+                    soln_stream::success(u)
                 }
 
                 _ => todo!("only modes supported:\n\
