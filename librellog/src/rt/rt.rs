@@ -5,11 +5,12 @@ use rpds::Vector;
 use crate::{
     ast::dup::TmDuplicator,
     ast::{Module, RcTm, Sig, Tm},
-    data_structures::Var,
     intrinsics::IntrinsicsMap,
     lex::tok::Tok,
     utils::cloning_iter::CloningIterator,
 };
+
+use super::{soln_stream::SolnStream, Res, UnifierSet};
 
 #[derive(Debug, Clone)]
 pub enum Err {
@@ -33,14 +34,6 @@ impl fmt::Display for Err {
         }
     }
 }
-
-pub type Res<T> = Result<T, Err>;
-
-pub type UnifierSet = unifier_set::UnifierSet<Var, RcTm>;
-
-/// Essentially a trait alias.
-pub trait SolnStream: Iterator<Item = Res<UnifierSet>> {}
-impl<T> SolnStream for T where T: Iterator<Item = Res<UnifierSet>> {}
 
 pub struct Rt<'rt> {
     db: &'rt Module,
@@ -80,7 +73,7 @@ impl<'rt> Rt<'rt> {
                     self.solve_query(reified, u, td)
                 }
             }
-            Tm::Sym(_) | Tm::Num(_) | Tm::Txt(_) | Tm::Cons(_, _) | Tm::Nil => Box::new(
+            Tm::Sym(..) | Tm::Num(..) | Tm::Txt(..) | Tm::Cons(..) | Tm::Nil => Box::new(
                 iter::once(Err(Err::AttemptToQueryNonCallable(query.clone()))),
             ),
         }

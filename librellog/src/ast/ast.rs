@@ -6,6 +6,7 @@ use std::{
     rc::Rc,
 };
 
+use char_list::CharList;
 use rpds::{vector, Vector};
 use unifier_set::{ClassifyTerm, DirectChildren, TermKind};
 
@@ -24,7 +25,7 @@ pub enum Tm {
     Sym(Sym),
     Var(Var),
     Num(Num),
-    Txt(String),
+    Txt(CharList, RcTm),
     Block(Tok, Vector<RcTm>),
     Rel(Rel),
     Cons(RcTm, RcTm),
@@ -47,7 +48,8 @@ impl Dup for Tm {
                     .collect();
                 Tm::Rel(rel)
             }
-            Tm::Sym(_) | Tm::Num(_) | Tm::Txt(_) | Tm::Nil => self.clone(),
+            Tm::Txt(cl, tl) => Tm::Txt(cl.clone(), tl.dup(duper)),
+            Tm::Sym(_) | Tm::Num(_) | Tm::Nil => self.clone(),
         }
     }
 }
@@ -174,7 +176,7 @@ impl ClassifyTerm<Var> for RcTm {
             (Tm::Sym(s1), Tm::Sym(s2)) => s1 == s2,
             (Tm::Var(_), Tm::Var(_)) => true,
             (Tm::Num(n1), Tm::Num(n2)) => n1 == n2,
-            (Tm::Txt(t1), Tm::Txt(t2)) => t1 == t2,
+            (Tm::Txt(cl1, _), Tm::Txt(cl2, _)) => cl1 == cl2,
             (Tm::Block(f1, _), Tm::Block(f2, _)) => f1 == f2,
             (Tm::Rel(r1), Tm::Rel(r2)) => r1.keys().eq(r2.keys()),
             (Tm::Cons(_, _), Tm::Cons(_, _)) => true,
@@ -187,7 +189,8 @@ impl ClassifyTerm<Var> for RcTm {
 impl DirectChildren<Var> for RcTm {
     fn direct_children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self> + 'a> {
         match self.as_ref() {
-            Tm::Sym(_) | Tm::Var(_) | Tm::Num(_) | Tm::Txt(_) | Tm::Nil => Box::new(iter::empty()),
+            Tm::Sym(_) | Tm::Var(_) | Tm::Num(_) | Tm::Nil => Box::new(iter::empty()),
+            Tm::Txt(_, tail) => Box::new(iter::once(tail)),
             Tm::Block(_, members) => Box::new(members.iter()),
             Tm::Rel(rel) => Box::new(rel.values()),
             Tm::Cons(head, tail) => Box::new(iter::once(head).chain(iter::once(tail))),
@@ -196,7 +199,8 @@ impl DirectChildren<Var> for RcTm {
 
     fn map_direct_children<'a>(&'a self, mut f: impl FnMut(&'a Self) -> Self + 'a) -> Self {
         match self.as_ref() {
-            Tm::Sym(_) | Tm::Var(_) | Tm::Num(_) | Tm::Txt(_) | Tm::Nil => self.clone(),
+            Tm::Sym(_) | Tm::Var(_) | Tm::Num(_) | Tm::Nil => self.clone(),
+            Tm::Txt(char_list, tail) => Tm::Txt(char_list.clone(), f(tail)).into(),
             Tm::Block(functor, members) => {
                 Tm::Block(functor.clone(), members.iter().map(f).collect()).into()
             }

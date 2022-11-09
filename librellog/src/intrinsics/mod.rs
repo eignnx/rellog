@@ -4,7 +4,10 @@ use rpds::Vector;
 
 use crate::{
     ast::{RcTm, Rel, Sig, Tm},
-    rt::{SolnStream, UnifierSet},
+    rt::{
+        soln_stream::{self, SolnStream},
+        UnifierSet,
+    },
     tm,
 };
 
@@ -224,13 +227,41 @@ impl IntrinsicsMap {
         });
 
         def_intrinsic!(intrs, |u, [txt_prefix][txt_suffix][txt_compound]| {
-            match (txt_prefix.as_ref(), txt_suffix.as_ref()) {
-                (Tm::Txt(prefix), Tm::Txt(suffix)) => {
-                    let compound = prefix.to_owned() + suffix;
-                    let compound = Tm::Txt(compound).into();
+            use Tm::{Txt, Var};
+            match (txt_prefix.as_ref(), txt_suffix.as_ref(), txt_suffix.as_ref()) {
+                (Txt(ref prefix_head, ref prefix_tail), Txt(suffix_head, suffix_tail), _) => {
+                    let mut prefix_tail = prefix_tail;
+
+                    let mut segments = vec![prefix_head.clone()];
+
+                    while let Tm::Txt(prefix_hd, prefix_tl) = prefix_tail.as_ref() {
+                        segments.push(prefix_hd.clone());
+                        prefix_tail = prefix_tl;
+                    }
+
+                    let mut compound = suffix_head.clone();
+
+                    for segment in segments.into_iter().rev() {
+                        compound = compound.cons_str(segment);
+                    }
+
+                    let compound = Txt(compound, suffix_tail.clone()).into();
                     soln_stream::unifying(u, txt_compound, &compound)
                 }
-                _ => todo!("only mode supported: [[mode txt.[prefix in][suffix in][compound out]]]"),
+
+                // -- [prefix "abc"][Suffix][Compound]
+                //  - Compound = "abc[..Suffix]"
+                (Txt(cl, tl), Var(_), _) => {
+                    Some(u)
+                        .and_then(|u| u.unify(&tl, txt_suffix))
+                        .and_then(|u| u.unify(&Tm::Txt(cl.clone(), txt_suffix.clone()).into(), txt_compound))
+                        .map_or_else(soln_stream::failure, soln_stream::success)
+                }
+
+                _ => todo!("only modes supported:\n\
+                            \t[[mode txt.[prefix in][suffix  in][compound out]]]\n\
+                            \t[[mode txt.[prefix in][suffix out][compound out]]]\n\
+                            "),
             }
         });
 
@@ -273,19 +304,27 @@ impl IntrinsicsMap {
         });
 
         def_intrinsic!(intrs, |u, [io_writeln]| {
-            let arg = io_writeln;
-            match arg.as_ref() {
-                Tm::Txt(txt) => println!("{}", txt),
-                _ => todo!("type error"),
+            let mut arg = io_writeln;
+
+            while let Tm::Txt(cl, tl) = arg.as_ref() {
+                print!("{cl}");
+                arg = tl;
             }
+
+            if !matches!(arg.as_ref(), Tm::Nil) {
+                todo!("type error: Partial string passed to `[io_writeln]`");
+            }
+
+            println!(); // Write '\n';
+
             soln_stream::success(u)
         });
 
         def_intrinsic!(intrs, |u, [term][text]| {
             match (term.as_ref(), text.as_ref()) {
-                (Tm::Var(_), _) => todo!("instantiation error"),
-                (_, Tm::Var(_) | Tm::Txt(_)) => {
-                    let term = Tm::Txt(term.to_string()).into();
+                (Tm::Var(..), _) => todo!("Not implemented yet"),
+                (_, Tm::Var(..) | Tm::Txt(..)) => {
+                    let term = Tm::Txt(term.to_string().into(), Tm::Nil.into()).into();
                     soln_stream::unifying(u, &term, text)
                 }
                 _ => todo!("type error")
@@ -316,20 +355,5 @@ impl IntrinsicsMap {
 
     pub(crate) fn index_match(&self, rel: &Rel) -> Option<&Intrinsic> {
         self.0.get(&rel.clone().into())
-    }
-}
-
-mod soln_stream {
-    use super::*;
-
-    pub fn success(u: UnifierSet) -> Box<dyn SolnStream> {
-        Box::new(iter::once(Ok(u)))
-    }
-    pub fn failure() -> Box<dyn SolnStream> {
-        Box::new(iter::empty())
-    }
-
-    pub fn unifying(u: UnifierSet, x: &RcTm, y: &RcTm) -> Box<dyn SolnStream> {
-        Box::new(u.unify(x, y).into_iter().map(Ok))
     }
 }

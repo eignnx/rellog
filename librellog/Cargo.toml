@@ -13,6 +13,7 @@ lasso = "0.6.0"
 magic_static = "3.0.3"
 unifier_set = { path = "./unifier_set" }
 nom_i9n = { path = "./nom_indentation" }
+char-list = "0.1.0"
 
 [dev-dependencies]
 assert2 = "0.3.6"

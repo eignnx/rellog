@@ -1,5 +1,6 @@
 use std::iter;
 
+use char_list::CharList;
 use nom::{
     branch::alt,
     combinator::{all_consuming, cut, opt},
@@ -162,7 +163,7 @@ fn num(ts: Toks) -> Res<Num> {
     }
 }
 
-fn txt(ts: Toks) -> Res<String> {
+fn txt(ts: Toks) -> Res<CharList> {
     match I9nInput::split_first(&ts).map(|(x, xs)| (x.clone().value(), xs)) {
         Some((Tok::Txt(s), rest)) => Ok((rest, s)),
         Some((t, _)) => Err(nom::Err::Error(Error::with_message(
@@ -278,7 +279,7 @@ fn non_operator_tm(ts: Toks) -> Res<Tm> {
         sym.map(Tm::Sym),
         var.map(Tm::Var),
         num.map(Tm::Num),
-        txt.map(Tm::Txt),
+        txt.map(|t| Tm::Txt(t, Tm::Nil.into())),
         rel.map(Tm::Rel),
         list,
         block,

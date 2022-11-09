@@ -3,6 +3,7 @@ use crate::{
     lex::tok::{At, MakeAt, Tok},
     utils::my_nom::{Res, Span},
 };
+use char_list::CharList;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_while},
@@ -14,11 +15,11 @@ use nom::{
 };
 use nom_i9n::{I9nInput, TokenizedInput};
 
-fn text_literal(i: Span) -> Res<String> {
+fn text_literal(i: Span) -> Res<CharList> {
     let (i, _) = tag("\"")(i)?;
     let (i, text) = take_while(|c: char| c != '"')(i)?;
     let (i, _) = tag("\"")(i)?;
-    Ok((i, text.to_string()))
+    Ok((i, CharList::from(*text.fragment())))
 }
 
 fn any_symbol(i: Span) -> Res<IStr> {
