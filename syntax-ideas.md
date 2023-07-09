@@ -38,6 +38,10 @@ _ :: female <<
     |   - [parent Parent][child Descendent]
         - [Ancestor][descendent Parent]
 
+[Ancestor parent][Descendent child]
+    - [Parent][Descendent child]
+    - [Ancestor][Parent descendent]
+
 [Pred][List][Sublist] if
     [goal include_impl[List][Pred]][initial Sublist][final {}]
 
