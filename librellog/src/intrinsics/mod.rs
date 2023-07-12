@@ -291,19 +291,11 @@ impl IntrinsicsMap {
         });
 
         def_intrinsic!(intrs, |u, [yes as "true"]| {
-            if yes.as_ref() == &tm!(yes) {
-                soln_stream::success(u)
-            } else {
-                soln_stream::failure()
-            }
+            soln_stream::success(u)
         });
 
         def_intrinsic!(intrs, |u, [no as "false"]| {
-            if no.as_ref() == &tm!(no) {
-                soln_stream::failure()
-            } else {
-                soln_stream::success(u)
-            }
+            soln_stream::failure()
         });
 
         def_intrinsic!(intrs, |u, [io_writeln]| {
