@@ -23,7 +23,8 @@ fn main() -> ! {
         r.run();
     } else {
         println!("Running in interactive mode.");
-        println!("use :load to load a source file.");
+        println!("Type `:help` for a list of commands.");
+        println!("Use `:load` to load a source file.");
         repl::Repl::loading_std_lib().run()
     }
 }
