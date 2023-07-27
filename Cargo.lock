@@ -281,6 +281,7 @@ dependencies = [
  "nom",
  "nom_i9n",
  "nom_locate",
+ "nu-ansi-term",
  "rpds",
  "unifier_set",
 ]

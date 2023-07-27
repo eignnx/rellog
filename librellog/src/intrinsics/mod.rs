@@ -302,7 +302,8 @@ impl IntrinsicsMap {
             let mut arg = io_writeln;
 
             while let Tm::Txt(cl, tl) = arg.as_ref() {
-                print!("{cl}");
+                use nu_ansi_term::Color;
+                print!("{}", Color::LightGray.italic().paint(cl.as_str()));
                 arg = tl;
             }
 
