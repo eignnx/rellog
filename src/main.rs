@@ -7,14 +7,23 @@ mod repl;
 fn main() -> ! {
     librellog::init_interner();
 
-    let fname = std::env::args().nth(1).unwrap_or_else(|| {
-        let exe_name = std::env::args().next().unwrap();
-        println!("USAGE:");
-        println!("\t{exe_name} FILENAME");
-        println!();
-        println!("Please provide a filename. (Exiting...)");
-        std::process::exit(1);
-    });
+    println!("Rellog REPL");
 
-    repl::Repl::loading_file(&fname).run()
+    if let Some(fname) = std::env::args().nth(1) {
+        let mut tok_buf = Vec::new();
+        let mut r = repl::Repl::loading_std_lib();
+        match r.load_file(&mut tok_buf, fname.clone()) {
+            Ok(()) => {}
+            Err(e) => {
+                println!("Could not load file {fname}.");
+                println!("Error: {e}");
+            }
+        }
+        println!("Loaded `{fname}`.");
+        r.run();
+    } else {
+        println!("Running in interactive mode.");
+        println!("use :load to load a source file.");
+        repl::Repl::loading_std_lib().run()
+    }
 }

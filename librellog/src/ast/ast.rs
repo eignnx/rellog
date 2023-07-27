@@ -321,6 +321,11 @@ impl Module {
         let sig = rel.clone().into();
         self.relations.get(&sig).map(|clauses| clauses.iter())
     }
+
+    pub fn import(&mut self, other: Module) {
+        self.directives.append(&mut other.directives.clone());
+        self.relations.append(&mut other.relations.clone());
+    }
 }
 
 impl fmt::Display for Module {
