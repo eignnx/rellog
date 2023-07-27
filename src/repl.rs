@@ -44,6 +44,7 @@ impl Repl {
         }
     }
 
+    #[allow(dead_code)]
     pub fn without_loading_file() -> Self {
         let config = RellogReplConfigHandle::default();
         Self {
@@ -54,6 +55,7 @@ impl Repl {
         }
     }
 
+    #[allow(dead_code)]
     pub fn loading_file(fname: &str) -> Self {
         let config = RellogReplConfigHandle::default();
         let mut tok_buf = Vec::new();
