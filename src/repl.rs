@@ -71,6 +71,8 @@ impl Repl {
                     println!("Enter a RELLOG TERM or one of these REPL COMMANDS:");
                     println!("  :h | :help | ?    Displays this help text.");
                     println!("  :r | :reload      Reloads the source file.");
+                    println!("  [Builtins]        Show a list of builtin relations.");
+                    println!("  [Sig][Help]       Show help text for a relation given by `Sig`.");
                     continue 'outer;
                 }
                 ":reload" | ":r" => {
