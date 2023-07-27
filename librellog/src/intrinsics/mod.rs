@@ -290,11 +290,11 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |u, [yes as "true"]| {
+        def_intrinsic!(intrs, |u, [_yes as "true"]| {
             soln_stream::success(u)
         });
 
-        def_intrinsic!(intrs, |u, [no as "false"]| {
+        def_intrinsic!(intrs, |_u, [_no as "false"]| {
             soln_stream::failure()
         });
 
