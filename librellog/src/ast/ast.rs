@@ -3,7 +3,7 @@ use std::{
     fmt,
     iter::{self, DoubleEndedIterator},
     ops::Deref,
-    rc::Rc,
+    rc::{self, Rc},
 };
 
 use char_list::CharList;
@@ -96,6 +96,20 @@ impl RcTm {
         }
 
         Self::from(list)
+    }
+
+    pub fn try_collect_txt_to_string(&self, buf: &mut String) -> Result<(), ()> {
+        let mut rc_tm = self;
+        loop {
+            match rc_tm.as_ref() {
+                Tm::Txt(head, tail) => {
+                    buf.push_str(head.as_str());
+                    rc_tm = tail;
+                }
+                Tm::Nil => break Ok(()),
+                _ => break Err(()),
+            }
+        }
     }
 }
 

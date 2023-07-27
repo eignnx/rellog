@@ -43,6 +43,7 @@ impl Highlighter for RellogReplConfigHandle {
                     }
                     _ => error_style(),
                 },
+                _ if inside_str => str_style(),
                 _ => unreachable!(),
             };
 

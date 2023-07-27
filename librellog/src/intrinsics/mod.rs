@@ -4,6 +4,8 @@ use rpds::Vector;
 
 use crate::{
     ast::{RcTm, Rel, Sig, Tm},
+    lex::{self, tokenize},
+    parse::{self, entire_term},
     rt::{
         soln_stream::{self, SolnStream},
         UnifierSet,
@@ -344,6 +346,37 @@ impl IntrinsicsMap {
         def_intrinsic!(intrs, |u, [builtins]| {
             let builtin_rel_sigs = builtin_rel_sigs.clone();
             soln_stream::unifying(u, builtins, &builtin_rel_sigs)
+        });
+
+        def_intrinsic!(intrs, |u, [rellog_src][rellog_term]| {
+            match (rellog_src.as_ref(), rellog_term.as_ref()) {
+                (Tm::Var(_), Tm::Var(_)) => todo!("instantiation error: [rellog_src][rellog_term] needs one ground term."),
+                (Tm::Txt(..), Tm::Var(..)) => {
+                    let term_var = rellog_term;
+                    let mut src_buf = String::new();
+                    let Ok(()) = rellog_src.try_collect_txt_to_string(&mut src_buf) else {
+                        return soln_stream::failure()
+                    };
+
+                    let mut tok_buf = Vec::new();
+                    let tokens = lex::tokenize_into(&mut tok_buf, &src_buf[..]);
+
+                    let term = match parse::entire_term(tokens) {
+                        Ok(q) => q,
+                        Err(e) => {
+                            println!("Parse error:");
+                            parse::display_parse_err(&e);
+                            return soln_stream::failure();
+                        }
+                    };
+
+                    soln_stream::unifying(u, &term, term_var)
+                }
+                (Tm::Var(_src), _term) => {
+                    todo!("stringify term")
+                }
+                _ => todo!("type error: [rellog_src][rellog_term] takes text and a term.")
+            }
         });
 
         intrs
