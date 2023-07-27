@@ -11,12 +11,16 @@ impl Prompt for RellogReplConfigHandle {
 
     fn render_prompt_right(&self) -> Cow<str> {
         let cfg = self.read().unwrap();
-        match &cfg.prompt_edit_mode {
-            PromptEditMode::Default => "".into(),
-            PromptEditMode::Emacs => "(emacs)".into(),
-            PromptEditMode::Vi(PromptViMode::Insert) => "(vi:insert)".into(),
-            PromptEditMode::Vi(PromptViMode::Normal) => "(vi:normal)".into(),
-            PromptEditMode::Custom(c) => format!("({c})").into(),
+
+        match &cfg.repl_mode {
+            ReplMode::TopLevel => match &cfg.prompt_edit_mode {
+                PromptEditMode::Default => "".into(),
+                PromptEditMode::Emacs => "(emacs)".into(),
+                PromptEditMode::Vi(PromptViMode::Insert) => "(vi:insert)".into(),
+                PromptEditMode::Vi(PromptViMode::Normal) => "(vi:normal)".into(),
+                PromptEditMode::Custom(c) => format!("({c})").into(),
+            },
+            ReplMode::PrintingSolns => "[ENTER to show next solution, CTRL-C to break]".into(),
         }
     }
 
@@ -25,7 +29,7 @@ impl Prompt for RellogReplConfigHandle {
         cfg.prompt_edit_mode = edit_mode;
         match &cfg.repl_mode {
             ReplMode::TopLevel => "-- ".into(),
-            ReplMode::PrintingSolns => "[ENTER to show next solution, CTRL-C to break] ".into(),
+            ReplMode::PrintingSolns => "".into(),
         }
     }
 
