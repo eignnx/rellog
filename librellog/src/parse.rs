@@ -193,10 +193,25 @@ fn attr(ts: Toks) -> Res<(Sym, RcTm)> {
 
 fn rel(ts: Toks) -> Res<Rel> {
     let (ts, _) = tok(OBrack).parse(ts)?;
-    let (ts, attrs) = separated_list1(
-        tok(COBrack),
-        context("Expected relation attribute", cut(attr)),
-    )(ts)?;
+    let (ts, attrs) = context(
+        "Expected relation",
+        cut(separated_list1(
+            tok(COBrack),
+            context(
+                "Expected relation attribute",
+                cut(alt((
+                    nom::sequence::delimited(
+                        nom_i9n::begin_block,
+                        nom_i9n::line(attr),
+                        nom_i9n::end_block,
+                    ),
+                    attr,
+                ))),
+            ),
+        )),
+    )
+    .parse(ts)?;
+
     let (ts, _) = tok(CBrack).parse(ts)?;
     let map = attrs.into_iter().collect::<Map<_, _>>();
     Ok((ts, map))
