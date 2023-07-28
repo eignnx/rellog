@@ -5,13 +5,13 @@ use std::{
 };
 
 use librellog::{
-    ast::{self, dup::TmDuplicator},
+    ast::{self, dup::TmDuplicator, Module},
     lex::{
         self,
         tok::{At, Tok},
     },
     parse,
-    rt::{self, UnifierSet},
+    rt::{self, Rt, UnifierSet},
     utils::display_unifier_set::DisplayUnifierSet,
 };
 use nu_ansi_term::Color;
@@ -27,6 +27,7 @@ pub struct Repl {
     module: ast::Module,
     config: RellogReplConfigHandle,
     line_editor: Reedline,
+    rt: Rt,
 }
 
 impl Repl {
@@ -36,22 +37,26 @@ impl Repl {
             load_module_from_string(&mut tok_buf, include_str!("../librellog/src/std.rellog"))
                 .expect("Could not parse `std.rellog`!");
         let config = RellogReplConfigHandle::default();
+        let rt = Rt::new(std_lib.clone());
         Self {
             current_file: "<repl>".to_owned(),
             module: std_lib,
             line_editor: config.create_editor(),
             config,
+            rt,
         }
     }
 
     #[allow(dead_code)]
     pub fn without_loading_file() -> Self {
         let config = RellogReplConfigHandle::default();
+        let rt = Rt::new(Module::default());
         Self {
             current_file: "<repl>".to_owned(),
             module: Default::default(),
             line_editor: config.create_editor(),
             config,
+            rt,
         }
     }
 
@@ -67,12 +72,14 @@ impl Repl {
                 ast::Module::default()
             }
         };
+        let rt = Rt::new(module.clone());
 
         Self {
             current_file: fname.to_owned(),
             module,
             line_editor: config.create_editor(),
             config,
+            rt,
         }
     }
 
@@ -125,6 +132,7 @@ impl Repl {
                             Default::default()
                         }
                     };
+                    self.rt = Rt::new(self.module.clone());
                     continue 'outer;
                 }
                 &[":load" | ":l"] => {
@@ -158,10 +166,9 @@ impl Repl {
                 }
             };
 
-            let rt = rt::Rt::new(&self.module);
             let u = UnifierSet::new();
             let td = RefCell::new(TmDuplicator::default());
-            let solns = rt.solve_query(query, u, &td);
+            let solns = self.rt.solve_query(query, u, &td);
 
             self.config.set_repl_mode(ReplMode::PrintingSolns);
             for soln in solns {

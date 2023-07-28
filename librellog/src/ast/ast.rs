@@ -318,7 +318,7 @@ impl Dup for Clause {
 }
 
 /// A single-file program (compilation unit).
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Module {
     pub directives: Vec<Rel>,
     pub relations: BTreeMap<Sig, Vec<Clause>>,

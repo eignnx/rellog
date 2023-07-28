@@ -1,4 +1,9 @@
-use std::{collections::BTreeMap, iter};
+use std::{
+    collections::BTreeMap,
+    fmt::{write, Debug},
+    io::{stderr, stdout, Write},
+    iter,
+};
 
 use rpds::Vector;
 
@@ -19,8 +24,8 @@ pub struct Intrinsic {
 
 impl Intrinsic {
     pub fn apply(&self, u: UnifierSet, rel: Rel) -> Box<dyn SolnStream> {
-        if self.signature != rel.clone().into() {
-            return Box::new(iter::empty());
+        if self.signature != Sig::from(rel.clone()) {
+            return soln_stream::failure();
         }
 
         (self.func)(u, rel)
@@ -67,6 +72,17 @@ macro_rules! def_intrinsic {
 }
 
 pub struct IntrinsicsMap(BTreeMap<Sig, Intrinsic>);
+
+impl Debug for IntrinsicsMap {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "IntrinsicsMap(")?;
+        for sig in self.0.keys() {
+            writeln!(f, "\t{sig},")?;
+        }
+        write!(f, ")")?;
+        Ok(())
+    }
+}
 
 impl IntrinsicsMap {
     fn new() -> Self {
@@ -299,27 +315,97 @@ impl IntrinsicsMap {
             soln_stream::failure()
         });
 
-        def_intrinsic!(intrs, |u, [io_writeln]| {
-            let mut arg = io_writeln;
+        #[derive(Clone, Copy)]
+        enum StdStream {
+            StdIn,
+            StdOut,
+            StdErr,
+        }
 
-            while let Tm::Txt(cl, tl) = arg.as_ref() {
+        impl From<&RcTm> for StdStream {
+            fn from(value: &RcTm) -> Self {
+                match value.as_ref() {
+                    Tm::Sym(s) if &*s.to_str() == "stdin" => Self::StdIn,
+                    Tm::Sym(s) if &*s.to_str() == "stdout" => Self::StdOut,
+                    Tm::Sym(s) if &*s.to_str() == "stderr" => Self::StdErr,
+                    Tm::Num(0) => Self::StdIn,
+                    Tm::Num(1) => Self::StdOut,
+                    Tm::Num(2) => Self::StdErr,
+                    _ => todo!(
+                        "argument error: `Stream` must be one of `stdin`, `stdout`, `stderr`, or `0`, `1`, or `2`."
+                    )
+                }
+            }
+        }
+
+        fn io_write_impl(u: UnifierSet, mut text: &RcTm, stream: StdStream) -> Box<dyn SolnStream> {
+            if let StdStream::StdIn = stream {
+                todo!("argument error: in [io_write][Stream], cannot write to `stdin`.")
+            }
+
+            while let Tm::Txt(cl, tl) = text.as_ref() {
                 use nu_ansi_term::Color;
-                print!("{}", Color::LightGray.italic().paint(cl.as_str()));
-                arg = tl;
+                let to_print = Color::LightGray.italic().paint(cl.as_str());
+                match stream {
+                    StdStream::StdOut => print!("{to_print}"),
+                    StdStream::StdErr => eprint!("{to_print}"),
+                    _ => unreachable!(),
+                }
+                text = tl;
             }
 
-            if !matches!(arg.as_ref(), Tm::Nil) {
-                todo!("type error: Partial string passed to `[io_writeln]`");
+            if !matches!(text.as_ref(), Tm::Nil) {
+                todo!("type error: Partial string passed to `[io_write][stream]`");
             }
 
-            println!(); // Write '\n';
+            match stream {
+                StdStream::StdOut => stdout().flush().unwrap(),
+                StdStream::StdErr => stderr().flush().unwrap(),
+                _ => {}
+            }
 
             soln_stream::success(u)
+        }
+
+        def_intrinsic!(intrs, |u, [text as "io_write"][stream as "stream"]| {
+            let stream = StdStream::from(stream);
+            io_write_impl(u, text, stream)
+        });
+
+        def_intrinsic!(intrs, |u, [text as "io_writeln"][stream as "stream"]| {
+            let stream = StdStream::from(stream);
+            let soln_stream = io_write_impl(u, text, stream);
+            match stream { // Print the '\n'.
+                StdStream::StdOut => println!(),
+                StdStream::StdErr => eprintln!(),
+                _ => unreachable!()
+            }
+            soln_stream
         });
 
         def_intrinsic!(intrs, |u, [term][text]| {
             match (term.as_ref(), text.as_ref()) {
-                (Tm::Var(..), _) => todo!("Not implemented yet"),
+                (Tm::Var(..), _) => {
+                    let term_var = term;
+                    let mut src_buf = String::new();
+                    let Ok(()) = text.try_collect_txt_to_string(&mut src_buf) else {
+                        return soln_stream::failure()
+                    };
+
+                    let mut tok_buf = Vec::new();
+                    let tokens = lex::tokenize_into(&mut tok_buf, &src_buf[..]);
+
+                    let term = match parse::entire_term(tokens) {
+                        Ok(q) => q,
+                        Err(e) => {
+                            println!("Parse error:");
+                            parse::display_parse_err(&e);
+                            return soln_stream::failure();
+                        }
+                    };
+
+                    soln_stream::unifying(u, &term, term_var)
+                }
                 (_, Tm::Var(..) | Tm::Txt(..)) => {
                     let term = Tm::Txt(term.to_string().into(), Tm::Nil.into()).into();
                     soln_stream::unifying(u, &term, text)
@@ -345,37 +431,6 @@ impl IntrinsicsMap {
         def_intrinsic!(intrs, |u, [builtins]| {
             let builtin_rel_sigs = builtin_rel_sigs.clone();
             soln_stream::unifying(u, builtins, &builtin_rel_sigs)
-        });
-
-        def_intrinsic!(intrs, |u, [rellog_src][rellog_term]| {
-            match (rellog_src.as_ref(), rellog_term.as_ref()) {
-                (Tm::Var(_), Tm::Var(_)) => todo!("instantiation error: [rellog_src][rellog_term] needs one ground term."),
-                (Tm::Txt(..), Tm::Var(..)) => {
-                    let term_var = rellog_term;
-                    let mut src_buf = String::new();
-                    let Ok(()) = rellog_src.try_collect_txt_to_string(&mut src_buf) else {
-                        return soln_stream::failure()
-                    };
-
-                    let mut tok_buf = Vec::new();
-                    let tokens = lex::tokenize_into(&mut tok_buf, &src_buf[..]);
-
-                    let term = match parse::entire_term(tokens) {
-                        Ok(q) => q,
-                        Err(e) => {
-                            println!("Parse error:");
-                            parse::display_parse_err(&e);
-                            return soln_stream::failure();
-                        }
-                    };
-
-                    soln_stream::unifying(u, &term, term_var)
-                }
-                (Tm::Var(_src), _term) => {
-                    todo!("stringify term")
-                }
-                _ => todo!("type error: [rellog_src][rellog_term] takes text and a term.")
-            }
         });
 
         intrs

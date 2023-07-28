@@ -20,3 +20,7 @@ pub fn failure() -> Box<dyn SolnStream> {
 pub fn unifying(u: UnifierSet, x: &RcTm, y: &RcTm) -> Box<dyn SolnStream> {
     Box::new(u.unify(x, y).into_iter().map(Ok))
 }
+
+pub fn once(res: Res<UnifierSet>) -> Box<dyn SolnStream> {
+    Box::new(iter::once(res))
+}

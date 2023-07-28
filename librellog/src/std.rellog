@@ -41,6 +41,20 @@
     - [list Xs][length XsLength]
     - [pred XsLength][succ Length]
 
+[io [println][Text]]
+    - [io_writeln Text][stream stdout]
+
+[io [print][Text]]
+    - [io_write Text][stream stdout]
+
+[help Signature]
+    - [sig Signature][help HelpTxt]
+    - [term Signature][text SigTxt]
+    - [io [print][text "Relation: "]]
+    - [io [println][text SigTxt]]
+    - [io [println][text "--------------"]]
+    - [io [println][text HelpTxt]]
+
 
 [[comment "Documentation for builtins"]]
 
@@ -76,11 +90,15 @@
     "Relates two adjacent integers: a predecessor and a successor."
 ]
 
-[sig [yes]][help "Always succeeds."]
-[sig [no]][help "Always fails."]
+[sig [true]][help "Always succeeds."]
+[sig [false]][help "Always fails."]
 
-[sig [io_writeln]][help
-    "Writes a text string to stdout, and then writes a newline character."
+[sig [io_writeln][stream]][help
+    "Writes a text string to `Stream`, and then writes a newline character."
+]
+
+[sig [io_write][stream]][help
+    "Writes a text string to `Stream`."
 ]
 
 [sig [term][text]][help
@@ -89,6 +107,3 @@
 
 [sig [builtins]][help "Lists all builtin relations."]
 
-[sig [rellog_src][rellog_term]][help
-    "Relates Rellog source code to a rellog term."
-]

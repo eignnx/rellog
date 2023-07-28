@@ -10,7 +10,10 @@ use crate::{
     utils::cloning_iter::CloningIterator,
 };
 
-use super::{soln_stream::SolnStream, Res, UnifierSet};
+use super::{
+    soln_stream::{self, SolnStream},
+    Res, UnifierSet,
+};
 
 #[derive(Debug, Clone)]
 pub enum Err {
@@ -35,13 +38,13 @@ impl fmt::Display for Err {
     }
 }
 
-pub struct Rt<'rt> {
-    db: &'rt Module,
+pub struct Rt {
+    db: Module,
     intrs: IntrinsicsMap,
 }
 
-impl<'rt> Rt<'rt> {
-    pub fn new(db: &'rt Module) -> Self {
+impl Rt {
+    pub fn new(db: Module) -> Self {
         Self {
             db,
             intrs: IntrinsicsMap::initialize(),
@@ -154,14 +157,13 @@ impl<'rt> Rt<'rt> {
         'rtb: 'it,
         'td: 'it,
     {
-        let init: Box<dyn SolnStream> = Box::new(iter::once(Ok(u)));
+        let init: Box<dyn SolnStream> = soln_stream::once(Ok(u));
 
         members.cloning_iter().fold(init, |solns, q| {
-            Box::new(
-                solns
-                    .map(Res::unwrap)
-                    .flat_map(move |u| self.solve_query(q.clone(), u, td)),
-            )
+            Box::new(solns.flat_map(move |u_res| match u_res {
+                Ok(u) => self.solve_query(q.clone(), u, td),
+                Err(e) => soln_stream::once(Err(e)),
+            }))
         })
     }
 }
