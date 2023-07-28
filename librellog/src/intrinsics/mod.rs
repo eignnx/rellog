@@ -4,8 +4,7 @@ use rpds::Vector;
 
 use crate::{
     ast::{RcTm, Rel, Sig, Tm},
-    lex::{self, tokenize},
-    parse::{self, entire_term},
+    lex, parse,
     rt::{
         soln_stream::{self, SolnStream},
         UnifierSet,

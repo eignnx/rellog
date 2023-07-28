@@ -3,7 +3,7 @@ use std::{
     fmt,
     iter::{self, DoubleEndedIterator},
     ops::Deref,
-    rc::{self, Rc},
+    rc::Rc,
 };
 
 use char_list::CharList;
