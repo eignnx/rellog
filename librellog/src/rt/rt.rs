@@ -12,7 +12,7 @@ use crate::{
 
 use super::{
     soln_stream::{self, SolnStream},
-    Res, UnifierSet,
+    UnifierSet,
 };
 
 #[derive(Debug, Clone)]

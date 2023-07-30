@@ -1,8 +1,7 @@
 use std::{
     collections::BTreeMap,
-    fmt::{write, Debug},
+    fmt::Debug,
     io::{stderr, stdout, Write},
-    iter,
 };
 
 use rpds::Vector;

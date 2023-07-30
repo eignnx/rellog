@@ -11,7 +11,7 @@ use librellog::{
         tok::{At, Tok},
     },
     parse,
-    rt::{self, Rt, UnifierSet},
+    rt::{Rt, UnifierSet},
     utils::display_unifier_set::DisplayUnifierSet,
 };
 use nu_ansi_term::Color;
@@ -64,6 +64,7 @@ impl Repl {
     pub fn loading_file(fname: &str) -> Self {
         let config = RellogReplConfigHandle::default();
         let mut tok_buf = Vec::new();
+
         let module = match load_module_from_file(&mut tok_buf, fname) {
             Ok(module) => module,
             Err(e) => {
@@ -168,12 +169,20 @@ impl Repl {
 
             let u = UnifierSet::new();
             let td = RefCell::new(TmDuplicator::default());
-            let solns = self.rt.solve_query(query, u, &td);
+            let mut solns = self.rt.solve_query(query, u, &td);
+            let mut or_bar_printed = false;
 
             self.config.set_repl_mode(ReplMode::PrintingSolns);
-            for soln in solns {
+
+            while let Some(soln) = solns.next() {
                 match soln {
-                    Ok(soln) => print!("{}", DisplayUnifierSet(soln)),
+                    Ok(soln) => {
+                        let disp = DisplayUnifierSet {
+                            u: soln,
+                            display_or_bar: or_bar_printed,
+                        };
+                        print!("{disp}")
+                    }
                     Err(e) => {
                         println!("{}", Color::Red.paint(format!("Exception: {e}")));
                         continue 'outer;
@@ -188,9 +197,28 @@ impl Repl {
                     }
                     Signal::CtrlD => exit(0),
                 };
+
+                // If we *know* there are no more solutions...
+                match solns.size_hint() {
+                    (_, Some(0)) => continue 'outer,
+                    (lo, Some(hi)) if lo == hi => println!(
+                        " {}",
+                        Color::Yellow.paint(format!("# {lo} solution(s) remain."))
+                    ),
+                    _ => {}
+                }
+                print!("|"); // Print an "or"; more solns incoming.
+                or_bar_printed = true;
             }
 
-            println!("    - [false]");
+            if !or_bar_printed {
+                print!(" ");
+            }
+
+            println!(
+                "   - [false] {}",
+                Color::Yellow.paint("# No additional solutions found.")
+            );
         }
     }
 }
