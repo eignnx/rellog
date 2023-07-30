@@ -189,6 +189,20 @@ impl Repl {
                     }
                 }
 
+                // If we *know* there are no more solutions...
+                match solns.size_hint() {
+                    (_, Some(0)) => {
+                        let msg = Color::Yellow.paint(format!("# Exactly 1 solution found."));
+                        println!(" {msg}");
+                        continue 'outer;
+                    }
+                    (lo, Some(hi)) if lo == hi => {
+                        let msg = Color::Yellow.paint(format!("# {lo} solution(s) remain."));
+                        println!(" {msg}");
+                    }
+                    _ => {}
+                }
+
                 match self.line_editor.read_line(&self.config).unwrap() {
                     Signal::Success(_) => {}
                     Signal::CtrlC => {
@@ -196,18 +210,9 @@ impl Repl {
                         continue 'outer;
                     }
                     Signal::CtrlD => exit(0),
-                };
-
-                // If we *know* there are no more solutions...
-                match solns.size_hint() {
-                    (_, Some(0)) => continue 'outer,
-                    (lo, Some(hi)) if lo == hi => println!(
-                        " {}",
-                        Color::Yellow.paint(format!("# {lo} solution(s) remain."))
-                    ),
-                    _ => {}
                 }
-                print!("|"); // Print an "or"; more solns incoming.
+
+                print!("\n|"); // Print an "or"; more solns incoming.
                 or_bar_printed = true;
             }
 
