@@ -26,13 +26,13 @@ impl fmt::Display for Err {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Err::AttemptToQueryNonCallable(tm) => {
-                write!(f, "The term {tm} is not callable.")
+                write!(f, "The term `{tm}` is not callable.")
             }
             Err::InstantiationError(tm) => {
-                write!(f, "The term {tm} is not sufficiently instantiated.")
+                write!(f, "The term `{tm}` is not sufficiently instantiated.")
             }
             Err::NoSuchRelation(sig) => {
-                write!(f, "No relation exists with signature {sig}.")
+                write!(f, "No relation exists with signature `{sig}`.")
             }
         }
     }
