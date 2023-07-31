@@ -431,8 +431,7 @@ impl IntrinsicsMap {
                     let term = match parse::entire_term(tokens) {
                         Ok(q) => q,
                         Err(e) => {
-                            println!("Parse error:");
-                            parse::display_parse_err(&e);
+                            println!("Parse error: {e}");
                             return soln_stream::failure();
                         }
                     };

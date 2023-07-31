@@ -32,19 +32,20 @@ pub struct Repl {
 
 impl Repl {
     pub fn loading_std_lib() -> Self {
-        let mut tok_buf = Vec::new();
-        let std_lib =
-            load_module_from_string(&mut tok_buf, include_str!("../librellog/src/std.rellog"))
-                .expect("Could not parse `std.rellog`!");
-        let config = RellogReplConfigHandle::default();
-        let rt = Rt::new(std_lib.clone());
-        Self {
-            current_file: "<repl>".to_owned(),
-            module: std_lib,
-            line_editor: config.create_editor(),
-            config,
-            rt,
-        }
+        Self::loading_file("../librellog/src/std.rellog")
+        // let mut tok_buf = Vec::new();
+        // let std_lib =
+        //     load_module_from_string(&mut tok_buf, include_str!("../librellog/src/std.rellog"))
+        //         .expect("Could not parse `std.rellog`!");
+        // let config = RellogReplConfigHandle::default();
+        // let rt = Rt::new(std_lib.clone());
+        // Self {
+        //     current_file: "<repl>".to_owned(),
+        //     module: std_lib,
+        //     line_editor: config.create_editor(),
+        //     config,
+        //     rt,
+        // }
     }
 
     #[allow(dead_code)]
@@ -68,8 +69,8 @@ impl Repl {
         let module = match load_module_from_file(&mut tok_buf, fname) {
             Ok(module) => module,
             Err(e) => {
-                println!("{e}");
-                println!("Loading default module.");
+                println!("Error loading module `{fname}`:");
+                println!("    {e}");
                 ast::Module::default()
             }
         };
@@ -161,8 +162,7 @@ impl Repl {
             let query = match parse::entire_term(tokens) {
                 Ok(q) => q,
                 Err(e) => {
-                    println!("Parse error:");
-                    parse::display_parse_err(&e);
+                    println!("Parse error: {e}");
                     continue 'outer;
                 }
             };
@@ -250,7 +250,7 @@ fn load_module_from_string<'ts>(
     let m = match parse::entire_module(tokens) {
         Ok(m) => m,
         Err(verbose_err) => {
-            parse::display_parse_err(&verbose_err);
+            println!("{verbose_err}");
             return Err(AppErr::Parse(verbose_err));
         }
     };

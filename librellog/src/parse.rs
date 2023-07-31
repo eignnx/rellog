@@ -1,4 +1,7 @@
-use std::iter;
+use std::{
+    fmt::{self, Display, Formatter},
+    iter,
+};
 
 use char_list::CharList;
 use nom::{
@@ -10,7 +13,7 @@ use nom::{
     sequence::{preceded, tuple},
     Finish, IResult, Parser,
 };
-use nom_i9n::{I9nError, I9nInput, TokenizedInput};
+use nom_i9n::{I9nError, I9nErrorCtx, I9nErrorSituation, I9nInput, TokenizedInput};
 use rpds::Vector;
 
 use crate::{
@@ -31,6 +34,30 @@ type Toks<'ts> = I9nInput<BaseInput<'ts>, TokenFinder<'ts>>;
 #[derive(Debug)]
 pub struct Error<'ts> {
     stack: Vec<(BaseInput<'ts>, Problem<'ts>)>,
+}
+
+impl<'ts> Display for Error<'ts> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        let (last, init) = self.stack.split_last().unwrap();
+        for (i, problem) in init {
+            let loc = match i {
+                [t, ..] => format!("{}:{}", t.line, t.col),
+                [] => "eof".into(),
+            };
+
+            writeln!(f, "\t[{loc}] {problem} because...")?;
+        }
+        let (i, last) = last;
+        writeln!(
+            f,
+            "\t...{last} Last token: {}.",
+            i.first().map_or_else(
+                || "end of input".into(),
+                |tok| format!("token `{}` at [{}:{}]", tok.value, tok.line, tok.col)
+            )
+        )?;
+        Ok(())
+    }
 }
 
 impl<'ts> Error<'ts> {
@@ -54,6 +81,16 @@ pub enum Problem<'ts> {
     CustomMessage(String),
     Context(&'static str),
     Blah(Toks<'ts>),
+}
+
+impl<'ts> Display for Problem<'ts> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Problem::CustomMessage(msg) => f.write_str(msg),
+            Problem::Context(msg) => write!(f, "in the context of {msg}"),
+            Problem::Blah(ts) => write!(f, "at tokens {:?}", &ts[..1]),
+        }
+    }
 }
 
 impl<'ts> ParseError<Toks<'ts>> for Error<'ts> {
@@ -81,32 +118,61 @@ pub fn entire_term(ts: Toks) -> Result<RcTm, Error> {
     Ok(t.into())
 }
 
-pub fn display_parse_err(verbose_err: &Error) {
-    eprintln!("Parse error:");
-    let (last, init) = verbose_err.stack.split_last().unwrap();
-    for (i, problem) in init {
-        let loc = match i {
-            [t, ..] => format!("{}:{}", t.line, t.col),
-            [] => "eof".into(),
-        };
-
-        eprintln!("\t[{loc}] {problem:?} because...");
-    }
-    let (i, last) = last;
-    eprintln!(
-        "\t...{last:?}, got {}.",
-        i.first().map_or_else(
-            || "end of input".into(),
-            |tok| format!("token `{}` at [{}:{}]", tok.value, tok.line, tok.col)
-        )
-    );
-}
-
 impl<'ts> From<I9nError<BaseInput<'ts>>> for Error<'ts> {
     fn from(e: I9nError<BaseInput<'ts>>) -> Self {
         Error {
-            stack: vec![(e.input, Problem::CustomMessage(format!("{e:?}")))],
+            stack: vec![(
+                e.input,
+                Problem::CustomMessage(match e {
+                    I9nError {
+                        input,
+                        situation,
+                        ctx,
+                    } => {
+                        let situation = I9nErrorSituationDisplay(situation);
+                        let ctx = I9nErrorCtxDisplay(ctx);
+                        let input_preview = input
+                            .get(0)
+                            .map(|tok| tok.value.to_string())
+                            .unwrap_or_else(|| "end of file".into());
+                        format!("Indentation error: {situation} {ctx} at token `{input_preview}`.")
+                    }
+                }),
+            )],
         }
+    }
+}
+
+struct I9nErrorSituationDisplay(I9nErrorSituation);
+
+impl Display for I9nErrorSituationDisplay {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let relation = match self.0.relation {
+            nom_i9n::I9nRelation::NotGt => "not indented more than",
+            nom_i9n::I9nRelation::NotEq => "not the same indentation as",
+            nom_i9n::I9nRelation::Gt => "indented more than",
+            nom_i9n::I9nRelation::Eq => "the same indentation as",
+            nom_i9n::I9nRelation::Lt => "indented less than",
+        };
+
+        write!(f, "Current line was {relation} expected")?;
+
+        Ok(())
+    }
+}
+
+struct I9nErrorCtxDisplay(I9nErrorCtx);
+
+impl Display for I9nErrorCtxDisplay {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let msg = match self.0 {
+            I9nErrorCtx::AtNewGroup => "at a new indentation group",
+            I9nErrorCtx::WithinLine => "within a line",
+            I9nErrorCtx::AtNewLine => "at a new line",
+            I9nErrorCtx::AtGroupEnd => "at the end of an indentation group",
+            I9nErrorCtx::WithinLineButAfterStart => "within a line but after start",
+        };
+        f.write_str(msg)
     }
 }
 

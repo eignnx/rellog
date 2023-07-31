@@ -13,6 +13,20 @@ pub enum AppErr<'ts> {
 
 impl<'ts> fmt::Display for AppErr<'ts> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self) // Punt this off till later...
+        match self {
+            AppErr::FileOpen(msg, io_err) => {
+                write!(
+                    f,
+                    "Could not open file {msg}. (io error {:?})",
+                    io_err.kind()
+                )
+            }
+            AppErr::FileRead(msg, io_err) => write!(
+                f,
+                "Could not read file {msg}. (io error {:?})",
+                io_err.kind()
+            ),
+            AppErr::Parse(pe) => write!(f, "{pe}"),
+        }
     }
 }
