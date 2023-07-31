@@ -6,7 +6,7 @@ use crate::{
 use char_list::CharList;
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_while},
+    bytes::complete::{tag, take_until, take_while},
     character::complete::{anychar, i64, multispace0},
     combinator::{recognize, verify},
     multi::many0,
@@ -15,11 +15,57 @@ use nom::{
 };
 use nom_i9n::{I9nInput, TokenizedInput};
 
-fn text_literal(i: Span) -> Res<CharList> {
-    let (i, _) = tag("\"")(i)?;
-    let (i, text) = take_while(|c: char| c != '"')(i)?;
-    let (i, _) = tag("\"")(i)?;
-    Ok((i, CharList::from(*text.fragment())))
+fn text_literal<'i>(i: Span<'i>) -> Res<'i, CharList> {
+    alt((
+        move |i: Span<'i>| {
+            let start_col = i.get_column() - 1;
+            let (i, _) = tag(r#"""""#)(i)?;
+            let (i, text) = take_until(r#"""""#)(i)?;
+            let (i, _) = tag(r#"""""#)(i)?;
+
+            let mut out = String::new();
+
+            if text.starts_with("\n") || text.starts_with("\r\n") {
+                // _ _ _ """
+                // _ _ _ _ _ asdf
+                // _ _ _ """
+                // should produce
+                // """
+                // _ _ asdf
+                // """
+                for line in text.lines().skip(1) {
+                    out.push_str(&line[start_col..]);
+                }
+
+                if out.ends_with("\n") {
+                    out.pop();
+                }
+            } else {
+                // _ _ _ """adsf
+                // _ _ _ _ _ _ asdf
+                // _ _ _ """
+                // should produce
+                // "adsf\n _ asdf"
+                out.push_str(text.lines().next().unwrap_or_default());
+                out.push('\n');
+                let start_col = start_col + 3;
+                for line in text.lines().skip(1) {
+                    out.push_str(&line[start_col..]);
+                    out.push('\n');
+                }
+                out.pop();
+            }
+
+            Ok((i, CharList::from(out)))
+        },
+        move |i: Span<'i>| {
+            let (i, _) = tag("\"")(i)?;
+            let (i, text) = take_while(|c: char| c != '"')(i)?;
+            let (i, _) = tag("\"")(i)?;
+            Ok((i, CharList::from(*text.fragment())))
+        },
+    ))
+    .parse(i)
 }
 
 fn any_symbol(i: Span) -> Res<IStr> {

@@ -1,4 +1,8 @@
-use std::{cell::RefCell, fmt, iter};
+use std::{
+    cell::RefCell,
+    fmt::{self, Debug},
+    iter,
+};
 
 use rpds::Vector;
 
@@ -20,6 +24,17 @@ pub enum Err {
     AttemptToQueryNonCallable(RcTm),
     InstantiationError(RcTm),
     NoSuchRelation(Sig),
+    ArgumentTypeError {
+        rel: String,
+        /// The attribute key that the incorrect value was passed to.
+        /// Example: `[pred "adsf"][Succ]` -> key = "pred".
+        key: String,
+        expected_ty: String,
+        recieved_tm: String,
+    },
+    TypeError {
+        msg: String,
+    },
 }
 
 impl fmt::Display for Err {
@@ -33,6 +48,21 @@ impl fmt::Display for Err {
             }
             Err::NoSuchRelation(sig) => {
                 write!(f, "No relation exists with signature `{sig}`.")
+            }
+            Err::ArgumentTypeError {
+                rel,
+                key,
+                expected_ty,
+                recieved_tm,
+            } => {
+                write!(
+                    f,
+                    "The `{key}` key of the relation `{rel}` expected a \
+                     `{expected_ty}` argument, but received the term `{recieved_tm}`."
+                )
+            }
+            Err::TypeError { msg } => {
+                write!(f, "Type error: {msg}")
             }
         }
     }

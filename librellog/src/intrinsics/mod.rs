@@ -1,6 +1,6 @@
 use std::{
     collections::BTreeMap,
-    fmt::Debug,
+    fmt::{Debug, Display},
     io::{stderr, stdout, Write},
 };
 
@@ -9,6 +9,7 @@ use rpds::Vector;
 use crate::{
     ast::{RcTm, Rel, Sig, Tm},
     lex, parse,
+    rt::Err,
     rt::{
         soln_stream::{self, SolnStream},
         UnifierSet,
@@ -121,22 +122,31 @@ impl IntrinsicsMap {
                     let var = rel;
                     let attrs: Vector<RcTm> = match attrs.try_as_list().unwrap() {
                         (vec, None) => vec,
-                        (_vec, Some(_tail_var)) => todo!("What happens when list is partial?")
+                        (_vec, Some(_tail_var)) => return soln_stream::error(Err::InstantiationError(attrs.clone()))
                     };
 
-                    let rel: Rel = attrs.into_iter()
+                    let rel: Result<Rel, Err> = attrs.into_iter()
                         .map(|attr| match attr.as_ref() {
-                            Tm::Rel(r) if r.size() == 1 => r.clone(),
-                            Tm::Rel(_) => todo!("type error: only size-1 attributes accepted"),
-                            Tm::Var(_) => todo!("throw instantiation error"),
-                            _ => todo!("throw type error"),
+                            Tm::Rel(r) if r.size() == 1 => {
+                                Ok(r
+                                    .iter()
+                                    .map(|(k, v)| (*k, v.clone()))
+                                    .next()
+                                    .expect("There's exactly one key-value pair in here"))
+                            }
+                            Tm::Var(_) => Err(Err::InstantiationError(attr.clone())),
+                            _ => Err(Err::ArgumentTypeError {
+                                rel: "[rel][attrs]".into(),
+                                key: "attrs".into(),
+                                expected_ty: "size-1 attribute relation".into(),
+                                recieved_tm: attr.to_string()
+                            }),
                         })
-                        .map(|attr| attr
-                            .iter()
-                            .map(|(k, v)| (*k, v.clone()))
-                            .next()
-                            .expect("There's exactly one key-value pair in here"))
                         .collect();
+
+                    let Ok(rel) = rel else {
+                        return soln_stream::error(rel.unwrap_err());
+                    };
 
                     let rel = RcTm::from(Tm::Rel(rel));
 
@@ -148,9 +158,9 @@ impl IntrinsicsMap {
                     soln_stream::unifying(u, attrs, &list)
                 }
 
-                (Tm::Var(_), Tm::Var(_)) => todo!("throw instantiation error"),
+                (Tm::Var(_), Tm::Var(_)) => soln_stream::error(Err::InstantiationError(rel.clone())),
 
-                (_, _) => todo!("throw type error"),
+                (_, _) => soln_stream::error(Err::TypeError { msg: "[rel][attrs] takes a relation and a list of attributes".into() }),
             }
         });
 
@@ -170,7 +180,7 @@ impl IntrinsicsMap {
 
                 (Tm::Rel(_non_attr_rel), _, _) => {
                     // Is this good advice?
-                    todo!("type error: use [rel][attr] instead")
+                    soln_stream::error(Err::TypeError { msg: "use [rel][attr] instead".into() })
                 }
 
                 // [[mode [attr inout][key in][value inout]]]
@@ -179,9 +189,9 @@ impl IntrinsicsMap {
                     soln_stream::unifying(u, attr, &a)
                 }
 
-                (Tm::Var(_), Tm::Var(_), _) => todo!("instantiation error"),
+                (Tm::Var(_), Tm::Var(_), _) => soln_stream::error(Err::InstantiationError(key.clone())),
 
-                _ => todo!("type error"),
+                _ => soln_stream::error(Err::TypeError { msg: "bad arguments to [attr][key][value]".into() })
             }
         });
 
@@ -194,7 +204,7 @@ impl IntrinsicsMap {
                         soln_stream::failure()
                     }
                 }
-                _ => todo!("type error: expected two numbers")
+                _ => soln_stream::error(Err::TypeError { msg: "[gt][lt] accepts two numbers".into() })
             }
         });
 
@@ -207,7 +217,7 @@ impl IntrinsicsMap {
                         soln_stream::failure()
                     }
                 }
-                _ => todo!("type error: expected two numbers")
+                _ => soln_stream::error(Err::TypeError { msg: "[gte][lte] accepts two numbers".into() })
             }
         });
 
@@ -221,14 +231,14 @@ impl IntrinsicsMap {
         def_intrinsic!(intrs, |u, [rel][key][value]| {
             let rel = match rel.as_ref() {
                 Tm::Rel(rel) => rel,
-                Tm::Var(_) => todo!("instantiation error"),
-                _ => todo!("type error"),
+                Tm::Var(_) => return soln_stream::error(Err::InstantiationError(rel.clone())),
+                _ => return soln_stream::error(Err::TypeError { msg: "[Rel][key][value] requires a relation for `Rel`.".into() })
             };
 
             let key = match key.as_ref() {
                 Tm::Sym(key) => key,
-                Tm::Var(_) => todo!("instantiation error"),
-                _ => todo!("type error"),
+                Tm::Var(_) => return soln_stream::error(Err::InstantiationError(key.clone())),
+                _ => return soln_stream::error(Err::TypeError { msg: "[rel][Key][value] requires a ground term for `Key`.".into() })
             };
 
             if let Some(found) = rel.get(key) {
@@ -277,16 +287,20 @@ impl IntrinsicsMap {
                     soln_stream::success(u)
                 }
 
-                _ => todo!("only modes supported:\n\
-                            \t[[mode txt.[prefix in][suffix  in][compound out]]]\n\
-                            \t[[mode txt.[prefix in][suffix out][compound out]]]\n\
-                            "),
+                _ => soln_stream::error(
+                    Err::TypeError {
+                        msg: "only modes supported for `[txt_prefix][txt_suffix][txt_compound]`:\n\
+                            \t[[mode txt_[prefix in][suffix  in][compound out]]]\n\
+                            \t[[mode txt_[prefix in][suffix out][compound out]]]\n\
+                            ".into()
+                        }
+                    ),
             }
         });
 
         def_intrinsic!(intrs, |u, [pred][succ]| {
             match (pred.as_ref(), succ.as_ref()) {
-                (Tm::Var(_), Tm::Var(_)) => todo!("instantiation error"),
+                (Tm::Var(_), Tm::Var(_)) => soln_stream::error(Err::InstantiationError(pred.clone())),
                 (Tm::Var(_), Tm::Num(s)) => {
                     let p = Tm::Num(s - 1).into();
                     soln_stream::unifying(u, pred, &p)
@@ -302,7 +316,7 @@ impl IntrinsicsMap {
                         soln_stream::failure()
                     }
                 }
-                _ => todo!("type error"),
+                _ => soln_stream::error(Err::TypeError { msg: "[pred][succ] only relates numbers.".into() })
             }
         });
 
@@ -319,6 +333,16 @@ impl IntrinsicsMap {
             StdIn,
             StdOut,
             StdErr,
+        }
+
+        impl Display for StdStream {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    StdStream::StdIn => write!(f, "stdin"),
+                    StdStream::StdOut => write!(f, "stdout"),
+                    StdStream::StdErr => write!(f, "stderr"),
+                }
+            }
         }
 
         impl From<&RcTm> for StdStream {
@@ -339,7 +363,12 @@ impl IntrinsicsMap {
 
         fn io_write_impl(u: UnifierSet, mut text: &RcTm, stream: StdStream) -> Box<dyn SolnStream> {
             if let StdStream::StdIn = stream {
-                todo!("argument error: in [io_write][Stream], cannot write to `stdin`.")
+                return soln_stream::error(Err::ArgumentTypeError {
+                    rel: "[io_write][stream]".into(),
+                    key: "stream".into(),
+                    expected_ty: "oneof {stdout stderr}".into(),
+                    recieved_tm: stream.to_string(),
+                });
             }
 
             while let Tm::Txt(cl, tl) = text.as_ref() {
@@ -354,7 +383,12 @@ impl IntrinsicsMap {
             }
 
             if !matches!(text.as_ref(), Tm::Nil) {
-                todo!("type error: Partial string passed to `[io_write][stream]`");
+                return soln_stream::error(Err::ArgumentTypeError {
+                    rel: "[io_write][stream]".into(),
+                    key: "io_write".into(),
+                    expected_ty: "text".into(),
+                    recieved_tm: "a partial string".into(),
+                });
             }
 
             match stream {
@@ -409,7 +443,12 @@ impl IntrinsicsMap {
                     let term = Tm::Txt(term.to_string().into(), Tm::Nil.into()).into();
                     soln_stream::unifying(u, &term, text)
                 }
-                _ => todo!("type error")
+                _ => soln_stream::error(Err::ArgumentTypeError {
+                        rel: "[term][text]".into(),
+                        key: "text".into(),
+                        expected_ty: "text".into(),
+                        recieved_tm: text.to_string(),
+                    })
             }
         });
 

@@ -47,19 +47,23 @@
 [io [print][Text]]
     - [io_write Text][stream stdout]
 
+[[comment
+]]
+
 [help Signature]
     - [sig Signature][help HelpTxt]
     - [term Signature][text SigTxt]
-    - [io [print][text "Relation: "]]
-    - [io [println][text SigTxt]]
-    - [io [println][text "--------------"]]
-    - [io [println][text HelpTxt]]
+    - [io_writeln "Relation: "][stream stdout]
+    - [io_writeln SigTxt][stream stdout]
+    - [io_writeln "--------------"][stream stdout]
+    - [io_writeln HelpTxt][stream stdout]
 
 
 [[comment "Documentation for builtins"]]
 
 [sig [rel][attrs]][help
-    "Relates a relation to a list of its attributes. An attribute is a `[key Value]` pair."
+    """Relates a relation to a list of its attributes. An attribute is a 
+       `[key Value]` pair."""
 ]
 
 [sig [attr][key][value]][help
@@ -79,7 +83,10 @@
 ]
 
 [sig [rel][key][value]][help
-    "Extracts a value from a relation given the key name. Faster than searching through a list of the relation's attributes."
+    """
+    Extracts a value from a relation given the key name. Faster than searching 
+    through a list of the relation's attributes.
+    """
 ]
 
 [sig [txt_prefix][txt_suffix][txt_compound]][help
