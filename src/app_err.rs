@@ -17,13 +17,13 @@ impl<'ts> fmt::Display for AppErr<'ts> {
             AppErr::FileOpen(msg, io_err) => {
                 write!(
                     f,
-                    "Could not open file {msg}. (io error {:?})",
+                    "Could not open file `{msg}`.\n\t(io error: {:?})",
                     io_err.kind()
                 )
             }
             AppErr::FileRead(msg, io_err) => write!(
                 f,
-                "Could not read file {msg}. (io error {:?})",
+                "Could not read file `{msg}`.\n\t(io error: {:?})",
                 io_err.kind()
             ),
             AppErr::Parse(pe) => write!(f, "{pe}"),
