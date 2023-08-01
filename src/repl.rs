@@ -32,20 +32,7 @@ pub struct Repl {
 
 impl Repl {
     pub fn loading_std_lib() -> Self {
-        Self::loading_file("../librellog/src/std.rellog")
-        // let mut tok_buf = Vec::new();
-        // let std_lib =
-        //     load_module_from_string(&mut tok_buf, include_str!("../librellog/src/std.rellog"))
-        //         .expect("Could not parse `std.rellog`!");
-        // let config = RellogReplConfigHandle::default();
-        // let rt = Rt::new(std_lib.clone());
-        // Self {
-        //     current_file: "<repl>".to_owned(),
-        //     module: std_lib,
-        //     line_editor: config.create_editor(),
-        //     config,
-        //     rt,
-        // }
+        Self::loading_file("./librellog/src/std.rellog")
     }
 
     #[allow(dead_code)]
@@ -122,15 +109,28 @@ impl Repl {
                     continue 'outer;
                 }
                 &[":reload" | ":r"] => {
-                    println!("Reloading source from {}...", self.current_file);
+                    println!(
+                        "{}",
+                        Color::Yellow
+                            .paint(format!("# Reloading source from {}...", self.current_file))
+                    );
                     self.module = match load_module_from_file(&mut tok_buf, &self.current_file) {
                         Ok(m) => {
-                            println!("{} relation definitions loaded.", m.relations.len());
+                            println!(
+                                "{}",
+                                Color::Yellow.paint(format!(
+                                    "# {} relation definitions loaded.",
+                                    m.relations.len()
+                                ))
+                            );
                             m
                         }
                         Err(e) => {
-                            println!("Error loading file: {e}");
-                            println!("Defaulting to empty module.");
+                            println!("{}", Color::Red.paint(format!("# Error loading file: {e}")));
+                            println!(
+                                "{}",
+                                Color::Red.paint(format!("# Defaulting to empty module."))
+                            );
                             Default::default()
                         }
                     };
@@ -139,16 +139,16 @@ impl Repl {
                 }
                 &[":load" | ":l"] => {
                     println!(
-                        "Which file would you like to load? Please specify `{query_buf} FILENAME`"
+                        "# Which file would you like to load? Please specify `{query_buf} FILENAME`"
                     );
                     continue 'outer;
                 }
                 &[":load" | ":l", fname] => {
                     let mut tok_buf = Vec::new();
                     match self.load_file(&mut tok_buf, fname) {
-                        Ok(()) => println!("Loaded `{fname}`."),
+                        Ok(()) => println!("# Loaded `{fname}`."),
                         Err(e) => {
-                            println!("Could not load file `{fname}`: {e}");
+                            println!("# Could not load file `{fname}`: {e}");
                         }
                     }
                     continue 'outer;
