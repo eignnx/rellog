@@ -451,6 +451,15 @@ impl IntrinsicsMap {
             }
         });
 
+        def_intrinsic!(intrs, |u, [cwd]| {
+            let dir: String = std::env::current_dir()
+                .unwrap()
+                .as_os_str()
+                .to_string_lossy()
+                .into_owned();
+            soln_stream::unifying(u, cwd, &Tm::Txt(dir.into(), Tm::Nil.into()).into())
+        });
+
         ////////////////////// Define `[builtins]` //////////////////////
 
         let builtin_rel_sigs = {
