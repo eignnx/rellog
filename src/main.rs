@@ -5,6 +5,7 @@ mod line_editor_config;
 mod repl;
 
 fn main() -> ! {
+    human_panic::setup_panic!();
     librellog::init_interner();
 
     println!("Rellog REPL");
