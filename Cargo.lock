@@ -96,6 +96,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "archery"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b6cd774058b1b415c4855d8b86436c04bf050c003156fe24bc326fb3fe75c343"
+dependencies = [
+ "static_assertions",
+]
+
+[[package]]
 name = "arrayvec"
 version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -445,7 +454,7 @@ dependencies = [
  "nom_i9n",
  "nom_locate",
  "nu-ansi-term",
- "rpds",
+ "rpds 0.13.0",
  "unifier_set",
 ]
 
@@ -548,7 +557,7 @@ version = "0.1.0"
 dependencies = [
  "nom",
  "nom_locate",
- "rpds",
+ "rpds 0.12.0",
 ]
 
 [[package]]
@@ -710,7 +719,16 @@ version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "66262ea963eff99163e6b741fbc3417a52cc13074728c1047e9911789df9b000"
 dependencies = [
- "archery",
+ "archery 0.4.0",
+]
+
+[[package]]
+name = "rpds"
+version = "0.13.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9bd6ce569b15c331b1e5fd8cf6adb0bf240678b5f0cdc4d0f41e11683f6feba9"
+dependencies = [
+ "archery 0.5.0",
 ]
 
 [[package]]
@@ -955,7 +973,7 @@ checksum = "3ed742d4ea2bd1176e236172c8429aaf54486e7ac098db29ffe6529e0ce50973"
 name = "unifier_set"
 version = "0.2.0"
 dependencies = [
- "rpds",
+ "rpds 0.12.0",
 ]
 
 [[package]]
