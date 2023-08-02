@@ -10,11 +10,11 @@
 [man ferdinand]
 
 [prefix {}][Suffix][compound Suffix]
-[prefix {A ...As}][Suffix][compound {A ...Compound}]
+[prefix {A ..As}][Suffix][compound {A ..Compound}]
     - [prefix As][suffix Suffix][Compound]
 
 [forwards {}][backwards {}]
-[forwards {A ...As}][Backwards]
+[forwards {A ..As}][Backwards]
     - [forwards As][backwards AsBackwards]
     - [prefix AsBackwards][suffix {A}][compound Backwards]
 
