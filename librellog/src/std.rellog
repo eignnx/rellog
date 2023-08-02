@@ -41,29 +41,34 @@
     - [list Xs][length XsLength]
     - [pred XsLength][succ Length]
 
-[io [println][Text]]
+[io {println}]
+    - [io_writeln ""][stream stdout]
+
+[io {println Text}]
     - [io_writeln Text][stream stdout]
 
-[io [print][Text]]
+[io {print Text}]
     - [io_write Text][stream stdout]
 
-[[comment
-]]
 
 [help Signature]
     - [sig Signature][help HelpTxt]
     - [term Signature][text SigTxt]
-    - [io_writeln "Relation: "][stream stdout]
-    - [io_writeln SigTxt][stream stdout]
-    - [io_writeln "--------------"][stream stdout]
-    - [io_writeln HelpTxt][stream stdout]
+    - [io {println}]
+    - [io {print "Relation: "}]
+    - [io {println SigTxt}]
+    - [io {println "--------------"}]
+    - [io {println HelpTxt}]
+    - [io {println}]
 
 
 [[comment "Documentation for builtins"]]
 
 [sig [rel][attrs]][help
-    """Relates a relation to a list of its attributes. An attribute is a 
-       `[key Value]` pair."""
+    """
+    Relates a relation to a list of its attributes. An attribute is a 
+    `[key Value]` pair.
+    """
 ]
 
 [sig [attr][key][value]][help
