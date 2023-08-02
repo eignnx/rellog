@@ -28,3 +28,15 @@ pub fn once(res: Res<UnifierSet>) -> Box<dyn SolnStream> {
 pub fn error(err: Err) -> Box<dyn SolnStream> {
     once(Err(err))
 }
+
+impl From<Err> for Box<dyn SolnStream> {
+    fn from(err: Err) -> Self {
+        once(Err(err))
+    }
+}
+
+impl From<UnifierSet> for Box<dyn SolnStream> {
+    fn from(u: UnifierSet) -> Self {
+        success(u)
+    }
+}
