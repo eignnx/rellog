@@ -41,12 +41,16 @@
     - [list Xs][length XsLength]
     - [pred XsLength][succ Length]
 
+
+[sig [io {println}]][help "Prints a newline character to stdout."]
 [io {println}]
     - [io_writeln ""][stream stdout]
 
+[sig [io {println Text}]][help "Prints `Text` to stdout, followed by a newline character."]
 [io {println Text}]
     - [io_writeln Text][stream stdout]
 
+[sig [io {print Text}]][help "Prints `Text` to stdout."]
 [io {print Text}]
     - [io_write Text][stream stdout]
 
@@ -60,6 +64,13 @@
     - [io {println "--------------"}]
     - [io {println HelpTxt}]
     - [io {println}]
+
+[fn {factorial 0}][ret 1]
+[fn {factorial 1}][ret 1]
+[fn {factorial N}][Ret]
+    - [succ N][pred PredN]
+    - [fn {factorial PredN}][ret Fact]
+    - [product Ret][x N][y Fact]
 
 
 [[comment "Documentation for builtins"]]
