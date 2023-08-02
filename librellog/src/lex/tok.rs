@@ -61,7 +61,7 @@ impl fmt::Display for Tok {
             Pipe => write!(f, "|"),
             Comma => write!(f, ","),
             Semicolon => write!(f, ";"),
-            Spread => write!(f, "..."),
+            Spread => write!(f, ".."),
             Sym(s) => write!(f, "{s}"),
             Var(v) => write!(f, "{v}"),
             Num(i) => write!(f, "{i}"),

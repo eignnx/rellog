@@ -108,7 +108,7 @@ fn one_token(i: Span) -> Res<At<Tok>> {
         tag("|").map(|_| Tok::Pipe),
         tag(",").map(|_| Tok::Comma),
         tag(";").map(|_| Tok::Semicolon),
-        tag("...").map(|_| Tok::Spread),
+        tag("..").map(|_| Tok::Spread),
         anychar.map(move |_| {
             panic!(
                 "[{}:{}] Unknown symbol encountered: {:?}",
