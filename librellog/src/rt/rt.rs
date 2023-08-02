@@ -35,6 +35,12 @@ pub enum Err {
     TypeError {
         msg: String,
     },
+    UnexpectedPartialList {
+        rel: String,
+        key: String,
+        partial: RcTm,
+    },
+    IoError(String),
 }
 
 impl fmt::Display for Err {
@@ -64,7 +70,17 @@ impl fmt::Display for Err {
             Err::TypeError { msg } => {
                 write!(f, "Type error: {msg}")
             }
+            Err::UnexpectedPartialList { rel, key, partial } => {
+                write!(f, "The relation `{rel}` received a partial list for it's `{key}` argument: {partial}")
+            }
+            Err::IoError(err) => f.write_str(&err),
         }
+    }
+}
+
+impl From<std::io::Error> for Err {
+    fn from(err: std::io::Error) -> Self {
+        Err::IoError(err.to_string())
     }
 }
 
