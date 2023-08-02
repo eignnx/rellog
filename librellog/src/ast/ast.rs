@@ -265,6 +265,7 @@ impl fmt::Display for Item {
     }
 }
 
+/// Contains a *sorted* `Vector` of keys.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Sig(Vector<Sym>);
 
@@ -276,13 +277,17 @@ impl Sig {
 
 impl From<Vector<Sym>> for Sig {
     fn from(v: Vector<Sym>) -> Self {
-        Self(v)
+        let mut v: Vec<_> = v.into_iter().cloned().collect();
+        v.sort();
+        Self(v.into_iter().collect())
     }
 }
 
 impl From<Rel> for Sig {
     fn from(rel: Rel) -> Self {
-        Self(rel.keys().cloned().collect())
+        let mut v: Vec<_> = rel.keys().cloned().collect();
+        v.sort();
+        Self(v.into_iter().collect())
     }
 }
 
