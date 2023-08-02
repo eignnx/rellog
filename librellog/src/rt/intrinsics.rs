@@ -296,6 +296,19 @@ impl IntrinsicsMap {
             }
         });
 
+        def_intrinsic!(intrs, |u, [product][x][y]| {
+            match (product.as_ref(), x.as_ref(), y.as_ref()) {
+                (_, Tm::Var(_), Tm::Var(_)) => Err::InstantiationError(x.clone()).into(),
+                (Tm::Var(_), _, Tm::Var(_)) => Err::InstantiationError(y.clone()).into(),
+                (Tm::Var(_), Tm::Var(_), _) => Err::InstantiationError(x.clone()).into(),
+                (_, Tm::Num(x), Tm::Num(y)) => {
+                    let p = Tm::Num(x * y).into();
+                    soln_stream::unifying(u, product, &p)
+                }
+                _ => Err::TypeError { msg: "[product][x][y] only relates numbers.".into() }.into()
+            }
+        });
+
         def_intrinsic!(intrs, |u, [pred][succ]| {
             match (pred.as_ref(), succ.as_ref()) {
                 (Tm::Var(_), Tm::Var(_)) => Err::InstantiationError(pred.clone()).into(),
