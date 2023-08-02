@@ -460,6 +460,58 @@ impl IntrinsicsMap {
             soln_stream::unifying(u, cwd, &Tm::Txt(dir.into(), Tm::Nil.into()).into())
         });
 
+        def_intrinsic!(intrs, |u, [cd]| {
+            if !matches!(cd.as_ref(), Tm::Txt(_, _)) {
+                return soln_stream::error(Err::ArgumentTypeError {
+                    rel: "[cd]".into(),
+                    key: "cd".into(),
+                    expected_ty: "text".into(),
+                    recieved_tm: cd.to_string(),
+                });
+            }
+
+            let mut path = String::new();
+            let mut it = cd;
+
+            while let Tm::Txt(head, tail) = it.as_ref() {
+                path.push_str(head.as_str());
+                it = tail;
+            }
+
+            let &Tm::Nil = it.as_ref() else {
+                return soln_stream::error(Err::UnexpectedPartialList {
+                    rel: "[cd]".into(),
+                    key: "cd".into(),
+                    partial: cd.clone(),
+                });
+            };
+
+            match std::env::set_current_dir(path) {
+                Err(e) => return soln_stream::error(e.into()),
+                Ok(_) => {}
+            };
+
+            soln_stream::success(u)
+        });
+
+        def_intrinsic!(intrs, |u, [output as "ls"]| {
+            let read_dir = match std::fs::read_dir(".") {
+                Ok(rd) => rd,
+                Err(e) => return soln_stream::error(e.into())
+            };
+
+            let entries: Vec<_> = match read_dir.collect() {
+                Ok(v) => v,
+                Err(e) => return soln_stream::error(e.into()),
+            };
+
+            let list = RcTm::list_from_iter(entries.into_iter().map(|ent| {
+                RcTm::sym(ent.file_name().to_string_lossy())
+            }));
+
+            soln_stream::unifying(u, output, &list)
+        });
+
         ////////////////////// Define `[builtins]` //////////////////////
 
         let builtin_rel_sigs = {

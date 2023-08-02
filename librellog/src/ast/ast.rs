@@ -1,5 +1,5 @@
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, HashSet},
     fmt,
     iter::{self, DoubleEndedIterator},
     ops::Deref,
@@ -7,6 +7,7 @@ use std::{
 };
 
 use char_list::CharList;
+use nom_locate::LocatedSpan;
 use rpds::{vector, Vector};
 use unifier_set::{ClassifyTerm, DirectChildren, TermKind};
 
@@ -14,7 +15,12 @@ use crate::{
     ast::dup::{Dup, TmDuplicator},
     ast::tm_displayer::TmDisplayer,
     data_structures::{Map, Num, Sym, Var},
-    lex::tok::Tok,
+    interner::IStr,
+    lex::{
+        self,
+        tok::{At, Tok},
+    },
+    parse::{self, Error},
 };
 
 pub type Rel = Map<Sym, RcTm>;
@@ -110,6 +116,10 @@ impl RcTm {
                 _ => break Err(()),
             }
         }
+    }
+
+    pub fn sym(s: impl AsRef<str>) -> Self {
+        Tm::Sym(IStr::from(s.as_ref())).into()
     }
 }
 
@@ -322,6 +332,7 @@ impl Dup for Clause {
 pub struct Module {
     pub directives: Vec<Rel>,
     pub relations: BTreeMap<Sig, Vec<Clause>>,
+    pub dependencies: HashSet<IStr>,
 }
 
 impl Module {
@@ -339,6 +350,14 @@ impl Module {
     pub fn import(&mut self, other: Module) {
         self.directives.append(&mut other.directives.clone());
         self.relations.append(&mut other.relations.clone());
+    }
+
+    pub fn parse<'ts>(
+        src: impl AsRef<str>,
+        token_buf: &'ts mut Vec<At<Tok>>,
+    ) -> Result<Module, Error<'ts>> {
+        let tokens = lex::tokenize_into(token_buf, LocatedSpan::new(src.as_ref()));
+        parse::entire_module(tokens)
     }
 }
 
