@@ -1,4 +1,4 @@
-use std::fmt::{self, Formatter};
+use std::fmt::{self, Display, Formatter};
 
 use rpds::Vector;
 
@@ -8,10 +8,18 @@ use crate::{
     lex::tok::Tok,
 };
 
-#[derive(Default)]
 pub struct TmDisplayer<'tm> {
     indent: usize,
     tm: Option<&'tm Tm>,
+}
+
+impl Default for TmDisplayer<'_> {
+    fn default() -> Self {
+        Self {
+            indent: 1,
+            tm: None,
+        }
+    }
 }
 
 impl<'tm> TmDisplayer<'tm> {
@@ -78,8 +86,59 @@ impl<'tm> TmDisplayer<'tm> {
         Ok(())
     }
 
+    const MIN_LIST_LINEBREAK_LEN: usize = 6;
+
     pub fn fmt_list(&self, mut x: RcTm, mut xs: RcTm, f: &mut fmt::Formatter) -> fmt::Result {
+        enum Layout {
+            Inline,
+            Block,
+        }
+
+        struct Sep {
+            indent: usize,
+            layout: Layout,
+        }
+
+        impl Display for Sep {
+            fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+                match self.layout {
+                    Layout::Inline => write!(f, " "),
+                    Layout::Block => {
+                        writeln!(f, "")?;
+                        for _ in 0..self.indent {
+                            write!(f, "    ")?;
+                        }
+                        Ok(())
+                    }
+                }
+            }
+        }
+
+        impl Sep {
+            fn close_brace(&self, f: &mut Formatter<'_>) -> fmt::Result {
+                if let Layout::Block = self.layout {
+                    writeln!(f, "")?;
+                    for _ in 0..self.indent - 1 {
+                        write!(f, "    ")?;
+                    }
+                }
+                write!(f, "}}")
+            }
+        }
+
+        let mut sep = Sep {
+            layout: Layout::Inline,
+            indent: self.indent + 1,
+        };
+
         write!(f, "{{")?;
+
+        if let Some((rest, _tail)) = xs.try_as_list() {
+            if rest.len() >= Self::MIN_LIST_LINEBREAK_LEN {
+                sep.layout = Layout::Block;
+                write!(f, "{sep}")?;
+            }
+        }
 
         loop {
             write!(f, "{}", self.indented(&*x))?;
@@ -87,17 +146,22 @@ impl<'tm> TmDisplayer<'tm> {
             match &*xs {
                 // xs = {y ...{}} = {y}
                 Tm::Cons(y, ys) if matches!(**ys, Tm::Nil) => {
-                    return write!(f, " {}}}", self.indented(&**y))
+                    write!(f, "{sep}{}", self.indented(&**y))?;
+                    return sep.close_brace(f);
                 }
                 // xs = {y ...ys} (continue loop)
                 Tm::Cons(y, ys) => (x, xs) = (y.clone(), ys.clone()),
                 // xs = {x}
-                Tm::Nil => return write!(f, "}}"),
+                Tm::Nil => return sep.close_brace(f),
+
                 // Malformed list like: {1 2 ...3} (instead of {1 2 3 ...{}})
-                xs => return write!(f, " {}{}}}", Tok::Spread, self.indented(xs)),
+                xs => {
+                    write!(f, "{sep}{}{}", Tok::Spread, self.indented(xs))?;
+                    return sep.close_brace(f);
+                }
             }
 
-            write!(f, " ")?;
+            write!(f, "{sep}")?;
         }
     }
 }
