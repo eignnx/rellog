@@ -1,9 +1,10 @@
-use std::fmt;
+use std::fmt::{self, Formatter};
 
 use rpds::Vector;
 
 use crate::{
     ast::ast::{RcTm, Rel, Tm},
+    interner::IStr,
     lex::tok::Tok,
 };
 
@@ -25,6 +26,22 @@ impl<'tm> TmDisplayer<'tm> {
         Self {
             tm: Some(tm),
             ..*self
+        }
+    }
+
+    fn fmt_sym(&self, f: &mut Formatter<'_>, sym: &IStr) -> Result<(), fmt::Error> {
+        let sym = sym.to_str();
+        if !sym.is_empty()
+            && !sym.contains(|c: char| !c.is_alphanumeric())
+            && sym
+                .chars()
+                .next()
+                .map(|c| c.is_alphabetic() && c.is_ascii_lowercase())
+                .expect("empty str case handled above")
+        {
+            write!(f, "{sym}")
+        } else {
+            write!(f, "'{sym}'")
         }
     }
 
@@ -93,7 +110,7 @@ impl<'tm> fmt::Display for TmDisplayer<'tm> {
             .expect("fmt::Display::fmt will not be called on empty TmDisplayer");
 
         match tm {
-            Tm::Sym(s) => write!(f, "{s}"),
+            Tm::Sym(s) => self.fmt_sym(f, s),
             Tm::Var(v) => write!(f, "{v}"),
             Tm::Num(i) => write!(f, "{i}"),
             Tm::Txt(char_list, tail) => {
