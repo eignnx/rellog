@@ -193,7 +193,7 @@ impl<'tm> fmt::Display for TmDisplayer<'tm> {
                 } else {
                     // If it's not text, and the tail wasn't Nil, break
                     // and display the tail (either Var or malformed).
-                    write!(f, "[.. {tail}]\"")
+                    write!(f, "[{} {tail}]\"", Tok::Spread)
                 }
             }
             Tm::Block(functor, members) => self.fmt_block(functor, members, f),
