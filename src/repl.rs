@@ -159,6 +159,8 @@ impl Repl {
             let mut buf = Vec::new();
             let tokens = lex::tokenize_into(&mut buf, &query_buf[..]);
 
+            let mut no_solns_yet_found = true;
+
             let query = match parse::entire_term(tokens) {
                 Ok(q) => q,
                 Err(e) => {
@@ -175,22 +177,30 @@ impl Repl {
             self.config.set_repl_mode(ReplMode::PrintingSolns);
 
             while let Some(soln) = solns.next() {
-                match soln {
+                let soln = match soln {
                     Ok(soln) => {
                         let disp = DisplayUnifierSet {
-                            u: soln,
+                            u: soln.clone(),
                             display_or_bar: or_bar_printed,
                         };
-                        print!("{disp}")
+                        print!("{disp}");
+                        no_solns_yet_found = false;
+                        soln
                     }
                     Err(e) => {
                         println!("{}", Color::Red.paint(format!("Exception: {e}")));
                         continue 'outer;
                     }
-                }
+                };
 
                 // If we *know* there are no more solutions...
                 match solns.size_hint() {
+                    (_, Some(0)) if soln.is_empty() => {
+                        let msg =
+                            Color::Yellow.paint(format!("# The query holds unconditionally."));
+                        println!(" {msg}");
+                        continue 'outer;
+                    }
                     (_, Some(0)) => {
                         let msg = Color::Yellow.paint(format!("# Exactly 1 solution found."));
                         println!(" {msg}");
@@ -198,6 +208,11 @@ impl Repl {
                     }
                     (lo, Some(hi)) if lo == hi => {
                         let msg = Color::Yellow.paint(format!("# {lo} solution(s) remain."));
+                        println!(" {msg}");
+                    }
+                    (_, Some(hi)) => {
+                        let msg =
+                            Color::Yellow.paint(format!("# At most {hi} solution(s) remain."));
                         println!(" {msg}");
                     }
                     _ => {}
@@ -220,10 +235,17 @@ impl Repl {
                 print!(" ");
             }
 
-            println!(
-                "   - [false] {}",
-                Color::Yellow.paint("# No additional solutions found.")
-            );
+            if no_solns_yet_found {
+                println!(
+                    "   - [false] {}",
+                    Color::Yellow.paint("# The query has no solutions.")
+                );
+            } else {
+                println!(
+                    "   - [false] {}",
+                    Color::Yellow.paint("# No additional solutions found.")
+                );
+            }
         }
     }
 }
