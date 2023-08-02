@@ -55,7 +55,7 @@
     - [term Signature][text SigTxt]
     - [io_writeln "Relation: "][stream stdout]
     - [io_writeln SigTxt][stream stdout]
- - [io_writeln "--------------"][stream stdout]
+    - [io_writeln "--------------"][stream stdout]
     - [io_writeln HelpTxt][stream stdout]
 
 
