@@ -2,7 +2,7 @@ use std::iter;
 
 use crate::{ast::RcTm, rt::UnifierSet};
 
-use super::{rt, Res};
+use super::{err::Err, Res};
 
 /// Essentially a trait alias.
 pub trait SolnStream: Iterator<Item = Res<UnifierSet>> {}
@@ -25,6 +25,6 @@ pub fn once(res: Res<UnifierSet>) -> Box<dyn SolnStream> {
     Box::new(iter::once(res))
 }
 
-pub fn error(err: rt::Err) -> Box<dyn SolnStream> {
+pub fn error(err: Err) -> Box<dyn SolnStream> {
     once(Err(err))
 }
