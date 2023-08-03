@@ -451,3 +451,71 @@ To solve this, insert an empty `relational context` between the two rules:
 ```ruby
 "[rule1][rule1_arg1]{}[rule2][rule2_arg2]"
 ```
+
+## Cut/Xor
+
+I don't want to add cut. Cut sucks, and is difficult to implement.
+
+### Exclusive-Or Blocks
+```ruby
+[bit B]
+    > B = 0
+    > B = 1
+
+# Or, equivalently:
+
+> [bit 0]
+> [bit 1]
+```
+
+```ruby
+-- [bit 0]
+    - [true] # NOTE: no backtracking afterwards!
+-- [bit B]
+    - B = 0
+|
+    - B = 1
+    # No additional solutions exist.
+```
+
+Useful for my documentation system:
+
+```ruby
+> [sig [gt][lt]][help "... [gt][lt] ..."]
+> [sig [pred][succ]][help "... [pred][succ] ..."]
+```
+
+```ruby
+-- [sig [gt][lt]][Help]
+    - Help = "... [gt][lt] ..."
+    # No additional solutions exist.
+-- [Sig][Help]
+    - Sig = [gt][lt]
+    - Help = "... [gt][lt] ..."
+|
+    - Sig = [pred][succ]
+    - Help = "... [pred][succ] ..."
+    # No additional solutions exist.
+```
+
+### Contract
+An exclusive-or block asserts that each sub-goal does not overlap with any other
+subgoal. For example:
+
+```ruby
+> [a 1]
+> [a 2]
+> [a 3]
+```
+
+...asserts that `1`, `2`, and `3` are distinct.
+
+The following would be an invalid use of an xor block:
+
+```ruby
+> [a 1]
+> [a X]
+> [a 3]
+```
+
+It's invalid cause `X` overlaps (subsumes?) both `1` and `3`.
