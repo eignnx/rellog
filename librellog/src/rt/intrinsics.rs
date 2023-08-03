@@ -296,16 +296,140 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |u, [product][x][y]| {
-            match (product.as_ref(), x.as_ref(), y.as_ref()) {
+        def_intrinsic!(intrs, |u, [sum][x][y]| {
+            match (sum.as_ref(), x.as_ref(), y.as_ref()) {
+                (_, Tm::Num(x), Tm::Num(y)) => {
+                    let res = Tm::Num(x + y).into();
+                    soln_stream::unifying(u, sum, &res)
+                }
+                // sum = X + y
+                // <=>
+                // X = sum - y
+                (Tm::Num(sum), _, Tm::Num(y)) => {
+                    let res = Tm::Num(sum - y).into();
+                    soln_stream::unifying(u, x, &res)
+                }
+                // sum = x + Y
+                // <=>
+                // Y = sum - x
+                (Tm::Num(sum), Tm::Num(x), _) => {
+                    let res = Tm::Num(sum - x).into();
+                    soln_stream::unifying(u, y, &res)
+                }
                 (_, Tm::Var(_), Tm::Var(_)) => Err::InstantiationError(x.clone()).into(),
                 (Tm::Var(_), _, Tm::Var(_)) => Err::InstantiationError(y.clone()).into(),
                 (Tm::Var(_), Tm::Var(_), _) => Err::InstantiationError(x.clone()).into(),
+                _ => Err::TypeError { msg: "[sum][x][y] only relates numbers.".into() }.into()
+            }
+        });
+
+        def_intrinsic!(intrs, |u, [product][x][y]| {
+            match (product.as_ref(), x.as_ref(), y.as_ref()) {
                 (_, Tm::Num(x), Tm::Num(y)) => {
-                    let p = Tm::Num(x * y).into();
-                    soln_stream::unifying(u, product, &p)
+                    let res = Tm::Num(x * y).into();
+                    soln_stream::unifying(u, product, &res)
                 }
+                // product = X * y
+                // <=>
+                // X = product / y
+                (Tm::Num(product), _, Tm::Num(y)) => {
+                    if *y == 0 {
+                        return Err::TypeError {
+                            msg: "Division by zero required to solve query [product _][X][y 0].".into()
+                        }.into();
+                    }
+                    let res = Tm::Num(product / y).into();
+                    soln_stream::unifying(u, x, &res)
+                }
+                // product = x * Y
+                // <=>
+                // Y = product / x
+                (Tm::Num(product), Tm::Num(x), _) => {
+                    if *x == 0 {
+                        return Err::TypeError {
+                            msg: "Division by zero required to solve query [product #][x 0][Y].".into()
+                        }.into();
+                    }
+                    let res = Tm::Num(product / x).into();
+                    soln_stream::unifying(u, y, &res)
+                }
+                (_, Tm::Var(_), Tm::Var(_)) => Err::InstantiationError(x.clone()).into(),
+                (Tm::Var(_), _, Tm::Var(_)) => Err::InstantiationError(y.clone()).into(),
+                (Tm::Var(_), Tm::Var(_), _) => Err::InstantiationError(x.clone()).into(),
                 _ => Err::TypeError { msg: "[product][x][y] only relates numbers.".into() }.into()
+            }
+        });
+
+        def_intrinsic!(intrs, |u, [difference][minuend][subtrahend]| {
+            match (difference.as_ref(), minuend.as_ref(), subtrahend.as_ref()) {
+                (a, b, c) if ![a, b, c].into_iter().all(|tm| matches!(*tm, Tm::Num(_) | Tm::Var(_))) => {
+                    Err::TypeError {
+                        msg: "The arguments to [difference][minuend][subtrahend] must all be unifyable with integers.".into()
+                    }.into()
+                }
+                // difference = minuend - subtrahend
+                (_, Tm::Num(min), Tm::Num(sub)) => {
+                    let diff = Tm::Num(*min - *sub).into();
+                    soln_stream::unifying(u, difference, &diff)
+                }
+                // minuend = difference + subtrahend
+                (Tm::Num(diff), _, Tm::Num(sub)) => {
+                    let min = Tm::Num(*diff + *sub).into();
+                    soln_stream::unifying(u, minuend, &min)
+                }
+                // subtrahend = minuend - difference
+                (Tm::Num(diff), Tm::Num(min), _) => {
+                    let sub = Tm::Num(*min - *diff).into();
+                    soln_stream::unifying(u, subtrahend, &sub)
+                }
+                _ => Err::TypeError {
+                    msg: "[difference][minuend][subtrahend] is not implemented for that mode.".into()
+                }.into(),
+            }
+        });
+
+        def_intrinsic!(intrs, |u, [quotient][remainder][numerator][denominator]| {
+            // numerator = quotient * denominator + remainder
+            match (quotient.as_ref(), remainder.as_ref(), numerator.as_ref(), denominator.as_ref()) {
+                (a, b, c, d) if ![a, b, c, d].into_iter().all(|tm| matches!(*tm, Tm::Num(_) | Tm::Var(_))) => {
+                    Err::TypeError {
+                        msg: "The arguments to [numerator][denominator][quotient][remainder] must all be unifyable with integers.".into()
+                    }.into()
+                }
+                (_, _, Tm::Num(numer), Tm::Num(denom)) => {
+                    if *denom == 0 {
+                        return Err::TypeError {
+                            msg: "Division by zero required to solve query [numerator #][denominator 0][Quotient][Remainder].".into()
+                        }.into();
+                    }
+                    let q = numer.div_euclid(*denom);
+                    let r = numer.rem_euclid(*denom);
+                    u.unify(quotient, &Tm::Num(q).into()).and_then(|u| {
+                        u.unify(remainder, &Tm::Num(r).into())
+                    }).map(|u| {
+                        soln_stream::success(u)
+                    }).unwrap_or_else(soln_stream::failure)
+                }
+                (Tm::Num(quot), Tm::Num(rem), _, Tm::Num(denom)) => {
+                    let numer = *quot * *denom + *rem;
+                    soln_stream::unifying(u, numerator, &Tm::Num(numer).into())
+                }
+                // denominator = (numerator - remainder) / quotient
+                (Tm::Num(quot), Tm::Num(rem), Tm::Num(numer), _) => {
+                    if *quot == 0 {
+                        return Err::TypeError {
+                            msg: "Division by zero required to solve query [quotient 0][remainder #][numerator #][Denominator].".into()
+                        }.into();
+                    }
+                    let denom = (*numer - *rem).div_euclid(*quot);
+                    if denom == 0 {
+                        return soln_stream::failure();
+                    }
+                    soln_stream::unifying(u, denominator, &Tm::Num(denom).into())
+                }
+                _ => Err::TypeError {
+                    msg: "[numerator][denominator][quotient][remainder] is not implemented for that mode.".into()
+                }.into(),
             }
         });
 

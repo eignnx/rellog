@@ -144,3 +144,20 @@
     working directory.
     """
 ]
+
+[sig [minuend][subtrahend][difference]][help
+    """
+    Expresses the relationship: `Minuend - Subtrahend = Difference`. To perform
+    addition, use mode `[Minuend][subtrahend #][difference #]`.
+    """
+]
+
+[sig [numerator][denominator][quotient][remainder]][help
+    """
+    Expresses the relationship: `Numerator/Denominator = Quotient (with a 
+    remainder of Remainder)`. More precisely, the relationship is `Numerator = 
+    Quotient * Denominator + Remainder`. Can be used to express divisibility 
+    (when Remainder is set to 0), as well as multiplication (when Remainder is 
+    0).
+    """
+]
