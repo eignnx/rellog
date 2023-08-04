@@ -15,6 +15,7 @@ use crate::{
         UnifierSet,
     },
     tm,
+    utils::int_counter::IntCounter,
 };
 
 pub struct Intrinsic {
@@ -389,13 +390,14 @@ impl IntrinsicsMap {
         });
 
         def_intrinsic!(intrs, |u, [quotient][remainder][numerator][denominator]| {
-            // numerator = quotient * denominator + remainder
             match (quotient.as_ref(), remainder.as_ref(), numerator.as_ref(), denominator.as_ref()) {
                 (a, b, c, d) if ![a, b, c, d].into_iter().all(|tm| matches!(*tm, Tm::Num(_) | Tm::Var(_))) => {
                     Err::TypeError {
                         msg: "The arguments to [numerator][denominator][quotient][remainder] must all be unifyable with integers.".into()
                     }.into()
                 }
+                // quotient = numerator / denominator
+                // remainder = numerator % denominator
                 (_, _, Tm::Num(numer), Tm::Num(denom)) => {
                     if *denom == 0 {
                         return Err::TypeError {
@@ -410,6 +412,7 @@ impl IntrinsicsMap {
                         soln_stream::success(u)
                     }).unwrap_or_else(soln_stream::failure)
                 }
+                // numerator = quotient * denominator + remainder
                 (Tm::Num(quot), Tm::Num(rem), _, Tm::Num(denom)) => {
                     let numer = *quot * *denom + *rem;
                     soln_stream::unifying(u, numerator, &Tm::Num(numer).into())
@@ -427,9 +430,43 @@ impl IntrinsicsMap {
                     }
                     soln_stream::unifying(u, denominator, &Tm::Num(denom).into())
                 }
-                _ => Err::TypeError {
-                    msg: "[numerator][denominator][quotient][remainder] is not implemented for that mode.".into()
-                }.into(),
+                // forall quotient: int . numerator = quotient * denominator + remainder
+                // (iterate through integer quotients)
+                (_, &Tm::Num(rem), _, &Tm::Num(den)) => {
+                    let numerator = numerator.clone();
+                    let quotient = quotient.clone();
+                    Box::new(IntCounter::default().flat_map(move |i| {
+                        let quo = i;
+                        let num = quo * den + rem;
+                        let opt = u.unify(&quotient, &Tm::Num(quo).into()).and_then(|u| {
+                            u.unify(&numerator, &Tm::Num(num).into())
+                        });
+                        if let Some(u) = opt {
+                            soln_stream::success(u)
+                        } else {
+                            soln_stream::failure()
+                        }
+                    }))
+                }
+                _ => {
+                    let mode: RcTm = tm!{
+                        [
+                            numerator numerator.clone()
+                        ][
+                            denominator denominator.clone()
+                        ][
+                            quotient quotient.clone()
+                        ][
+                            remainder remainder.clone()
+                        ]
+                    }.into();
+
+                    Err::TypeError {
+                        msg: format!(
+                            "[numerator][denominator][quotient][remainder] is not \
+                            implemented for mode `{mode}`.").into()
+                    }.into()
+                }
             }
         });
 

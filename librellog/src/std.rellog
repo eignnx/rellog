@@ -3,14 +3,25 @@
 [prefix {A ..As}][Suffix][compound {A ..Compound}]
     - [prefix As][suffix Suffix][Compound]
 
-[Prefix][Suffix][Compound]
-    - [txt_prefix Prefix][txt_suffix Suffix][txt_compound Compound]
+[[comment
+    """
+    [Prefix][Suffix][Compound]
+        - [txt_prefix Prefix][txt_suffix Suffix][txt_compound Compound]
+    """
+]]
 
 [sig [forwards][backwards]][help "Relates a list to its reversal."]
 [forwards {}][backwards {}]
 [forwards {A ..As}][Backwards]
     - [forwards As][backwards AsBackwards]
     - [prefix AsBackwards][suffix {A}][compound Backwards]
+
+[[todo
+    """
+    `[[mode [forwards out][backwards in]]]` loops forever.
+    Does it need to be an intrinsic?
+    """
+]]
 
 [list {Member ..Rest}][Member]
 [list {Other ..Rest}][Member]
@@ -145,12 +156,19 @@
     """
 ]
 
+[Min][Sub][Dif]
+[Mnnd][Sbth][Dffc]
+    - [minuend Min][subtrahend Sub][difference Dif]
+
 [sig [minuend][subtrahend][difference]][help
     """
     Expresses the relationship: `Minuend - Subtrahend = Difference`. To perform
     addition, use mode `[Minuend][subtrahend #][difference #]`.
     """
 ]
+
+[Num][Den][Quo][Rem]
+    - [numerator Num][denominator Den][quotient Quo][remainder Rem]
 
 [sig [numerator][denominator][quotient][remainder]][help
     """
@@ -159,5 +177,27 @@
     Quotient * Denominator + Remainder`. Can be used to express divisibility 
     (when Remainder is set to 0), as well as multiplication (when Remainder is 
     0).
+    [num][den][Quo][Rem]   <=> quo = num / den, rem = num % den
+    [Num][den][quo][rem]   <=> num = den * quo + rem
+    [Num][den 1][quo][rem] <=> num = quo + rem
+    [Num][den][quo 1][rem] <=> num = den + rem
+    [Num][den][quo][rem 0] <=> num = den * quo
+    [num][Den][quo][rem]   <=> den = (num - rem) / quo
+    [num][den][Quo][rem]   <=> quo = (num - rem) / den
+    [num][Den][quo 1][rem] <=> den = num - rem
+    [num][den 1][Quo][rem] <=> quo = num - rem
     """
 ]
+
+[Nat][Base][Digits]
+    - [forwards Digits][backwards RevDigits]
+    - [Nat][Base][RevDigits]
+
+[nat 0][Base][revdigits {}]
+[Nat][Base][revdigits {Rem ..Ds}]
+    - [num Nat][den Base][Quo][Rem]
+    - [nat Quo][Base][revdigits Ds]
+
+[[todo
+    "[[mode [num out][den in][quo out][rem in]]] not supported."
+]]

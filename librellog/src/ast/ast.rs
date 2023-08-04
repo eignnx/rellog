@@ -147,6 +147,18 @@ macro_rules! tm {
             Tm::Rel(rel)
         }
     };
+
+    ( $([$attr:ident $expr:expr])+ ) => {
+        {
+            let mut rel = Rel::new();
+
+            $(
+                rel.insert_mut(stringify!($attr).into(), $expr);
+            )+
+
+            Tm::Rel(rel)
+        }
+    };
 }
 
 impl Dup for RcTm {
