@@ -452,6 +452,32 @@ To solve this, insert an empty `relational context` between the two rules:
 "[rule1][rule1_arg1]{}[rule2][rule2_arg2]"
 ```
 
+## Multiline Strings
+
+```
+[story]
+    > "asfg"
+    > `asdf`
+    > """
+      Use for human language text. Single linebreaks
+      are folded into spaces (like with
+      markdown).
+      
+      Paragraph breaks are indicated by double
+      newline characters.
+      """
+    > ```
+      use for code-like text where
+      indentation and linebreaks are important.
+      ```
+    > #"""
+      This string contains triple quotes:
+         """
+       They are kept though.
+      """#
+
+```
+
 ## Cut/Xor
 
 I don't want to add cut. Cut sucks, and is difficult to implement.
