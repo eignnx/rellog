@@ -1,7 +1,6 @@
 use std::{
     cell::RefCell,
     io::{self, Read},
-    process::exit,
 };
 
 use librellog::{
