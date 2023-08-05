@@ -1,6 +1,9 @@
 use std::sync::{Arc, PoisonError, RwLock, RwLockReadGuard, RwLockWriteGuard};
 
-use reedline::{FileBackedHistory, PromptEditMode, PromptViMode, Reedline};
+use reedline::{
+    default_vi_insert_keybindings, default_vi_normal_keybindings, DefaultHinter, FileBackedHistory,
+    PromptEditMode, PromptViMode, Reedline,
+};
 
 mod highlighter;
 mod prompt;
@@ -29,13 +32,34 @@ impl Default for RellogReplConfig {
 #[derive(Clone, Default)]
 pub struct RellogReplConfigHandle(Arc<RwLock<RellogReplConfig>>);
 
+const HISTSIZE: usize = 500;
+
 impl RellogReplConfigHandle {
     pub fn create_editor(&self) -> reedline::Reedline {
+        let hist_file = directories_next::ProjectDirs::from(
+            "io.github",   /*qualifier*/
+            "eignnx",      /*organization*/
+            "Rellog Repl", /*application*/
+        )
+        .expect("valid home directory could not be located")
+        .cache_dir()
+        .to_path_buf()
+        .join("rellog_history.txt");
+
+        println!("[histfile_location \"{}\"]", hist_file.to_string_lossy());
+
         Reedline::create()
-            .with_history(Box::<FileBackedHistory>::default())
+            .with_history(Box::new(
+                FileBackedHistory::with_file(HISTSIZE, hist_file)
+                    .expect("HISTFILE could not be created"),
+            ))
+            .with_hinter(Box::new(DefaultHinter::default().with_min_chars(2)))
             .with_validator(Box::new(self.clone()))
             .with_highlighter(Box::new(self.clone()))
-            .with_edit_mode(Box::<reedline::Vi>::default())
+            .with_edit_mode(Box::new(reedline::Vi::new(
+                default_vi_insert_keybindings(),
+                default_vi_normal_keybindings(),
+            )))
     }
 
     pub fn set_repl_mode(&self, mode: ReplMode) {

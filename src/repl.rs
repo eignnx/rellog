@@ -5,7 +5,7 @@ use std::{
 };
 
 use librellog::{
-    ast::{self, dup::TmDuplicator, Module},
+    ast::{self, dup::TmDuplicator},
     lex::{
         self,
         tok::{At, Tok},
@@ -35,20 +35,6 @@ impl Repl {
         Self::loading_file("./librellog/src/std.rellog")
     }
 
-    #[allow(dead_code)]
-    pub fn without_loading_file() -> Self {
-        let config = RellogReplConfigHandle::default();
-        let rt = Rt::new(Module::default());
-        Self {
-            current_file: "<repl>".to_owned(),
-            module: Default::default(),
-            line_editor: config.create_editor(),
-            config,
-            rt,
-        }
-    }
-
-    #[allow(dead_code)]
     pub fn loading_file(fname: &str) -> Self {
         let config = RellogReplConfigHandle::default();
         let mut tok_buf = Vec::new();
@@ -82,18 +68,18 @@ impl Repl {
         Ok(())
     }
 
-    pub fn run(&mut self) -> ! {
+    pub fn run(&mut self) {
         let mut tok_buf = Vec::new();
 
         'outer: loop {
             self.config.set_repl_mode(ReplMode::TopLevel);
             let query_buf = match self.line_editor.read_line(&self.config) {
                 Ok(Signal::Success(s)) => s,
-                Ok(Signal::CtrlC | Signal::CtrlD) => exit(0),
+                Ok(Signal::CtrlC | Signal::CtrlD) => break 'outer,
                 Err(e) => {
                     println!("Unable to read line from terminal: {e}");
                     println!("Exiting...");
-                    exit(0);
+                    break 'outer;
                 }
             };
 
@@ -107,6 +93,10 @@ impl Repl {
                     println!("  [Builtins]        Show a list of builtin relations.");
                     println!("  [Sig][Help]       Show help text for a relation given by `Sig`.");
                     continue 'outer;
+                }
+                &[":quit" | ":q" | ":exit" | ":wq"] => {
+                    println!("Exiting Rellog REPL...");
+                    break 'outer;
                 }
                 &[":reload" | ":r"] => {
                     println!(
@@ -224,7 +214,7 @@ impl Repl {
                         println!("...");
                         continue 'outer;
                     }
-                    Signal::CtrlD => exit(0),
+                    Signal::CtrlD => break 'outer,
                 }
 
                 print!("\n|"); // Print an "or"; more solns incoming.

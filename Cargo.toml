@@ -12,3 +12,4 @@ nom_i9n = { path = "./librellog/nom_indentation" }
 reedline = "0.10.0"
 nu-ansi-term = "0.46.0"
 human-panic = "1.1.5"
+directories-next = "2.0.0"
