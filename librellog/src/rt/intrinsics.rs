@@ -161,7 +161,7 @@ impl IntrinsicsMap {
 
                 (Tm::Var(_), Tm::Var(_)) => Err::InstantiationError(rel.clone()).into(),
 
-                (_, _) => Err::TypeError { msg: "[rel][attrs] takes a relation and a list of attributes".into() }.into(),
+                (_, _) => Err::GenericError { msg: "[rel][attrs] takes a relation and a list of attributes".into() }.into(),
             }
         });
 
@@ -181,7 +181,7 @@ impl IntrinsicsMap {
 
                 (Tm::Rel(_non_attr_rel), _, _) => {
                     // Is this good advice?
-                    soln_stream::error(Err::TypeError { msg: "use [rel][attr] instead".into() })
+                    soln_stream::error(Err::GenericError { msg: "use [rel][attr] instead".into() })
                 }
 
                 // [[mode [attr inout][key in][value inout]]]
@@ -192,7 +192,7 @@ impl IntrinsicsMap {
 
                 (Tm::Var(_), Tm::Var(_), _) => Err::InstantiationError(key.clone()).into(),
 
-                _ => Err::TypeError { msg: "bad arguments to [attr][key][value]".into() }.into()
+                _ => Err::GenericError { msg: "bad arguments to [attr][key][value]".into() }.into()
             }
         });
 
@@ -205,7 +205,7 @@ impl IntrinsicsMap {
                         soln_stream::failure()
                     }
                 }
-                _ => Err::TypeError { msg: "[gt][lt] accepts two concrete numbers".into() }.into(),
+                _ => Err::GenericError { msg: "[gt][lt] accepts two concrete numbers".into() }.into(),
             }
         });
 
@@ -218,7 +218,7 @@ impl IntrinsicsMap {
                         soln_stream::failure()
                     }
                 }
-                _ => Err::TypeError { msg: "[gte][lte] accepts two concrete numbers".into() }.into()
+                _ => Err::GenericError { msg: "[gte][lte] accepts two concrete numbers".into() }.into()
             }
         });
 
@@ -233,13 +233,13 @@ impl IntrinsicsMap {
             let rel = match rel.as_ref() {
                 Tm::Rel(rel) => rel,
                 Tm::Var(_) => return Err::InstantiationError(rel.clone()).into(),
-                _ => return Err::TypeError { msg: "[Rel][key][value] requires a relation for `Rel`.".into() }.into()
+                _ => return Err::GenericError { msg: "[Rel][key][value] requires a relation for `Rel`.".into() }.into()
             };
 
             let key = match key.as_ref() {
                 Tm::Sym(key) => key,
                 Tm::Var(_) => return Err::InstantiationError(key.clone()).into(),
-                _ => return Err::TypeError { msg: "[rel][Key][value] requires a ground term for `Key`.".into() }.into()
+                _ => return Err::GenericError { msg: "[rel][Key][value] requires a ground term for `Key`.".into() }.into()
             };
 
             if let Some(found) = rel.get(key) {
@@ -288,7 +288,7 @@ impl IntrinsicsMap {
                     soln_stream::success(u)
                 }
 
-                _ => Err::TypeError {
+                _ => Err::GenericError {
                         msg: "only modes supported for `[txt_prefix][txt_suffix][txt_compound]`:\n\
                             \t[[mode txt_[prefix in][suffix  in][compound out]]]\n\
                             \t[[mode txt_[prefix in][suffix out][compound out]]]\n\
@@ -320,7 +320,7 @@ impl IntrinsicsMap {
                 (_, Tm::Var(_), Tm::Var(_)) => Err::InstantiationError(x.clone()).into(),
                 (Tm::Var(_), _, Tm::Var(_)) => Err::InstantiationError(y.clone()).into(),
                 (Tm::Var(_), Tm::Var(_), _) => Err::InstantiationError(x.clone()).into(),
-                _ => Err::TypeError { msg: "[sum][x][y] only relates numbers.".into() }.into()
+                _ => Err::GenericError { msg: "[sum][x][y] only relates numbers.".into() }.into()
             }
         });
 
@@ -335,7 +335,7 @@ impl IntrinsicsMap {
                 // X = product / y
                 (Tm::Num(product), _, Tm::Num(y)) => {
                     if *y == 0 {
-                        return Err::TypeError {
+                        return Err::GenericError {
                             msg: "Division by zero required to solve query [product _][X][y 0].".into()
                         }.into();
                     }
@@ -347,7 +347,7 @@ impl IntrinsicsMap {
                 // Y = product / x
                 (Tm::Num(product), Tm::Num(x), _) => {
                     if *x == 0 {
-                        return Err::TypeError {
+                        return Err::GenericError {
                             msg: "Division by zero required to solve query [product #][x 0][Y].".into()
                         }.into();
                     }
@@ -357,14 +357,14 @@ impl IntrinsicsMap {
                 (_, Tm::Var(_), Tm::Var(_)) => Err::InstantiationError(x.clone()).into(),
                 (Tm::Var(_), _, Tm::Var(_)) => Err::InstantiationError(y.clone()).into(),
                 (Tm::Var(_), Tm::Var(_), _) => Err::InstantiationError(x.clone()).into(),
-                _ => Err::TypeError { msg: "[product][x][y] only relates numbers.".into() }.into()
+                _ => Err::GenericError { msg: "[product][x][y] only relates numbers.".into() }.into()
             }
         });
 
         def_intrinsic!(intrs, |u, [difference][minuend][subtrahend]| {
             match (difference.as_ref(), minuend.as_ref(), subtrahend.as_ref()) {
                 (a, b, c) if ![a, b, c].into_iter().all(|tm| matches!(*tm, Tm::Num(_) | Tm::Var(_))) => {
-                    Err::TypeError {
+                    Err::GenericError {
                         msg: "The arguments to [difference][minuend][subtrahend] must all be unifyable with integers.".into()
                     }.into()
                 }
@@ -383,7 +383,7 @@ impl IntrinsicsMap {
                     let sub = Tm::Num(*min - *diff).into();
                     soln_stream::unifying(u, subtrahend, &sub)
                 }
-                _ => Err::TypeError {
+                _ => Err::GenericError {
                     msg: "[difference][minuend][subtrahend] is not implemented for that mode.".into()
                 }.into(),
             }
@@ -392,7 +392,7 @@ impl IntrinsicsMap {
         def_intrinsic!(intrs, |u, [quotient][remainder][numerator][denominator]| {
             match (quotient.as_ref(), remainder.as_ref(), numerator.as_ref(), denominator.as_ref()) {
                 (a, b, c, d) if ![a, b, c, d].into_iter().all(|tm| matches!(*tm, Tm::Num(_) | Tm::Var(_))) => {
-                    Err::TypeError {
+                    Err::GenericError {
                         msg: "The arguments to [numerator][denominator][quotient][remainder] must all be unifyable with integers.".into()
                     }.into()
                 }
@@ -400,7 +400,7 @@ impl IntrinsicsMap {
                 // remainder = numerator % denominator
                 (_, _, Tm::Num(numer), Tm::Num(denom)) => {
                     if *denom == 0 {
-                        return Err::TypeError {
+                        return Err::GenericError {
                             msg: "Division by zero required to solve query [numerator #][denominator 0][Quotient][Remainder].".into()
                         }.into();
                     }
@@ -420,7 +420,7 @@ impl IntrinsicsMap {
                 // denominator = (numerator - remainder) / quotient
                 (Tm::Num(quot), Tm::Num(rem), Tm::Num(numer), _) => {
                     if *quot == 0 {
-                        return Err::TypeError {
+                        return Err::GenericError {
                             msg: "Division by zero required to solve query [quotient 0][remainder #][numerator #][Denominator].".into()
                         }.into();
                     }
@@ -461,7 +461,7 @@ impl IntrinsicsMap {
                         ]
                     }.into();
 
-                    Err::TypeError {
+                    Err::GenericError {
                         msg: format!(
                             "[numerator][denominator][quotient][remainder] is not \
                             implemented for mode `{mode}`.").into()
@@ -488,7 +488,7 @@ impl IntrinsicsMap {
                         soln_stream::failure()
                     }
                 }
-                _ => Err::TypeError { msg: "[pred][succ] only relates numbers.".into() }.into()
+                _ => Err::GenericError { msg: "[pred][succ] only relates numbers.".into() }.into()
             }
         });
 

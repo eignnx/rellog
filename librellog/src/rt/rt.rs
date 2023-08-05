@@ -1,4 +1,7 @@
-use std::{cell::RefCell, iter};
+use std::{
+    cell::{Cell, RefCell},
+    iter,
+};
 
 use rpds::Vector;
 
@@ -16,9 +19,13 @@ use super::{
     UnifierSet,
 };
 
+pub static DEFAULT_MAX_RECURSION_DEPTH: usize = 256;
+
 pub struct Rt {
-    db: Module,
-    intrs: IntrinsicsMap,
+    pub db: Module,
+    pub intrs: IntrinsicsMap,
+    pub recursion_depth: Cell<usize>,
+    pub max_recursion_depth: usize,
 }
 
 impl Rt {
@@ -26,6 +33,8 @@ impl Rt {
         Self {
             db,
             intrs: IntrinsicsMap::initialize(),
+            recursion_depth: 0.into(),
+            max_recursion_depth: DEFAULT_MAX_RECURSION_DEPTH,
         }
     }
 
@@ -39,24 +48,60 @@ impl Rt {
         'rtb: 'it,
         'td: 'it,
     {
+        self.recursion_depth.set(0);
+        self.solve_query_impl(query, u, td)
+    }
+
+    pub fn solve_query_impl<'rtb, 'td, 'it>(
+        &'rtb self,
+        query: RcTm,
+        u: UnifierSet,
+        td: &'td RefCell<TmDuplicator>,
+    ) -> Box<dyn SolnStream + 'it>
+    where
+        'rtb: 'it,
+        'td: 'it,
+    {
+        if self.recursion_depth.get() >= self.max_recursion_depth {
+            return Err::MaxRecursionDepthExceeded {
+                query: u.reify_term(&query),
+                depth: self.recursion_depth.get(),
+            }
+            .into();
+        }
+
+        self.incr_recursion_depth();
+
         match query.as_ref() {
             Tm::Rel(_) => self.solve_rel(query.clone(), u, td),
-            Tm::Block(Tok::Pipe, members) => Box::new(self.solve_or_block(members.clone(), u, td)),
-            Tm::Block(Tok::Dash, members) => Box::new(self.solve_and_block(members.clone(), u, td)),
-            Tm::Block(_, _) => Box::new(iter::once(Err(Err::AttemptToQueryNonCallable(
-                query.clone(),
-            )))),
+            Tm::Block(Tok::Pipe, members) => Box::new(
+                self.solve_or_block(members.clone(), u, td)
+                    .chain(self.deferred_decr_recursion_depth()),
+            ),
+            Tm::Block(Tok::Dash, members) => Box::new(
+                self.solve_and_block(members.clone(), u, td)
+                    .chain(self.deferred_decr_recursion_depth()),
+            ),
+            Tm::Block(_, _) => {
+                self.decr_recursion_depth();
+                Err::AttemptToQueryNonCallable(query.clone()).into()
+            }
             Tm::Var(_) => {
                 let reified = u.reify_term(&query);
                 if query == reified {
-                    Box::new(iter::once(Err(Err::InstantiationError(query.clone()))))
+                    self.decr_recursion_depth();
+                    Err::InstantiationError(query.clone()).into()
                 } else {
-                    self.solve_query(reified, u, td)
+                    Box::new(
+                        self.solve_query_impl(reified, u, td)
+                            .chain(self.deferred_decr_recursion_depth()),
+                    )
                 }
             }
-            Tm::Sym(..) | Tm::Num(..) | Tm::Txt(..) | Tm::Cons(..) | Tm::Nil => Box::new(
-                iter::once(Err(Err::AttemptToQueryNonCallable(query.clone()))),
-            ),
+            Tm::Sym(..) | Tm::Num(..) | Tm::Txt(..) | Tm::Cons(..) | Tm::Nil => {
+                self.decr_recursion_depth();
+                Err::AttemptToQueryNonCallable(query.clone()).into()
+            }
         }
     }
 
@@ -70,10 +115,9 @@ impl Rt {
         'rtb: 'it,
         'td: 'it,
     {
-        // Assume we always send in a relation term.
         let rel = match query.as_ref() {
             Tm::Rel(rel) => rel,
-            _ => unreachable!(),
+            _ => unreachable!("Assume we always send in a `Rel` term."),
         };
 
         // Perform "argument indexing", get all potientially-matching clauses.
@@ -83,31 +127,35 @@ impl Rt {
                 // If it can't be found in the loaded module, check the intrinsics.
                 return match self.intrs.index_match(rel) {
                     Some(intr) => intr.apply(u, rel.clone()),
-                    None => Box::new(iter::once(Err(Err::NoSuchRelation(rel.clone().into())))),
+                    None => Err::NoSuchRelation(rel.clone().into()).into(),
                 };
             }
         };
 
-        Box::new(clauses.flat_map(move |clause| {
-            // Make a duplicate of the clause.
-            let clause = td.borrow_mut().duplicate(clause);
+        Box::new(
+            clauses
+                .flat_map(move |clause| {
+                    // Make a duplicate of the clause.
+                    let clause = td.borrow_mut().duplicate(clause);
 
-            let head = Tm::Rel(clause.head).into();
+                    let head = Tm::Rel(clause.head).into();
 
-            // Attempt to unify head and query.
-            match u.unify(&query, &head) {
-                // If unification succeeds...
-                Some(u) => {
-                    if let Some(body) = clause.body {
-                        self.solve_query(body, u, td)
-                    } else {
-                        Box::new(iter::once(Ok(u)))
+                    // Attempt to unify head and query.
+                    match u.unify(&query, &head) {
+                        // If unification succeeds...
+                        Some(u) => {
+                            if let Some(body) = clause.body {
+                                self.solve_query_impl(body, u, td)
+                            } else {
+                                soln_stream::success(u)
+                            }
+                        }
+                        // Unification failed, move on to test next clause.
+                        None => soln_stream::failure(),
                     }
-                }
-                // Unification failed, move on to test next clause.
-                None => Box::new(iter::empty()),
-            }
-        }))
+                })
+                .chain(self.deferred_decr_recursion_depth()),
+        )
     }
 
     fn solve_or_block<'rtb, 'td, 'it>(
@@ -122,7 +170,7 @@ impl Rt {
     {
         members
             .cloning_iter()
-            .flat_map(move |q| self.solve_query(q, u.clone(), td))
+            .flat_map(move |q| self.solve_query_impl(q, u.clone(), td))
     }
 
     fn solve_and_block<'rtb, 'td, 'it>(
@@ -135,14 +183,32 @@ impl Rt {
         'rtb: 'it,
         'td: 'it,
     {
-        let init: Box<dyn SolnStream> = soln_stream::once(Ok(u));
+        let init: Box<dyn SolnStream> = soln_stream::success(u);
 
         members.cloning_iter().fold(init, |solns, q| {
             Box::new(solns.flat_map(move |u_res| match u_res {
-                Ok(u) => self.solve_query(q.clone(), u, td),
-                Err(e) => soln_stream::once(Err(e)),
+                Ok(u) => self.solve_query_impl(q.clone(), u, td),
+                Err(e) => e.into(),
             }))
         })
+    }
+
+    fn incr_recursion_depth(&self) {
+        let d = self.recursion_depth.get();
+        self.recursion_depth.set(d + 1);
+    }
+
+    #[track_caller]
+    fn decr_recursion_depth(&self) {
+        let d = self.recursion_depth.get();
+        self.recursion_depth.set(d - 1);
+    }
+
+    fn deferred_decr_recursion_depth<'rtb>(&'rtb self) -> Box<dyn SolnStream + 'rtb> {
+        Box::new(iter::from_fn(|| {
+            self.decr_recursion_depth();
+            None
+        }))
     }
 }
 

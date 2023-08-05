@@ -1,3 +1,5 @@
+//! Defines the rellog runtime.
+
 mod err;
 pub mod intrinsics;
 mod rt;

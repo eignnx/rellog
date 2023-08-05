@@ -15,7 +15,7 @@ pub enum Err {
         expected_ty: String,
         recieved_tm: String,
     },
-    TypeError {
+    GenericError {
         msg: String,
     },
     UnexpectedPartialList {
@@ -24,6 +24,10 @@ pub enum Err {
         partial: RcTm,
     },
     IoError(String),
+    MaxRecursionDepthExceeded {
+        depth: usize,
+        query: RcTm,
+    },
 }
 
 impl fmt::Display for Err {
@@ -50,13 +54,19 @@ impl fmt::Display for Err {
                      `{expected_ty}` argument, but received the term `{recieved_tm}`."
                 )
             }
-            Err::TypeError { msg } => {
-                write!(f, "Type error: {msg}")
+            Err::GenericError { msg } => {
+                write!(f, "Generic error: {msg}")
             }
             Err::UnexpectedPartialList { rel, key, partial } => {
                 write!(f, "The relation `{rel}` received a partial list for it's `{key}` argument: {partial}")
             }
             Err::IoError(err) => f.write_str(&err),
+            Err::MaxRecursionDepthExceeded { depth, query } => {
+                write!(
+                    f,
+                    "Max recursion depth ({depth}) exceeded for query `{query}`.",
+                )
+            }
         }
     }
 }
