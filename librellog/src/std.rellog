@@ -79,6 +79,7 @@
 [fn {factorial 0}][ret 1]
 [fn {factorial 1}][ret 1]
 [fn {factorial N}][Ret]
+    - [gt N][lt 1]
     - [succ N][pred PredN]
     - [fn {factorial PredN}][ret Fact]
     - [product Ret][x N][y Fact]
