@@ -193,6 +193,23 @@ impl From<Var> for RcTm {
     }
 }
 
+impl From<Sig> for RcTm {
+    fn from(sig: Sig) -> Self {
+        Self(Rc::new(Tm::Rel(
+            sig.0
+                .into_iter()
+                .map(|sym| (*sym, Tm::Sym(*sym).into()))
+                .collect(),
+        )))
+    }
+}
+
+impl From<String> for RcTm {
+    fn from(s: String) -> Self {
+        Self(Rc::new(Tm::Txt(CharList::from(s), Self(Rc::new(Tm::Nil)))))
+    }
+}
+
 impl fmt::Display for RcTm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", TmDisplayer::default().with_tm(self.as_ref()))
