@@ -84,6 +84,45 @@
     - [fn {factorial PredN}][ret Fact]
     - [product Ret][x N][y Fact]
 
+[sig [formula][result]][help
+    """
+    Computes an arithmetic expression given by `Formula` and stores the result 
+    in `Result`.
+    Available operations are:
+        - `{X add Y}` for addition
+        - `{X sub Y}` for subtraction
+        - `{X mul Y}` for multiplication
+        - `{X div Y}` for integer division
+        - `{X mod Y}` for euclidean modulus
+        - `{neg X}` for negation
+    """
+]
+[formula N][result N]
+    - [is_num N]
+[formula {A0 mul B0}][result C]
+    - [formula A0][result A]
+    - [formula B0][result B]
+    - [den A][quo B][rem 0][num C]
+[formula {A0 div B0}][result C]
+    - [formula A0][result A]
+    - [formula B0][result B]
+    - [num A][den B][quo C][rem Ignore]
+[formula {A0 mod B0}][result C]
+    - [formula A0][result A]
+    - [formula B0][result B]
+    - [num A][den B][quo Ignore][rem C]
+[formula {A0 add B0}][result C]
+    - [formula A0][result A]
+    - [formula B0][result B]
+    - [subtrahend A][difference B][minuend C]
+[formula {A0 sub B0}][result C]
+    - [formula A0][result A]
+    - [formula B0][result B]
+    - [minuend A][subtrahend A][difference C]
+[formula {neg A0}][result B]
+    - [formula A0][result A]
+    - [minuend 0][subtrahend A][difference B]
+
 
 [[comment "Documentation for builtins"]]
 
