@@ -1,20 +1,18 @@
-use std::{
-    cell::{Cell, RefCell},
-    iter,
-};
+use std::cell::{Cell, RefCell};
 
 use rpds::Vector;
 
 use crate::{
     ast::dup::TmDuplicator,
-    ast::{Module, RcTm, Tm},
+    ast::{RcTm, Tm},
     lex::tok::Tok,
-    utils::cloning_iter::CloningIterator,
+    utils::{cloning_iter::CloningIterator, deferred_iter::DeferredIter},
 };
 
 use super::{
     err::Err,
     intrinsics::IntrinsicsMap,
+    kb::KnowledgeBase,
     soln_stream::{self, SolnStream},
     UnifierSet,
 };
@@ -23,16 +21,16 @@ pub static DEFAULT_MAX_RECURSION_DEPTH: usize = 256;
 
 /// The rellog runtime engine. (`rt` stands for "run time")
 pub struct Rt {
-    pub db: Module,
+    pub db: KnowledgeBase,
     pub intrs: IntrinsicsMap,
     pub recursion_depth: Cell<usize>,
     pub max_recursion_depth: usize,
 }
 
 impl Rt {
-    pub fn new(db: Module) -> Self {
+    pub fn new(db: impl Into<KnowledgeBase>) -> Self {
         Self {
-            db,
+            db: db.into(),
             intrs: IntrinsicsMap::initialize(),
             recursion_depth: 0.into(),
             max_recursion_depth: DEFAULT_MAX_RECURSION_DEPTH,
@@ -116,6 +114,7 @@ impl Rt {
         'rtb: 'it,
         'td: 'it,
     {
+        let query = u.reify_term(&query);
         let rel = match query.as_ref() {
             Tm::Rel(rel) => rel,
             _ => unreachable!("Assume we always send in a `Rel` term."),
@@ -205,11 +204,12 @@ impl Rt {
         self.recursion_depth.set(d - 1);
     }
 
-    fn deferred_decr_recursion_depth<'rtb>(&'rtb self) -> Box<dyn SolnStream + 'rtb> {
-        Box::new(iter::from_fn(|| {
+    fn deferred_decr_recursion_depth<'rtb>(
+        &'rtb self,
+    ) -> impl ExactSizeIterator<Item = Result<UnifierSet, Err>> + 'rtb {
+        DeferredIter::new(|| {
             self.decr_recursion_depth();
-            None
-        }))
+        })
     }
 }
 

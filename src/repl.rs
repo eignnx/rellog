@@ -23,7 +23,7 @@ use crate::{
 
 pub struct Repl {
     current_file: String,
-    module: ast::Module,
+    // module: KnowledgeBase,
     config: RellogReplConfigHandle,
     line_editor: Reedline,
     rt: Rt,
@@ -50,7 +50,7 @@ impl Repl {
 
         Self {
             current_file: fname.to_owned(),
-            module,
+            // module,
             line_editor: config.create_editor(),
             config,
             rt,
@@ -63,7 +63,7 @@ impl Repl {
         fname: impl AsRef<str>,
     ) -> AppRes<'ts, ()> {
         let loaded_module = load_module_from_file(tok_buf, fname)?;
-        self.module.import(loaded_module);
+        self.rt.db.import(loaded_module);
         Ok(())
     }
 
@@ -103,7 +103,7 @@ impl Repl {
                         Color::Yellow
                             .paint(format!("# Reloading source from {}...", self.current_file))
                     );
-                    self.module = match load_module_from_file(&mut tok_buf, &self.current_file) {
+                    self.rt.db = match load_module_from_file(&mut tok_buf, &self.current_file) {
                         Ok(m) => {
                             println!(
                                 "{}",
@@ -112,7 +112,7 @@ impl Repl {
                                     m.relations.len()
                                 ))
                             );
-                            m
+                            m.into()
                         }
                         Err(e) => {
                             println!("{}", Color::Red.paint(format!("# Error loading file: {e}")));
@@ -120,7 +120,6 @@ impl Repl {
                             Default::default()
                         }
                     };
-                    self.rt = Rt::new(self.module.clone());
                     continue 'outer;
                 }
                 [":load" | ":l"] => {

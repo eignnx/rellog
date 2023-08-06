@@ -2,6 +2,7 @@
 
 mod err;
 pub mod intrinsics;
+pub mod kb;
 mod rt;
 pub mod soln_stream;
 

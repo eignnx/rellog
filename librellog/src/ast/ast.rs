@@ -210,6 +210,12 @@ impl From<String> for RcTm {
     }
 }
 
+impl From<Rel> for RcTm {
+    fn from(rel: Rel) -> Self {
+        Self(Rc::new(Tm::Rel(rel)))
+    }
+}
+
 impl fmt::Display for RcTm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", TmDisplayer::default().with_tm(self.as_ref()))
@@ -341,7 +347,7 @@ impl fmt::Display for Sig {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Clause {
     pub head: Rel,
     pub body: Option<RcTm>,
@@ -370,22 +376,6 @@ pub struct Module {
 }
 
 impl Module {
-    /// Returns an `ExactSizeIterator` of all the clauses that could match the given Rel.
-    /// Eventually this ought to perform smart argument-indexing.
-    /// If the relation does not exist, `None` is returned.
-    pub fn index_match<'m>(
-        &'m self,
-        rel: &Rel,
-    ) -> Option<impl ExactSizeIterator<Item = &'m Clause> + 'm> {
-        let sig = rel.clone().into();
-        self.relations.get(&sig).map(|clauses| clauses.iter())
-    }
-
-    pub fn import(&mut self, other: Module) {
-        self.directives.append(&mut other.directives.clone());
-        self.relations.append(&mut other.relations.clone());
-    }
-
     pub fn parse<'ts>(
         src: impl AsRef<str>,
         token_buf: &'ts mut Vec<At<Tok>>,
