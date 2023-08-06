@@ -1,4 +1,7 @@
+use std::str::FromStr;
+
 use crate::{
+    data_structures::Int,
     interner::IStr,
     lex::tok::{At, MakeAt, Tok},
     utils::my_nom::{Res, Span},
@@ -6,8 +9,8 @@ use crate::{
 use char_list::CharList;
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_until, take_while},
-    character::complete::{anychar, i64, multispace0},
+    bytes::complete::{tag, take_until, take_while, take_while1},
+    character::complete::{anychar, multispace0},
     combinator::{recognize, verify},
     multi::many0,
     sequence::tuple,
@@ -91,10 +94,20 @@ fn var_or_sym(i: Span) -> Res<Tok> {
         .parse(i)
 }
 
+fn int(i: Span) -> Res<Int> {
+    take_while1(char::is_numeric)
+        .map(|i: Span| {
+            let s: &str = i.as_ref();
+            Int::from_str(s)
+                .expect("take_while(char::is_numeric) feeds into Int::from_str without error")
+        })
+        .parse(i)
+}
+
 fn one_token(i: Span) -> Res<At<Tok>> {
     let (i, _) = multispace0(i)?;
     alt((
-        i64.map(Tok::Num),
+        int.map(Tok::Int),
         text_literal.map(Tok::Txt),
         var_or_sym,
         tag("][").map(|_| Tok::COBrack),

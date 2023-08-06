@@ -18,7 +18,7 @@ use rpds::Vector;
 
 use crate::{
     ast::{Clause, Item, Module, RcTm, Rel, Tm},
-    data_structures::{Map, Num, Sym, Var},
+    data_structures::{Int, Map, Sym, Var},
     lex::tok::{
         At,
         Tok::{self, *},
@@ -218,9 +218,9 @@ fn var(ts: Toks) -> Res<Var> {
     }
 }
 
-fn num(ts: Toks) -> Res<Num> {
+fn num(ts: Toks) -> Res<Int> {
     match I9nInput::split_first(&ts).map(|(x, xs)| (x.clone().value(), xs)) {
-        Some((Tok::Num(n), rest)) => Ok((rest, n)),
+        Some((Tok::Int(n), rest)) => Ok((rest, n)),
         Some((t, _)) => Err(nom::Err::Error(Error::with_message(
             ts,
             format!("Expected number, found {t:?}"),
@@ -359,7 +359,7 @@ fn non_operator_tm(ts: Toks) -> Res<Tm> {
     alt((
         sym.map(Tm::Sym),
         var.map(Tm::Var),
-        num.map(Tm::Num),
+        num.map(Tm::Int),
         txt.map(|t| Tm::Txt(t, Tm::Nil.into())),
         rel.map(Tm::Rel),
         list,
@@ -537,7 +537,7 @@ mod tests {
         crate::init_interner();
         assert_eq!(
             parse_to_tm("{123}"),
-            Tm::Cons(Tm::Num(123).into(), Tm::Nil.into())
+            Tm::Cons(Tm::Int(123).into(), Tm::Nil.into())
         );
     }
 

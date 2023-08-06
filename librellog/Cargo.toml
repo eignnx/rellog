@@ -15,6 +15,7 @@ unifier_set = { path = "./unifier_set" }
 nom_i9n = { path = "./nom_indentation" }
 char-list = "0.1.0"
 nu-ansi-term = "0.46.0"
+num = "0.4.1"
 
 [dev-dependencies]
 assert2 = "0.3.6"

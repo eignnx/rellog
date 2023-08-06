@@ -176,7 +176,7 @@ impl<'tm> fmt::Display for TmDisplayer<'tm> {
         match tm {
             Tm::Sym(s) => self.fmt_sym(f, s),
             Tm::Var(v) => write!(f, "{v}"),
-            Tm::Num(i) => write!(f, "{i}"),
+            Tm::Int(i) => write!(f, "{i}"),
             Tm::Txt(char_list, tail) => {
                 let mut char_list = char_list;
                 let mut tail = tail;

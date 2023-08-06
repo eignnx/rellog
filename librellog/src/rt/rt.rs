@@ -97,7 +97,7 @@ impl Rt {
                     )
                 }
             }
-            Tm::Sym(..) | Tm::Num(..) | Tm::Txt(..) | Tm::Cons(..) | Tm::Nil => {
+            Tm::Sym(..) | Tm::Int(..) | Tm::Txt(..) | Tm::Cons(..) | Tm::Nil => {
                 self.decr_recursion_depth();
                 Err::AttemptToQueryNonCallable(query.clone()).into()
             }

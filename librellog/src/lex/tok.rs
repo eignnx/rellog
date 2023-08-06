@@ -4,7 +4,7 @@ use char_list::CharList;
 use nom_i9n::StartCol;
 
 use crate::{
-    data_structures::{Num, Sym, Var},
+    data_structures::{Int, Sym, Var},
     utils::my_nom::Span,
 };
 
@@ -42,7 +42,7 @@ pub enum Tok {
 
     Sym(Sym),
     Var(Var),
-    Num(Num),
+    Int(Int),
     Txt(CharList),
 }
 
@@ -64,7 +64,7 @@ impl fmt::Display for Tok {
             Spread => write!(f, ".."),
             Sym(s) => write!(f, "{s}"),
             Var(v) => write!(f, "{v}"),
-            Num(i) => write!(f, "{i}"),
+            Int(i) => write!(f, "{i}"),
             Txt(s) => write!(f, "\"{s}\""),
         }
     }

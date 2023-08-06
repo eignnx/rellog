@@ -1,5 +1,6 @@
 use std::{fmt, num::NonZeroUsize, ops::Deref};
 
+use num::BigInt;
 use rpds::RedBlackTreeMap;
 
 use crate::{
@@ -8,7 +9,7 @@ use crate::{
 };
 
 pub type Sym = IStr;
-pub type Num = i64;
+pub type Int = BigInt;
 pub type Map<K, V> = RedBlackTreeMap<K, V>;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]

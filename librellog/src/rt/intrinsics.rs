@@ -4,10 +4,12 @@ use std::{
     io::{stderr, stdout, Write},
 };
 
+use num::{Integer, Zero};
 use rpds::Vector;
 
 use crate::{
     ast::{RcTm, Rel, Sig, Tm},
+    data_structures::Int,
     lex, parse,
     rt::Err,
     rt::{
@@ -198,7 +200,7 @@ impl IntrinsicsMap {
 
         def_intrinsic!(intrs, |u, [gt][lt]| {
             match (gt.as_ref(), lt.as_ref()) {
-                (Tm::Num(gt), Tm::Num(lt)) => {
+                (Tm::Int(gt), Tm::Int(lt)) => {
                     if gt > lt {
                         soln_stream::success(u)
                     } else {
@@ -211,7 +213,7 @@ impl IntrinsicsMap {
 
         def_intrinsic!(intrs, |u, [gte][lte]| {
             match (gte.as_ref(), lte.as_ref()) {
-                (Tm::Num(gte), Tm::Num(lte)) => {
+                (Tm::Int(gte), Tm::Int(lte)) => {
                     if gte >= lte {
                         soln_stream::success(u)
                     } else {
@@ -222,9 +224,16 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |u, [is_var]| {
-            match u.reify_term(is_var).as_ref() {
+        def_intrinsic!(intrs, |u, [tm as "is_var"]| {
+            match u.reify_term(tm).as_ref() {
                 Tm::Var(_) => soln_stream::success(u),
+                _ => soln_stream::failure(),
+            }
+        });
+
+        def_intrinsic!(intrs, |u, [tm as "is_num"]| {
+            match u.reify_term(tm).as_ref() {
+                Tm::Int(_) => soln_stream::success(u),
                 _ => soln_stream::failure(),
             }
         });
@@ -299,22 +308,22 @@ impl IntrinsicsMap {
 
         def_intrinsic!(intrs, |u, [sum][x][y]| {
             match (sum.as_ref(), x.as_ref(), y.as_ref()) {
-                (_, Tm::Num(x), Tm::Num(y)) => {
-                    let res = Tm::Num(x + y).into();
+                (_, Tm::Int(x), Tm::Int(y)) => {
+                    let res = Tm::Int(x + y).into();
                     soln_stream::unifying(u, sum, &res)
                 }
                 // sum = X + y
                 // <=>
                 // X = sum - y
-                (Tm::Num(sum), _, Tm::Num(y)) => {
-                    let res = Tm::Num(sum - y).into();
+                (Tm::Int(sum), _, Tm::Int(y)) => {
+                    let res = Tm::Int(sum - y).into();
                     soln_stream::unifying(u, x, &res)
                 }
                 // sum = x + Y
                 // <=>
                 // Y = sum - x
-                (Tm::Num(sum), Tm::Num(x), _) => {
-                    let res = Tm::Num(sum - x).into();
+                (Tm::Int(sum), Tm::Int(x), _) => {
+                    let res = Tm::Int(sum - x).into();
                     soln_stream::unifying(u, y, &res)
                 }
                 (_, Tm::Var(_), Tm::Var(_)) => Err::InstantiationError(x.clone()).into(),
@@ -326,32 +335,32 @@ impl IntrinsicsMap {
 
         def_intrinsic!(intrs, |u, [product][x][y]| {
             match (product.as_ref(), x.as_ref(), y.as_ref()) {
-                (_, Tm::Num(x), Tm::Num(y)) => {
-                    let res = Tm::Num(x * y).into();
+                (_, Tm::Int(x), Tm::Int(y)) => {
+                    let res = Tm::Int(x * y).into();
                     soln_stream::unifying(u, product, &res)
                 }
                 // product = X * y
                 // <=>
                 // X = product / y
-                (Tm::Num(product), _, Tm::Num(y)) => {
-                    if *y == 0 {
+                (Tm::Int(product), _, Tm::Int(y)) => {
+                    if y.is_zero() {
                         return Err::GenericError {
                             msg: "Division by zero required to solve query [product _][X][y 0].".into()
                         }.into();
                     }
-                    let res = Tm::Num(product / y).into();
+                    let res = Tm::Int(product / y).into();
                     soln_stream::unifying(u, x, &res)
                 }
                 // product = x * Y
                 // <=>
                 // Y = product / x
-                (Tm::Num(product), Tm::Num(x), _) => {
-                    if *x == 0 {
+                (Tm::Int(product), Tm::Int(x), _) => {
+                    if x.is_zero() {
                         return Err::GenericError {
                             msg: "Division by zero required to solve query [product #][x 0][Y].".into()
                         }.into();
                     }
-                    let res = Tm::Num(product / x).into();
+                    let res = Tm::Int(product / x).into();
                     soln_stream::unifying(u, y, &res)
                 }
                 (_, Tm::Var(_), Tm::Var(_)) => Err::InstantiationError(x.clone()).into(),
@@ -363,24 +372,24 @@ impl IntrinsicsMap {
 
         def_intrinsic!(intrs, |u, [difference][minuend][subtrahend]| {
             match (difference.as_ref(), minuend.as_ref(), subtrahend.as_ref()) {
-                (a, b, c) if ![a, b, c].into_iter().all(|tm| matches!(*tm, Tm::Num(_) | Tm::Var(_))) => {
+                (a, b, c) if ![a, b, c].into_iter().all(|tm| matches!(*tm, Tm::Int(_) | Tm::Var(_))) => {
                     Err::GenericError {
                         msg: "The arguments to [difference][minuend][subtrahend] must all be unifyable with integers.".into()
                     }.into()
                 }
                 // difference = minuend - subtrahend
-                (_, Tm::Num(min), Tm::Num(sub)) => {
-                    let diff = Tm::Num(*min - *sub).into();
+                (_, Tm::Int(min), Tm::Int(sub)) => {
+                    let diff = Tm::Int(min - sub).into();
                     soln_stream::unifying(u, difference, &diff)
                 }
                 // minuend = difference + subtrahend
-                (Tm::Num(diff), _, Tm::Num(sub)) => {
-                    let min = Tm::Num(*diff + *sub).into();
+                (Tm::Int(diff), _, Tm::Int(sub)) => {
+                    let min = Tm::Int(diff + sub).into();
                     soln_stream::unifying(u, minuend, &min)
                 }
                 // subtrahend = minuend - difference
-                (Tm::Num(diff), Tm::Num(min), _) => {
-                    let sub = Tm::Num(*min - *diff).into();
+                (Tm::Int(diff), Tm::Int(min), _) => {
+                    let sub = Tm::Int(min - diff).into();
                     soln_stream::unifying(u, subtrahend, &sub)
                 }
                 _ => Err::GenericError {
@@ -391,61 +400,61 @@ impl IntrinsicsMap {
 
         def_intrinsic!(intrs, |u, [quotient][remainder][numerator][denominator]| {
             match (quotient.as_ref(), remainder.as_ref(), numerator.as_ref(), denominator.as_ref()) {
-                (a, b, c, d) if ![a, b, c, d].into_iter().all(|tm| matches!(*tm, Tm::Num(_) | Tm::Var(_))) => {
+                (a, b, c, d) if ![a, b, c, d].into_iter().all(|tm| matches!(*tm, Tm::Int(_) | Tm::Var(_))) => {
                     Err::GenericError {
                         msg: "The arguments to [numerator][denominator][quotient][remainder] must all be unifyable with integers.".into()
                     }.into()
                 }
                 // quotient = numerator / denominator
                 // remainder = numerator % denominator
-                (_, _, Tm::Num(numer), Tm::Num(denom)) => {
-                    if *denom == 0 {
+                (_, _, Tm::Int(numer), Tm::Int(denom)) => {
+                    if denom.is_zero() {
                         return Err::GenericError {
                             msg: "Division by zero required to solve query [numerator #][denominator 0][Quotient][Remainder].".into()
                         }.into();
                     }
-                    let q = numer.div_euclid(*denom);
-                    let r = numer.rem_euclid(*denom);
-                    u.unify(quotient, &Tm::Num(q).into()).and_then(|u| {
-                        u.unify(remainder, &Tm::Num(r).into())
+                    let (q, r) = numer.div_mod_floor(denom);
+                    u.unify(quotient, &Tm::Int(q).into()).and_then(|u| {
+                        u.unify(remainder, &Tm::Int(r).into())
                     }).map(|u| {
                         soln_stream::success(u)
                     }).unwrap_or_else(soln_stream::failure)
                 }
                 // numerator = quotient * denominator + remainder
-                (Tm::Num(quot), Tm::Num(rem), _, Tm::Num(denom)) => {
-                    let numer = *quot * *denom + *rem;
-                    soln_stream::unifying(u, numerator, &Tm::Num(numer).into())
+                (Tm::Int(quot), Tm::Int(rem), _, Tm::Int(denom)) => {
+                    let numer = quot * denom + rem;
+                    soln_stream::unifying(u, numerator, &Tm::Int(numer).into())
                 }
                 // denominator = (numerator - remainder) / quotient
-                (Tm::Num(quot), Tm::Num(rem), Tm::Num(numer), _) => {
-                    if *quot == 0 {
+                (Tm::Int(quot), Tm::Int(rem), Tm::Int(numer), _) => {
+                    if quot.is_zero() {
                         return Err::GenericError {
                             msg: "Division by zero required to solve query [quotient 0][remainder #][numerator #][Denominator].".into()
                         }.into();
                     }
-                    let denom = (*numer - *rem).div_euclid(*quot);
-                    if denom == 0 {
+                    let denom = (numer - rem).div_floor(quot);
+                    if denom.is_zero() {
                         return soln_stream::failure();
                     }
-                    soln_stream::unifying(u, denominator, &Tm::Num(denom).into())
+                    soln_stream::unifying(u, denominator, &Tm::Int(denom).into())
                 }
                 // forall quotient: int . numerator = quotient * denominator + remainder
                 // (iterate through integer quotients)
-                (_, &Tm::Num(rem), _, &Tm::Num(den)) => {
+                (_, Tm::Int(rem), _, Tm::Int(den)) => {
                     let numerator = numerator.clone();
                     let quotient = quotient.clone();
+                    let den = den.clone();
+                    let rem = rem.clone();
                     Box::new(IntCounter::default().flat_map(move |i| {
-                        let quo = i;
-                        let num = quo * den + rem;
-                        let opt = u.unify(&quotient, &Tm::Num(quo).into()).and_then(|u| {
-                            u.unify(&numerator, &Tm::Num(num).into())
-                        });
-                        if let Some(u) = opt {
-                            soln_stream::success(u)
-                        } else {
-                            soln_stream::failure()
-                        }
+                        let quo = Int::from(i);
+                        let num = &quo * &den + &rem;
+                        let Some(u) = u.unify(&quotient, &Tm::Int(quo).into()) else {
+                            return soln_stream::failure();
+                        };
+                        let Some(u) = u.unify(&numerator, &Tm::Int(num).into()) else {
+                            return soln_stream::failure();
+                        };
+                        soln_stream::success(u)
                     }))
                 }
                 _ => {
@@ -473,15 +482,15 @@ impl IntrinsicsMap {
         def_intrinsic!(intrs, |u, [pred][succ]| {
             match (pred.as_ref(), succ.as_ref()) {
                 (Tm::Var(_), Tm::Var(_)) => Err::InstantiationError(pred.clone()).into(),
-                (Tm::Var(_), Tm::Num(s)) => {
-                    let p = Tm::Num(s - 1).into();
+                (Tm::Var(_), Tm::Int(s)) => {
+                    let p = Tm::Int(s - 1).into();
                     soln_stream::unifying(u, pred, &p)
                 }
-                (Tm::Num(p), Tm::Var(_)) => {
-                    let s = Tm::Num(p + 1).into();
+                (Tm::Int(p), Tm::Var(_)) => {
+                    let s = Tm::Int(p + 1).into();
                     soln_stream::unifying(u, succ, &s)
                 }
-                (Tm::Num(p), Tm::Num(s)) => {
+                (Tm::Int(p), Tm::Int(s)) => {
                     if p + 1 == *s {
                         soln_stream::success(u)
                     } else {
@@ -524,9 +533,9 @@ impl IntrinsicsMap {
                     Tm::Sym(s) if &*s.to_str() == "stdin" => Ok(Self::StdIn),
                     Tm::Sym(s) if &*s.to_str() == "stdout" => Ok(Self::StdOut),
                     Tm::Sym(s) if &*s.to_str() == "stderr" => Ok(Self::StdErr),
-                    Tm::Num(0) => Ok(Self::StdIn),
-                    Tm::Num(1) => Ok(Self::StdOut),
-                    Tm::Num(2) => Ok(Self::StdErr),
+                    Tm::Int(i) if *i == 0.into() => Ok(Self::StdIn),
+                    Tm::Int(i) if *i == 1.into() => Ok(Self::StdOut),
+                    Tm::Int(i) if *i == 2.into() => Ok(Self::StdErr),
                     _ => Err(()),
                 }
             }
