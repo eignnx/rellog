@@ -21,6 +21,7 @@ use super::{
 
 pub static DEFAULT_MAX_RECURSION_DEPTH: usize = 256;
 
+/// The rellog runtime engine. (`rt` stands for "run time")
 pub struct Rt {
     pub db: Module,
     pub intrs: IntrinsicsMap,
