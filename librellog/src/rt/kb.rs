@@ -1,6 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::ast::{self, Clause, RcTm, Rel, Sig};
+use crate::ast::{self, Clause, Rel, Sig};
 
 use super::UnifierSet;
 
@@ -34,12 +34,6 @@ impl KnowledgeBase {
                 u.unify(&clause_head, &query_head).is_some()
             })
             .collect::<BTreeSet<_>>();
-
-        println!("\nIndex results for `{}`:", RcTm::from(query_head.clone()));
-        for clause in &arg_indexed {
-            println!("\t{}", RcTm::from(clause.head.clone()));
-        }
-        println!("\tTotal matches: {}", arg_indexed.len());
 
         Some(arg_indexed.into_iter())
     }
