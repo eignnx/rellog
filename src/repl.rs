@@ -84,8 +84,8 @@ impl Repl {
 
             let query_parts: Vec<&str> = query_buf.trim().split_ascii_whitespace().collect();
 
-            match &query_parts[..] {
-                &["help" | ":help" | ":h" | "?"] => {
+            match query_parts[..] {
+                ["help" | ":help" | ":h" | "?"] => {
                     println!("Enter a RELLOG TERM or one of these REPL COMMANDS:");
                     println!("  :h | :help | ?    Displays this help text.");
                     println!("  :r | :reload      Reloads the source file.");
@@ -93,11 +93,11 @@ impl Repl {
                     println!("  [Sig][Help]       Show help text for a relation given by `Sig`.");
                     continue 'outer;
                 }
-                &[":quit" | ":q" | ":exit" | ":wq"] => {
+                [":quit" | ":q" | ":exit" | ":wq"] => {
                     println!("Exiting Rellog REPL...");
                     break 'outer;
                 }
-                &[":reload" | ":r"] => {
+                [":reload" | ":r"] => {
                     println!(
                         "{}",
                         Color::Yellow
@@ -116,23 +116,20 @@ impl Repl {
                         }
                         Err(e) => {
                             println!("{}", Color::Red.paint(format!("# Error loading file: {e}")));
-                            println!(
-                                "{}",
-                                Color::Red.paint(format!("# Defaulting to empty module."))
-                            );
+                            println!("{}", Color::Red.paint("# Defaulting to empty module."));
                             Default::default()
                         }
                     };
                     self.rt = Rt::new(self.module.clone());
                     continue 'outer;
                 }
-                &[":load" | ":l"] => {
+                [":load" | ":l"] => {
                     println!(
                         "# Which file would you like to load? Please specify `{query_buf} FILENAME`"
                     );
                     continue 'outer;
                 }
-                &[":load" | ":l", fname] => {
+                [":load" | ":l", fname] => {
                     let mut tok_buf = Vec::new();
                     match self.load_file(&mut tok_buf, fname) {
                         Ok(()) => println!("# Loaded `{fname}`."),
@@ -185,13 +182,12 @@ impl Repl {
                 // If we *know* there are no more solutions...
                 match solns.size_hint() {
                     (_, Some(0)) if soln.is_empty() => {
-                        let msg =
-                            Color::Yellow.paint(format!("# The query holds unconditionally."));
+                        let msg = Color::Yellow.paint("# The query holds unconditionally.");
                         println!(" {msg}");
                         continue 'outer;
                     }
                     (_, Some(0)) => {
-                        let msg = Color::Yellow.paint(format!("# Exactly 1 solution found."));
+                        let msg = Color::Yellow.paint("# Exactly 1 solution found.");
                         println!(" {msg}");
                         continue 'outer;
                     }
@@ -239,10 +235,10 @@ impl Repl {
     }
 }
 
-fn load_module_from_file<'ts>(
-    tok_buf: &'ts mut Vec<At<Tok>>,
+fn load_module_from_file(
+    tok_buf: &mut Vec<At<Tok>>,
     fname: impl AsRef<str>,
-) -> AppRes<'ts, ast::Module> {
+) -> AppRes<ast::Module> {
     let f = std::fs::File::open(fname.as_ref())
         .map_err(|e| AppErr::FileOpen(fname.as_ref().into(), e))?;
     let mut r = io::BufReader::new(f);
@@ -252,10 +248,10 @@ fn load_module_from_file<'ts>(
     load_module_from_string(tok_buf, src)
 }
 
-fn load_module_from_string<'ts>(
-    tok_buf: &'ts mut Vec<At<Tok>>,
+fn load_module_from_string(
+    tok_buf: &mut Vec<At<Tok>>,
     src: impl AsRef<str>,
-) -> AppRes<'ts, ast::Module> {
+) -> AppRes<ast::Module> {
     let tokens = lex::tokenize_into(tok_buf, src.as_ref());
 
     let m = match parse::entire_module(tokens) {
