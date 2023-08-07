@@ -620,7 +620,13 @@ impl IntrinsicsMap {
                     };
 
                     let mut tok_buf = Vec::new();
-                    let tokens = lex::tokenize_into(&mut tok_buf, &src_buf[..]);
+                    let tokens = match lex::tokenize_into(&mut tok_buf, &src_buf[..], "<user input>".into()) {
+                        Ok(tokens) => tokens,
+                        Err(e) => {
+                            println!("Tokenization error: {e}");
+                            return soln_stream::failure();
+                        }
+                    };
 
                     let term = match parse::entire_term(tokens) {
                         Ok(q) => q,

@@ -19,9 +19,12 @@ use rpds::Vector;
 use crate::{
     ast::{Clause, Item, Module, RcTm, Rel, Tm},
     data_structures::{Int, Map, Sym, Var},
-    lex::tok::{
-        At,
-        Tok::{self, *},
+    lex::{
+        tok::{
+            At,
+            Tok::{self, *},
+        },
+        LexError,
     },
 };
 
@@ -34,6 +37,14 @@ type Toks<'ts> = I9nInput<BaseInput<'ts>, TokenFinder<'ts>>;
 #[derive(Debug)]
 pub struct Error<'ts> {
     stack: Vec<(BaseInput<'ts>, Problem<'ts>)>,
+}
+
+impl<'ts> From<LexError> for Error<'ts> {
+    fn from(le: LexError) -> Self {
+        Self {
+            stack: vec![(&[], Problem::LexError(le))],
+        }
+    }
 }
 
 impl<'ts> Display for Error<'ts> {
@@ -81,6 +92,7 @@ pub enum Problem<'ts> {
     CustomMessage(String),
     Context(&'static str),
     Blah(Toks<'ts>),
+    LexError(LexError),
 }
 
 impl<'ts> Display for Problem<'ts> {
@@ -89,6 +101,14 @@ impl<'ts> Display for Problem<'ts> {
             Problem::CustomMessage(msg) => f.write_str(msg),
             Problem::Context(msg) => write!(f, "in the context of {msg}"),
             Problem::Blah(ts) => write!(f, "at tokens {:?}", &ts[..1]),
+            Problem::LexError(le) => write!(
+                f,
+                "while tokenizing [{}:{}:{}]: {}",
+                le.file.as_ref().unwrap().to_string_lossy(),
+                le.line,
+                le.column,
+                le.fragment,
+            ),
         }
     }
 }
@@ -426,7 +446,7 @@ mod tests {
 
     #[track_caller]
     fn parse_to_tm(src: &'static str) -> Tm {
-        let tokens = tokenize(Span::from(src));
+        let tokens = tokenize(Span::from(src), "blah.rellog".into()).unwrap();
         let (rest, t) = tm.parse(tokens[..].into()).unwrap();
 
         assert!(

@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{fmt::Display, path::PathBuf, str::FromStr};
 
 use crate::{
     data_structures::Int,
@@ -11,10 +11,11 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_until, take_while, take_while1},
     character::complete::{anychar, multispace0},
-    combinator::{recognize, verify},
+    combinator::{all_consuming, recognize, verify},
+    error::VerboseError,
     multi::many0,
-    sequence::tuple,
-    Parser,
+    sequence::{terminated, tuple},
+    Finish, Parser,
 };
 use nom_i9n::{I9nInput, TokenizedInput};
 
@@ -122,31 +123,74 @@ fn one_token(i: Span) -> Res<At<Tok>> {
         tag(",").map(|_| Tok::Comma),
         tag(";").map(|_| Tok::Semicolon),
         tag("..").map(|_| Tok::Spread),
-        anychar.map(move |_| {
-            panic!(
-                "[{}:{}] Unknown symbol encountered: {:?}",
-                i.location_line(),
-                i.get_column(),
-                i.chars().take(5).collect::<String>(),
-            );
-        }),
     ))
     .map(|t| t.at(i))
     .parse(i)
 }
 
-pub fn tokenize<'i>(src: impl Into<Span<'i>> + 'i) -> Vec<At<Tok>> {
+#[derive(Debug, Clone)]
+pub struct LexError {
+    pub file: Option<PathBuf>,
+    pub line: usize,
+    pub column: usize,
+    pub fragment: String,
+}
+
+impl Display for LexError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let Self {
+            file,
+            line,
+            column,
+            fragment,
+        } = self;
+        write!(
+            f,
+            "[{}:{line}:{column}]: `{fragment}…`",
+            file.as_ref().unwrap().to_string_lossy()
+        )
+    }
+}
+
+impl<'i> From<VerboseError<Span<'i>>> for LexError {
+    fn from(ve: VerboseError<Span<'i>>) -> Self {
+        debug_assert!(ve.errors.len() == 1);
+        let (i, _kind) = ve.errors.first().expect("nonempty error list");
+        let fragment = i.fragment().trim_start();
+        let preview_len = fragment.len().min(5);
+        let fragment = fragment[..preview_len].to_string();
+        Self {
+            file: None,
+            line: i.location_line() as usize,
+            column: i.get_column(), // TODO: use `i.get_utf8_column()` instead?
+            fragment,
+        }
+    }
+}
+
+pub fn tokenize<'i>(
+    src: impl Into<Span<'i>> + 'i,
+    filename: PathBuf,
+) -> Result<Vec<At<Tok>>, LexError> {
     let src: Span = src.into();
-    let (_i, tokens) = many0(one_token).parse(src).unwrap();
-    tokens
+    all_consuming(terminated(many0(one_token), multispace0))
+        .parse(src)
+        .finish()
+        .map(|(_i, tokens)| tokens)
+        .map_err(|e| {
+            let mut e = LexError::from(e);
+            e.file = Some(filename);
+            e
+        })
 }
 
 pub fn tokenize_into<'i, 'buf>(
     buf: &'buf mut Vec<At<Tok>>,
     src: impl Into<Span<'i>> + 'i,
-) -> I9nInput<&'buf [At<Tok>], TokenizedInput<&'buf [At<Tok>], At<Tok>>> {
-    *buf = tokenize(src);
-    I9nInput::from(&**buf)
+    filename: PathBuf,
+) -> Result<I9nInput<&'buf [At<Tok>], TokenizedInput<&'buf [At<Tok>], At<Tok>>>, LexError> {
+    *buf = tokenize(src, filename)?;
+    Ok(I9nInput::from(&**buf))
 }
 
 #[cfg(test)]
@@ -168,7 +212,10 @@ mod block_tests {
     - [glop]
 ";
 
-        let actual = tokenize(src).into_iter().map(At::value).collect::<Vec<_>>();
+        let actual = tokenize(src, "blah.rellog".into())
+            .into_iter()
+            .map(At::value)
+            .collect::<Vec<_>>();
 
         let expected = vec![
             OBrack,
@@ -195,7 +242,10 @@ mod block_tests {
     fn tokenize_relation_term() {
         let src = r#"[asdf Qwerty][Poiu]"#;
 
-        let actual = tokenize(src).into_iter().map(At::value).collect::<Vec<_>>();
+        let actual = tokenize(src, "blah.rellog".into())
+            .into_iter()
+            .map(At::value)
+            .collect::<Vec<_>>();
 
         let expected = vec![
             OBrack,

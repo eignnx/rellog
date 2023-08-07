@@ -3,6 +3,7 @@ use std::{
     fmt,
     iter::{self, DoubleEndedIterator},
     ops::Deref,
+    path::PathBuf,
     rc::Rc,
 };
 
@@ -378,9 +379,10 @@ pub struct Module {
 impl Module {
     pub fn parse<'ts>(
         src: impl AsRef<str>,
+        filename: PathBuf,
         token_buf: &'ts mut Vec<At<Tok>>,
     ) -> Result<Module, Error<'ts>> {
-        let tokens = lex::tokenize_into(token_buf, LocatedSpan::new(src.as_ref()));
+        let tokens = lex::tokenize_into(token_buf, LocatedSpan::new(src.as_ref()), filename)?;
         parse::entire_module(tokens)
     }
 }

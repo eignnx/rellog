@@ -1,6 +1,7 @@
 use std::{
     cell::RefCell,
     io::{self, Read},
+    path::PathBuf,
 };
 
 use librellog::{
@@ -142,7 +143,13 @@ impl Repl {
             }
 
             let mut buf = Vec::new();
-            let tokens = lex::tokenize_into(&mut buf, &query_buf[..]);
+            let tokens = match lex::tokenize_into(&mut buf, &query_buf[..], "<user input>".into()) {
+                Ok(ts) => ts,
+                Err(le) => {
+                    println!("{}", Color::Red.paint(format!("Tokenization error: {le}")));
+                    continue 'outer;
+                }
+            };
 
             let mut no_solns_yet_found = true;
 
@@ -244,14 +251,15 @@ fn load_module_from_file(
     let mut src = String::new();
     r.read_to_string(&mut src)
         .map_err(|e| AppErr::FileRead(fname.as_ref().into(), e))?;
-    load_module_from_string(tok_buf, src)
+    load_module_from_string(tok_buf, src, fname.as_ref().into())
 }
 
 fn load_module_from_string(
     tok_buf: &mut Vec<At<Tok>>,
     src: impl AsRef<str>,
+    filename: PathBuf,
 ) -> AppRes<ast::Module> {
-    let tokens = lex::tokenize_into(tok_buf, src.as_ref());
+    let tokens = lex::tokenize_into(tok_buf, src.as_ref(), filename)?;
 
     let m = match parse::entire_module(tokens) {
         Ok(m) => m,
