@@ -88,12 +88,20 @@
     """
     Computes an arithmetic expression given by `Formula` and stores the result 
     in `Result`.
+
+
     Available operations are:
+
         - `{X add Y}` for addition
+
         - `{X sub Y}` for subtraction
+
         - `{X mul Y}` for multiplication
+
         - `{X div Y}` for integer division
+
         - `{X mod Y}` for euclidean modulus
+
         - `{neg X}` for negation
     """
 ]
@@ -202,8 +210,9 @@
 
 [sig [minuend][subtrahend][difference]][help
     """
-    Expresses the relationship: `Minuend - Subtrahend = Difference`. To perform
-    addition, use mode `[Minuend][subtrahend #][difference #]`.
+    Expresses the relationship: `Minuend - Subtrahend = Difference`.
+    
+    To perform addition, use mode `[Minuend][subtrahend #][difference #]`.
     """
 ]
 
@@ -214,17 +223,30 @@
     """
     Expresses the relationship: `Numerator/Denominator = Quotient (with a 
     remainder of Remainder)`. More precisely, the relationship is `Numerator = 
-    Quotient * Denominator + Remainder`. Can be used to express divisibility 
-    (when Remainder is set to 0), as well as multiplication (when Remainder is 
-    0).
+    Quotient * Denominator + Remainder`.
+    
+    Can be used to express divisibility (when Remainder is set to 0), as well as
+    multiplication (when Remainder is 0).
+
+
+    Common Modes:
+
     [num][den][Quo][Rem]   <=> quo = num / den, rem = num % den
+
     [Num][den][quo][rem]   <=> num = den * quo + rem
+
     [Num][den 1][quo][rem] <=> num = quo + rem
+
     [Num][den][quo 1][rem] <=> num = den + rem
+
     [Num][den][quo][rem 0] <=> num = den * quo
+
     [num][Den][quo][rem]   <=> den = (num - rem) / quo
+
     [num][den][Quo][rem]   <=> quo = (num - rem) / den
+
     [num][Den][quo 1][rem] <=> den = num - rem
+
     [num][den 1][Quo][rem] <=> quo = num - rem
     """
 ]

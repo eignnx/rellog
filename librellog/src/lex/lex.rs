@@ -4,15 +4,15 @@ use crate::{
     data_structures::Int,
     interner::IStr,
     lex::tok::{At, MakeAt, Tok},
-    utils::my_nom::{Res, Span},
+    utils::my_nom::{PErr, Res, Span},
 };
 use char_list::CharList;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_until, take_while, take_while1},
     character::complete::{anychar, multispace0},
-    combinator::{all_consuming, recognize, verify},
-    error::VerboseError,
+    combinator::{all_consuming, fail, recognize, verify},
+    error::{self, context, ContextError, VerboseError},
     multi::many0,
     sequence::{terminated, tuple},
     Finish, Parser,
@@ -38,7 +38,19 @@ fn text_literal<'i>(i: Span<'i>) -> Res<'i, CharList> {
                 // _ _ asdf
                 // """
                 for line in text.lines().skip(1) {
-                    out.push_str(&line[start_col..]);
+                    if line.trim().is_empty() {
+                        out.push_str("\n");
+                    } else {
+                        if line.len() <= start_col {
+                            return context(
+                                "Not enough indentation in multiline string literal.",
+                                fail,
+                            )
+                            .parse(i);
+                        }
+                        let dedented = &line[start_col..];
+                        out.push_str(dedented);
+                    }
                 }
 
                 if out.ends_with("\n") {
