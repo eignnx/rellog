@@ -37,7 +37,7 @@ pub enum Tok {
 
     Semicolon,
 
-    /// The "cons operator" which looks like `...`
+    /// The "cons operator" which looks like `..`
     Spread,
 
     Sym(Sym),
