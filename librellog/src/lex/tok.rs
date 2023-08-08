@@ -65,6 +65,9 @@ impl fmt::Display for Tok {
             Sym(s) => write!(f, "{s}"),
             Var(v) => write!(f, "{v}"),
             Int(i) => write!(f, "{i}"),
+            Txt(s) if s.as_str().contains('\n') => {
+                write!(f, "\"\"\"\n{s}\n\"\"\"")
+            }
             Txt(s) => write!(f, "\"{s}\""),
         }
     }
