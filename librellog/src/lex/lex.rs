@@ -4,7 +4,7 @@ use crate::{
     data_structures::Int,
     interner::IStr,
     lex::tok::{At, MakeAt, Tok},
-    utils::my_nom::{PErr, Res, Span},
+    utils::my_nom::{Res, Span},
 };
 use char_list::CharList;
 use nom::{
@@ -12,7 +12,7 @@ use nom::{
     bytes::complete::{tag, take_until, take_while, take_while1},
     character::complete::{anychar, multispace0},
     combinator::{all_consuming, fail, recognize, verify},
-    error::{self, context, ContextError, VerboseError},
+    error::{context, VerboseError},
     multi::many0,
     sequence::{terminated, tuple},
     Finish, Parser,
