@@ -49,6 +49,20 @@ $ cargo run
 
 ## Language Reference
 
+### Table of Contents
+- [Overview: The Big Ideas](#overview-the-big-ideas)
+- [Getting Help](#getting-help)
+- [Clauses](#clauses)
+- [Rellog Values](#rellog-values)
+    - [Symbols](#symbols)
+    - [Integers](#integers)
+    - [Text Strings](#text-strings)
+    - [Variables](#variables)
+    - [Relations](#relations)
+    - [Lists](#lists)
+- [The REPL](#the-repl)
+
+
 ### Overview: The Big Ideas
 
 Rellog is all about ***relations***. A relation is a set of association of values.
