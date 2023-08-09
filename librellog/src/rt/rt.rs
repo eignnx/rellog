@@ -24,7 +24,7 @@ pub struct Rt {
     pub db: KnowledgeBase,
     pub intrs: IntrinsicsMap,
     pub recursion_depth: Cell<usize>,
-    pub max_recursion_depth: usize,
+    pub max_recursion_depth: Cell<usize>,
 }
 
 impl Rt {
@@ -33,7 +33,7 @@ impl Rt {
             db: db.into(),
             intrs: IntrinsicsMap::initialize(),
             recursion_depth: 0.into(),
-            max_recursion_depth: DEFAULT_MAX_RECURSION_DEPTH,
+            max_recursion_depth: DEFAULT_MAX_RECURSION_DEPTH.into(),
         }
     }
 
@@ -61,7 +61,7 @@ impl Rt {
         'rtb: 'it,
         'td: 'it,
     {
-        if self.recursion_depth.get() >= self.max_recursion_depth {
+        if self.recursion_depth.get() >= self.max_recursion_depth.get() {
             return Err::MaxRecursionDepthExceeded {
                 query: u.reify_term(&query),
                 depth: self.recursion_depth.get(),
@@ -224,13 +224,13 @@ fn test_runtime() {
     - [prefix As][suffix Suffix][Compound]
 ";
 
-    let tokens = lex::tokenize(src);
+    let tokens = lex::tokenize(src, "".into());
     let module = parse::entire_module(tokens[..].into()).unwrap();
 
     let rt = Rt::new(&module);
 
     let query = {
-        let tokens = lex::tokenize("[prefix {1 2 3}][suffix {4 5 6}][Compound]");
+        let tokens = lex::tokenize("[prefix {1 2 3}][suffix {4 5 6}][Compound]", "".into());
         parse::entire_term(tokens[..].into()).unwrap()
     };
 
