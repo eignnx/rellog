@@ -1,4 +1,9 @@
-[sig [prefix][suffix][compound]][help "Relates a list `Compound` to some partitioning of itself into a `Prefix` and a `Suffix`. Also works for text strings."]
+[sig [prefix][suffix][compound]][help
+    """
+    Relates a list `Compound` to some partitioning of itself into a `Prefix` 
+    and a `Suffix`. Also works for text strings.
+    """
+]
 [prefix {}][Suffix][compound Suffix]
 [prefix {A ..As}][Suffix][compound {A ..Compound}]
     - [prefix As][suffix Suffix][Compound]
@@ -39,6 +44,15 @@
 
 [can_be [list {}]]
 [can_be [list {X ..Xs}]]
+[can_be [list L]]
+    - [is_var L]
+
+[can_be [int N]]
+    | [is_num N]
+    | [is_var N]
+
+[must_be [int N]]
+    - [is_num N]
 
 [sig [list][last]][help "Relates a list to its last element."]
 [list {Last}][Last]
@@ -205,14 +219,15 @@
 ]
 
 [Min][Sub][Dif]
-[Mnnd][Sbth][Dffc]
     - [minuend Min][subtrahend Sub][difference Dif]
 
 [sig [minuend][subtrahend][difference]][help
     """
     Expresses the relationship: `Minuend - Subtrahend = Difference`.
     
-    To perform addition, use mode `[Minuend][subtrahend #][difference #]`.
+    To perform addition, use mode `[subtrahend][difference][Minuend]`.
+
+    Alias: [min][sub][dif]
     """
 ]
 
@@ -227,6 +242,8 @@
     
     Can be used to express divisibility (when Remainder is set to 0), as well as
     multiplication (when Remainder is 0).
+
+    Alias: [num][den][quo][rem]
 
 
     Common Modes:
@@ -252,8 +269,8 @@
 ]
 
 [Nat][Base][Digits]
-    - [forwards Digits][backwards RevDigits]
     - [Nat][Base][RevDigits]
+    - [forwards RevDigits][backwards Digits]
 
 [nat 0][Base][revdigits {}]
 [Nat][Base][revdigits {Rem ..Ds}]
