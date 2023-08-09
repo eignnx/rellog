@@ -134,6 +134,40 @@ Now, to ask who Gideon's teachers are we could query:
     - Teacher = dr_na
 ```
 
+### Getting Help
+
+There are many relations predefined for you to use in your Rellog code. Use the `[sig][help]` relation to query them:
+
+```yaml
+-- [Sig][Help]
+
+    - Sig = [prefix][suffix][compound]
+    - Help =
+        """
+       Relates a list `Compound` to some partitioning 
+       of itself into a `Prefix` and a `Suffix`. Also 
+       works for text strings.
+       """
+```
+
+The `[sig][help]` relation is good to use to document your own relations too.
+
+There's also the `[help]` relation. It performs a side-effect when queried (so it's not a pure relation). It prints out the `Help` text associated with the signature passed in:
+
+
+<code>
+-- [help [pred][succ]]
+<br/>
+<br/>
+<i>Relation: [pred][succ]<br/>
+--------------<br/>
+Relates two adjacent integers: a predecessor and a successor.
+</i>
+</code><br/><br/>
+
+
+It's just a little easier on the eyes.
+
 ### Clauses
 
 A clause is a top-level definition. A clause is either:
