@@ -13,7 +13,7 @@ append([1, 2], [3, 4], Compound)
 
 in Rellog you could write any of
 
-```toml
+```yaml
 [prefix {1, 2}][suffix {3, 4}][compound Compound]
 [prefix {1, 2}][suffix {3, 4}][Compound]
 [suffix {3, 4}][prefix {1, 2}][Compound]
@@ -24,7 +24,7 @@ in Rellog you could write any of
 ```
 
 ## Example
-```toml
+```yaml
 [prefix {}][Suffix][compound Suffix]
 [prefix {A ...As}][Suffix][compound {A ...Compound}]
     - [prefix As][suffix Suffix][Compound]
@@ -175,27 +175,27 @@ A clause is a top-level definition. A clause is either:
 1. A **fact**:
 
     The following three facts declare that three symbols (`socrates`, `chomsky`, and `you`) refer to humans.
-    ```toml
+    ```yaml
     [human socrates]
     [human chomsky]
     [human you]
     ```
     Most facts are unconditionally true. But here's an example of a fact that could fail depending on its argument:
-    ```toml
+    ```yaml
     [nonempty_list {A ..B}]
     ```
     The query `[nonempty_list {}]` would fail.
 1. A **rule**:
 
     A rule has conditions. Heres an example of a rule:
-    ```toml
+    ```yaml
     [mortal X]
         - [human X]
     ```
     This rule says "an `X` is `mortal` if that `X` is `human`.
 
     Lets query the `mortal` rule.
-    ```toml
+    ```yaml
     -- [mortal socrates]
         - [true] # Exactly 1 solution found.
 
