@@ -4,7 +4,7 @@ use std::{
     io::{stderr, stdout, Write},
 };
 
-use num::{Integer, Zero};
+use num::{Integer, ToPrimitive, Zero};
 use rpds::Vector;
 
 use crate::{
@@ -20,18 +20,20 @@ use crate::{
     utils::int_counter::IntCounter,
 };
 
+use super::Rt;
+
 pub struct Intrinsic {
     signature: Sig,
-    func: Box<dyn Fn(UnifierSet, Rel) -> Box<dyn SolnStream>>,
+    func: Box<dyn Fn(&Rt, UnifierSet, Rel) -> Box<dyn SolnStream>>,
 }
 
 impl Intrinsic {
-    pub fn apply(&self, u: UnifierSet, rel: Rel) -> Box<dyn SolnStream> {
+    pub fn apply(&self, rt: &Rt, u: UnifierSet, rel: Rel) -> Box<dyn SolnStream> {
         if self.signature != Sig::from(rel.clone()) {
             return soln_stream::failure();
         }
 
-        (self.func)(u, rel)
+        (self.func)(rt, u, rel)
     }
 }
 
@@ -56,9 +58,9 @@ macro_rules! ident_of_binding {
 }
 
 macro_rules! def_intrinsic {
-    ($intrs:expr, |$u:ident, $([$ident:ident $(as $name:literal)?])+| $body:expr) => {
+    ($intrs:expr, |$rt:ident, $u:ident, $([$ident:ident $(as $name:literal)?])+| $body:expr) => {
         let sig = [$(name_of_binding!($ident $(as $name)?),)+];
-        $intrs.def(&sig, move |u, rel| {
+        $intrs.def(&sig, move |rt, u, rel| {
             $(
             let ident_of_binding!($ident $(as $name)?) = match rel.get(&name_of_binding!($ident $(as $name)?).into()) {
                 Some(x) => u.reify_term(x),
@@ -67,6 +69,7 @@ macro_rules! def_intrinsic {
             let ident_of_binding!($ident $(as $name)?) = &ident_of_binding!($ident $(as $name)?);
             )+
 
+            let $rt = rt;
             let $u = u;
 
             $body
@@ -99,7 +102,7 @@ impl IntrinsicsMap {
     fn def(
         &mut self,
         sig: &[&str],
-        func: impl Fn(UnifierSet, Rel) -> Box<dyn SolnStream> + 'static,
+        func: impl Fn(&Rt, UnifierSet, Rel) -> Box<dyn SolnStream> + 'static,
     ) {
         let sig: Sig = sig.iter().map(|s| s.into()).collect::<Vector<_>>().into();
 
@@ -115,11 +118,11 @@ impl IntrinsicsMap {
     pub(crate) fn initialize() -> Self {
         let mut intrs = Self::new();
 
-        def_intrinsic!(intrs, |u, [eq1][eq2]| {
+        def_intrinsic!(intrs, |_rt, u, [eq1][eq2]| {
             soln_stream::unifying(u, eq1, eq2)
         });
 
-        def_intrinsic!(intrs, |u, [rel][attrs]| {
+        def_intrinsic!(intrs, |_rt, u, [rel][attrs]| {
             match (rel.as_ref(), attrs.as_ref()) {
                 (Tm::Var(_), Tm::Cons(_, _)) => {
                     let var = rel;
@@ -167,7 +170,7 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |u, [attr][key][value]| {
+        def_intrinsic!(intrs, |_rt, u, [attr][key][value]| {
             match (attr.as_ref(), key.as_ref(), value.as_ref()) {
 
                 // [[mode [attr in][key inout][value inout]]]
@@ -198,7 +201,7 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |u, [gt][lt]| {
+        def_intrinsic!(intrs, |_rt, u, [gt][lt]| {
             match (gt.as_ref(), lt.as_ref()) {
                 (Tm::Int(gt), Tm::Int(lt)) => {
                     if gt > lt {
@@ -211,7 +214,7 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |u, [gte][lte]| {
+        def_intrinsic!(intrs, |_rt, u, [gte][lte]| {
             match (gte.as_ref(), lte.as_ref()) {
                 (Tm::Int(gte), Tm::Int(lte)) => {
                     if gte >= lte {
@@ -224,21 +227,21 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |u, [tm as "is_var"]| {
+        def_intrinsic!(intrs, |_rt, u, [tm as "is_var"]| {
             match u.reify_term(tm).as_ref() {
                 Tm::Var(_) => soln_stream::success(u),
                 _ => soln_stream::failure(),
             }
         });
 
-        def_intrinsic!(intrs, |u, [tm as "is_num"]| {
+        def_intrinsic!(intrs, |_rt, u, [tm as "is_num"]| {
             match u.reify_term(tm).as_ref() {
                 Tm::Int(_) => soln_stream::success(u),
                 _ => soln_stream::failure(),
             }
         });
 
-        def_intrinsic!(intrs, |u, [rel][key][value]| {
+        def_intrinsic!(intrs, |_rt, u, [rel][key][value]| {
             let rel = match rel.as_ref() {
                 Tm::Rel(rel) => rel,
                 Tm::Var(_) => return Err::InstantiationError(rel.clone()).into(),
@@ -258,7 +261,7 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |u, [txt_prefix][txt_suffix][txt_compound]| {
+        def_intrinsic!(intrs, |_rt, u, [txt_prefix][txt_suffix][txt_compound]| {
             use Tm::{Txt, Var};
             match (txt_prefix.as_ref(), txt_suffix.as_ref(), txt_suffix.as_ref()) {
                 (Txt(ref prefix_head, ref prefix_tail), Txt(suffix_head, suffix_tail), _) => {
@@ -306,7 +309,7 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |u, [sum][x][y]| {
+        def_intrinsic!(intrs, |_rt, u, [sum][x][y]| {
             match (sum.as_ref(), x.as_ref(), y.as_ref()) {
                 (_, Tm::Int(x), Tm::Int(y)) => {
                     let res = Tm::Int(x + y).into();
@@ -333,7 +336,7 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |u, [product][x][y]| {
+        def_intrinsic!(intrs, |_rt, u, [product][x][y]| {
             match (product.as_ref(), x.as_ref(), y.as_ref()) {
                 (_, Tm::Int(x), Tm::Int(y)) => {
                     let res = Tm::Int(x * y).into();
@@ -370,7 +373,7 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |u, [difference][minuend][subtrahend]| {
+        def_intrinsic!(intrs, |_rt, u, [difference][minuend][subtrahend]| {
             match (difference.as_ref(), minuend.as_ref(), subtrahend.as_ref()) {
                 (a, b, c) if ![a, b, c].into_iter().all(|tm| matches!(*tm, Tm::Int(_) | Tm::Var(_))) => {
                     Err::GenericError {
@@ -398,7 +401,7 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |u, [quotient][remainder][numerator][denominator]| {
+        def_intrinsic!(intrs, |_rt, u, [quotient][remainder][numerator][denominator]| {
             match (quotient.as_ref(), remainder.as_ref(), numerator.as_ref(), denominator.as_ref()) {
                 (a, b, c, d) if ![a, b, c, d].into_iter().all(|tm| matches!(*tm, Tm::Int(_) | Tm::Var(_))) => {
                     Err::GenericError {
@@ -479,7 +482,7 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |u, [pred][succ]| {
+        def_intrinsic!(intrs, |_rt, u, [pred][succ]| {
             match (pred.as_ref(), succ.as_ref()) {
                 (Tm::Var(_), Tm::Var(_)) => Err::InstantiationError(pred.clone()).into(),
                 (Tm::Var(_), Tm::Int(s)) => {
@@ -501,11 +504,11 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |u, [_yes as "true"]| {
+        def_intrinsic!(intrs, |_rt, u, [_yes as "true"]| {
             soln_stream::success(u)
         });
 
-        def_intrinsic!(intrs, |_u, [_no as "false"]| {
+        def_intrinsic!(intrs, |_rt, _u, [_no as "false"]| {
             soln_stream::failure()
         });
 
@@ -580,7 +583,7 @@ impl IntrinsicsMap {
             soln_stream::success(u)
         }
 
-        def_intrinsic!(intrs, |u, [text as "io_write"][stream as "stream"]| {
+        def_intrinsic!(intrs, |_rt, u, [text as "io_write"][stream as "stream"]| {
             let Ok(stream) = StdStream::try_from(stream) else {
                 return Err::ArgumentTypeError {
                     rel: "[io_write][stream]".into(),
@@ -592,7 +595,7 @@ impl IntrinsicsMap {
             io_write_impl(u, text, stream)
         });
 
-        def_intrinsic!(intrs, |u, [text as "io_writeln"][stream as "stream"]| {
+        def_intrinsic!(intrs, |_rt, u, [text as "io_writeln"][stream as "stream"]| {
             let Ok(stream) = StdStream::try_from(stream) else {
                 return Err::ArgumentTypeError {
                     rel: "[io_writeln][stream]".into(),
@@ -610,7 +613,7 @@ impl IntrinsicsMap {
             soln_stream
         });
 
-        def_intrinsic!(intrs, |u, [term][text]| {
+        def_intrinsic!(intrs, |_rt, u, [term][text]| {
             match (term.as_ref(), text.as_ref()) {
                 (Tm::Var(..), _) => {
                     let term_var = term;
@@ -651,7 +654,7 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |u, [cwd]| {
+        def_intrinsic!(intrs, |_rt, u, [cwd]| {
             let dir: String = std::env::current_dir()
                 .unwrap()
                 .as_os_str()
@@ -660,7 +663,7 @@ impl IntrinsicsMap {
             soln_stream::unifying(u, cwd, &Tm::Txt(dir.into(), Tm::Nil.into()).into())
         });
 
-        def_intrinsic!(intrs, |u, [cd]| {
+        def_intrinsic!(intrs, |_rt, u, [cd]| {
             if !matches!(cd.as_ref(), Tm::Txt(_, _)) {
                 return Err::ArgumentTypeError {
                     rel: "[cd]".into(),
@@ -696,7 +699,7 @@ impl IntrinsicsMap {
             soln_stream::success(u)
         });
 
-        def_intrinsic!(intrs, |u, [output as "ls"]| {
+        def_intrinsic!(intrs, |_rt, u, [output as "ls"]| {
             let read_dir = match std::fs::read_dir(".") {
                 Ok(rd) => rd,
                 Err(e) => return soln_stream::error(e.into())
@@ -714,6 +717,38 @@ impl IntrinsicsMap {
             soln_stream::unifying(u, output, &list)
         });
 
+        def_intrinsic!(intrs, |rt, u, [recursion_limit]| {
+            match recursion_limit.as_ref() {
+                Tm::Int(i) => {
+                    if i <= &Zero::zero() {
+                        return Err::GenericError {
+                            msg: "Recursion limit must be positive".into(),
+                        }
+                        .into();
+                    }
+                    if i >= &Int::from(usize::MAX) {
+                        return Err::GenericError {
+                            msg: format!("Recursion limit must be less than {}", usize::MAX),
+                        }
+                        .into();
+                    }
+                    rt.max_recursion_depth.set(i.to_usize().unwrap());
+                    soln_stream::success(u)
+                }
+                Tm::Var(..) => {
+                    let limit = Tm::Int(rt.max_recursion_depth.get().into()).into();
+                    soln_stream::unifying(u, &limit, recursion_limit)
+                }
+                _ => Err::ArgumentTypeError {
+                    rel: "[recursion_limit]".into(),
+                    key: "recursion_limit".into(),
+                    expected_ty: "int or var".into(),
+                    recieved_tm: format!("{recursion_limit}"),
+                }
+                .into(),
+            }
+        });
+
         ////////////////////// Define `[builtins]` //////////////////////
 
         let builtin_rel_sigs = {
@@ -728,7 +763,7 @@ impl IntrinsicsMap {
             RcTm::list_from_iter(builtin_rel_sigs.into_iter())
         };
 
-        def_intrinsic!(intrs, |u, [builtins]| {
+        def_intrinsic!(intrs, |_rt, u, [builtins]| {
             let builtin_rel_sigs = builtin_rel_sigs.clone();
             soln_stream::unifying(u, builtins, &builtin_rel_sigs)
         });
