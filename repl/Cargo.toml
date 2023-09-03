@@ -1,0 +1,15 @@
+[package]
+name = "rellog"
+version = "0.1.0"
+edition = "2021"
+authors = ["eignnx <eignnx@gmail.com>"]
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+librellog = { path = "../librellog" }
+nom_i9n = { path = "../nom_i9n" }
+reedline = "0.10.0"
+nu-ansi-term = "0.46.0"
+human-panic = "1.1.5"
+directories-next = "2.0.0"
