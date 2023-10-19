@@ -104,7 +104,7 @@ impl<'tm> TmDisplayer<'tm> {
                 match self.layout {
                     Layout::Inline => write!(f, " "),
                     Layout::Block => {
-                        writeln!(f, "")?;
+                        writeln!(f)?;
                         for _ in 0..self.indent {
                             write!(f, "    ")?;
                         }
@@ -117,7 +117,7 @@ impl<'tm> TmDisplayer<'tm> {
         impl Sep {
             fn close_brace(&self, f: &mut Formatter<'_>) -> fmt::Result {
                 if let Layout::Block = self.layout {
-                    writeln!(f, "")?;
+                    writeln!(f)?;
                     for _ in 0..self.indent - 1 {
                         write!(f, "    ")?;
                     }

@@ -377,11 +377,11 @@ pub struct Module {
 }
 
 impl Module {
-    pub fn parse<'ts>(
+    pub fn parse(
         src: impl AsRef<str>,
         filename: PathBuf,
-        token_buf: &'ts mut Vec<At<Tok>>,
-    ) -> Result<Module, Error<'ts>> {
+        token_buf: &mut Vec<At<Tok>>,
+    ) -> Result<Module, Error<'_>> {
         let tokens = lex::tokenize_into(token_buf, LocatedSpan::new(src.as_ref()), filename)?;
         parse::entire_module(tokens)
     }

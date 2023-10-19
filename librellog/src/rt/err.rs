@@ -60,7 +60,7 @@ impl fmt::Display for Err {
             Err::UnexpectedPartialList { rel, key, partial } => {
                 write!(f, "The relation `{rel}` received a partial list for it's `{key}` argument: {partial}")
             }
-            Err::IoError(err) => f.write_str(&err),
+            Err::IoError(err) => f.write_str(err),
             Err::MaxRecursionDepthExceeded { depth, query } => {
                 write!(
                     f,

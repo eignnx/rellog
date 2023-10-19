@@ -452,7 +452,7 @@ mod tests {
             rest.is_empty(),
             "\nCould not parse entire input: ```\n{src}\n```\n\
              Remaining input begins with: [{}]\n",
-            rest.into_iter()
+            rest.iter()
                 .take(5)
                 .map(|tok| format!("`{}`", tok.as_ref()))
                 .collect::<Vec<_>>()

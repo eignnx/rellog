@@ -476,7 +476,7 @@ impl IntrinsicsMap {
                     Err::GenericError {
                         msg: format!(
                             "[numerator][denominator][quotient][remainder] is not \
-                            implemented for mode `{mode}`.").into()
+                            implemented for mode `{mode}`.")
                     }.into()
                 }
             }
@@ -513,6 +513,7 @@ impl IntrinsicsMap {
         });
 
         #[derive(Clone, Copy)]
+        #[allow(clippy::enum_variant_names)]
         enum StdStream {
             StdIn,
             StdOut,
@@ -691,10 +692,9 @@ impl IntrinsicsMap {
                 .into();
             };
 
-            match std::env::set_current_dir(path) {
-                Err(e) => return soln_stream::error(e.into()),
-                Ok(_) => {}
-            };
+            if let Err(e) = std::env::set_current_dir(path) {
+                return soln_stream::error(e.into());
+            }
 
             soln_stream::success(u)
         });
