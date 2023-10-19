@@ -237,7 +237,7 @@ where
                 if &root_term == term {
                     term.clone()
                 } else {
-                    return self.reify_term(&root_term);
+                    self.reify_term(&root_term)
                 }
             }
 
@@ -260,7 +260,7 @@ where
         // Clone here so borrow of `RefCell` can be dropped immediately.
         let map = self.map.borrow().clone();
         for var in map.keys() {
-            let root_term = self.find(&var);
+            let root_term = self.find(var);
             let reified_root_term = self.reify_term(&root_term);
 
             let entry = sets
