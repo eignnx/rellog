@@ -13,7 +13,7 @@ lasso = "0.6.0"
 magic_static = "3.0.3"
 unifier_set = { path = "../unifier_set" }
 nom_i9n = { path = "../nom_i9n" }
-char-list = "0.1.0"
+char-list = { path = "../char-list" }
 nu-ansi-term = "0.46.0"
 num = "0.4.1"
 
