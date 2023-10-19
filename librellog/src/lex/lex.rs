@@ -29,7 +29,7 @@ fn text_literal<'i>(i: Span<'i>) -> Res<'i, CharList> {
 
             let mut out = String::new();
 
-            if text.starts_with("\n") || text.starts_with("\r\n") {
+            if text.starts_with('\n') || text.starts_with("\r\n") {
                 // _ _ _ """
                 // _ _ _ _ _ asdf
                 // _ _ _ """
@@ -39,7 +39,7 @@ fn text_literal<'i>(i: Span<'i>) -> Res<'i, CharList> {
                 // """
                 for line in text.lines().skip(1) {
                     if line.trim().is_empty() {
-                        out.push_str("\n");
+                        out.push('\n');
                     } else {
                         if line.len() <= start_col {
                             return context(
@@ -53,7 +53,7 @@ fn text_literal<'i>(i: Span<'i>) -> Res<'i, CharList> {
                     }
                 }
 
-                if out.ends_with("\n") {
+                if out.ends_with('\n') {
                     out.pop();
                 }
             } else {
@@ -209,7 +209,7 @@ pub fn tokenize_into<'i, 'buf>(
 mod block_tests {
     use super::tokenize;
     use super::Tok::*;
-    use crate::tok::At;
+    use crate::lex::tok::At;
     use pretty_assertions::assert_eq;
 
     #[test]
@@ -225,6 +225,7 @@ mod block_tests {
 ";
 
         let actual = tokenize(src, "blah.rellog".into())
+            .unwrap()
             .into_iter()
             .map(At::value)
             .collect::<Vec<_>>();
@@ -255,6 +256,7 @@ mod block_tests {
         let src = r#"[asdf Qwerty][Poiu]"#;
 
         let actual = tokenize(src, "blah.rellog".into())
+            .unwrap()
             .into_iter()
             .map(At::value)
             .collect::<Vec<_>>();

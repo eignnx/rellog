@@ -6,16 +6,16 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-nom = "7.1.1"
+char-list = "0.1.0"                       # { path = "../char-list" }nom = "7.1.1"
 nom_locate = "4.0.0"
 rpds = "0.13.0"
 lasso = "0.6.0"
 magic_static = "3.0.3"
 unifier_set = { path = "../unifier_set" }
 nom_i9n = { path = "../nom_i9n" }
-char-list = { path = "../char-list" }
 nu-ansi-term = "0.46.0"
 num = "0.4.1"
+nom = "7.1.1"
 
 [dev-dependencies]
 assert2 = "0.3.6"

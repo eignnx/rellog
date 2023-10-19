@@ -143,20 +143,19 @@ impl<'ts> From<I9nError<BaseInput<'ts>>> for Error<'ts> {
         Error {
             stack: vec![(
                 e.input,
-                Problem::CustomMessage(match e {
-                    I9nError {
+                Problem::CustomMessage({
+                    let I9nError {
                         input,
                         situation,
                         ctx,
-                    } => {
-                        let situation = I9nErrorSituationDisplay(situation);
-                        let ctx = I9nErrorCtxDisplay(ctx);
-                        let input_preview = input
-                            .get(0)
-                            .map(|tok| tok.value.to_string())
-                            .unwrap_or_else(|| "end of file".into());
-                        format!("Indentation error: {situation} {ctx} at token `{input_preview}`.")
-                    }
+                    } = e;
+                    let situation = I9nErrorSituationDisplay(situation);
+                    let ctx = I9nErrorCtxDisplay(ctx);
+                    let input_preview = input
+                        .get(0)
+                        .map(|tok| tok.value.to_string())
+                        .unwrap_or_else(|| "end of file".into());
+                    format!("Indentation error: {situation} {ctx} at token `{input_preview}`.")
                 }),
             )],
         }
@@ -440,7 +439,7 @@ pub fn module(ts: Toks) -> Res<Module> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{lex::tokenize, tm_displayer::TmDisplayer, utils::my_nom::Span};
+    use crate::{ast::tm_displayer::TmDisplayer, lex::tokenize, utils::my_nom::Span};
     use pretty_assertions::assert_eq;
     use rpds::vector;
 
@@ -557,7 +556,7 @@ mod tests {
         crate::init_interner();
         assert_eq!(
             parse_to_tm("{123}"),
-            Tm::Cons(Tm::Int(123).into(), Tm::Nil.into())
+            Tm::Cons(Tm::Int(123.into()).into(), Tm::Nil.into())
         );
     }
 

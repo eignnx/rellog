@@ -204,9 +204,9 @@ impl Rt {
         self.recursion_depth.set(d - 1);
     }
 
-    fn deferred_decr_recursion_depth<'rtb>(
-        &'rtb self,
-    ) -> impl ExactSizeIterator<Item = Result<UnifierSet, Err>> + 'rtb {
+    fn deferred_decr_recursion_depth(
+        &self,
+    ) -> impl ExactSizeIterator<Item = Result<UnifierSet, Err>> + '_ {
         DeferredIter::new(|| {
             self.decr_recursion_depth();
         })
@@ -224,13 +224,14 @@ fn test_runtime() {
     - [prefix As][suffix Suffix][Compound]
 ";
 
-    let tokens = lex::tokenize(src, "".into());
+    let tokens = lex::tokenize(src, "".into()).unwrap();
     let module = parse::entire_module(tokens[..].into()).unwrap();
 
-    let rt = Rt::new(&module);
+    let rt = Rt::new(module);
 
     let query = {
-        let tokens = lex::tokenize("[prefix {1 2 3}][suffix {4 5 6}][Compound]", "".into());
+        let tokens =
+            lex::tokenize("[prefix {1 2 3}][suffix {4 5 6}][Compound]", "".into()).unwrap();
         parse::entire_term(tokens[..].into()).unwrap()
     };
 
