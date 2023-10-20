@@ -54,6 +54,7 @@
 [must_be [int N]]
     - [is_num N]
 
+[[meta semidet]]
 [sig [list][last]][help "Relates a list to its last element."]
 [list {Last}][Last]
 [list {X ..Xs}][Last]
@@ -67,19 +68,23 @@
     - [pred XsLength][succ Length]
 
 
+[[meta impure]]
 [sig [io {println}]][help "Prints a newline character to stdout."]
 [io {println}]
     - [io_writeln ""][stream stdout]
 
+[[meta impure]]
 [sig [io {println Text}]][help "Prints `Text` to stdout, followed by a newline character."]
 [io {println Text}]
     - [io_writeln Text][stream stdout]
 
+[[meta impure]]
 [sig [io {print Text}]][help "Prints `Text` to stdout."]
 [io {print Text}]
     - [io_write Text][stream stdout]
 
 
+[[meta impure]]
 [help Signature]
     - [sig Signature][help HelpTxt]
     - [term Signature][text SigTxt]
@@ -159,6 +164,13 @@
     "Relates an attribute (a `[key Value]` pair) to its key and value."
 ]
 
+[sig [rel][key][value]][help
+    """
+    Extracts a value from a relation given the key name. Faster than searching 
+    through a list of the relation's attributes.
+    """
+]
+
 [sig [gt][lt]][help
     "True if the number `Gt` is greater than the number `Lt`."
 ]
@@ -167,15 +179,10 @@
     "True if the number `Gte` is greater than or equal to the number `Lte`."
 ]
 
+[[meta non_monotonic]]
+[[meta impure]]
 [sig [is_var]][help
     "Succeeds if its argument is an unbound variable."
-]
-
-[sig [rel][key][value]][help
-    """
-    Extracts a value from a relation given the key name. Faster than searching 
-    through a list of the relation's attributes.
-    """
 ]
 
 [sig [txt_prefix][txt_suffix][txt_compound]][help
@@ -189,28 +196,35 @@
 [sig [true]][help "Always succeeds."]
 [sig [false]][help "Always fails."]
 
+[[meta impure]]
 [sig [io_writeln][stream]][help
     "Writes a text string to `Stream`, and then writes a newline character."
 ]
 
+[[meta impure]]
 [sig [io_write][stream]][help
     "Writes a text string to `Stream`."
 ]
 
+[[meta non_monotonic]]
 [sig [term][text]][help
     "Relates a term to its text string representation."
 ]
 
 [sig [builtins]][help "Lists all builtin relations."]
 
+[[meta impure]]
 [sig [cwd]][help "Gives the current working directory."]
 
+[[meta impure]]
 [sig [cd]][help
     """
     Changes the current working directory to the path provided as an argument.
     """
 ]
 
+[[meta non_monotonic]]
+[[meta impure]]
 [sig [ls]][help
     """
     Unifies its argument with a list of file/directory names from the current 
@@ -218,6 +232,7 @@
     """
 ]
 
+[[alias_for [minuend][subtrahend][difference]]]
 [Min][Sub][Dif]
     - [minuend Min][subtrahend Sub][difference Dif]
 
@@ -231,6 +246,7 @@
     """
 ]
 
+[[alias_for [numerator][denominator][quotient][remainder]]]
 [Num][Den][Quo][Rem]
     - [numerator Num][denominator Den][quotient Quo][remainder Rem]
 
