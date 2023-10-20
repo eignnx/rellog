@@ -4,10 +4,10 @@ use char_list::{CharList, CharListTail};
 
 use crate::data_structures::Var;
 
-use super::{RcTm, Tm};
+use super::{dup::Dup, RcTm, Tm};
 
 #[derive(Debug, Clone)]
-pub struct PartialCharList(CharList<RcTm>);
+pub struct PartialCharList(pub CharList<RcTm>);
 
 impl CharListTail for RcTm {
     type Err = TailError;
@@ -15,8 +15,8 @@ impl CharListTail for RcTm {
     fn next_char_list(&self) -> Result<Option<char_list::CharList<Self>>, Self::Err> {
         match self.as_ref() {
             Tm::Nil => Ok(None),
-            Tm::Txt(PartialCharList(cl)) => Ok(Some(*cl)),
-            Tm::Var(v) => Err(TailError::UninstantiatedTail(*v)),
+            Tm::Txt(PartialCharList(cl)) => Ok(Some(cl.clone())),
+            Tm::Var(v) => Err(TailError::UninstantiatedTail(v.clone())),
             Tm::Sym(..) | Tm::Int(..) | Tm::Block(..) | Tm::Rel(..) | Tm::Cons(..) => {
                 Err(TailError::NonListTail(self.clone()))
             }
@@ -27,7 +27,7 @@ impl CharListTail for RcTm {
         match self.as_ref() {
             Tm::Nil => Ok(0),
             Tm::Txt(PartialCharList(cl)) => cl.len(),
-            Tm::Var(v) => Err(TailError::UninstantiatedTail(*v)),
+            Tm::Var(v) => Err(TailError::UninstantiatedTail(v.clone())),
             Tm::Sym(..) | Tm::Int(..) | Tm::Block(..) | Tm::Rel(..) | Tm::Cons(..) => {
                 Err(TailError::NonListTail(self.clone()))
             }
@@ -51,6 +51,24 @@ impl PartialEq for PartialCharList {
 
 impl PartialOrd for PartialCharList {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+fn remove_common_prefix(a: &mut &str, b: &mut &str) {
+    let mut i = 0;
+    for (ch_a, ch_b) in a.chars().zip(b.chars()) {
+        if ch_a != ch_b {
+            break;
+        }
+        i += 1;
+    }
+    *a = &a[..i];
+    *b = &b[..i];
+}
+
+impl Ord for PartialCharList {
+    fn cmp(&self, other: &Self) -> Ordering {
         let mut cl_a = self.clone();
         let mut cl_b = other.clone();
 
@@ -63,11 +81,11 @@ impl PartialOrd for PartialCharList {
             if (seg_a.is_empty() && seg_b.is_empty())
                 && (!cl_a.tail().is_nil() || !cl_b.tail().is_nil())
             {
-                return cl_a.tail().partial_cmp(cl_b.tail());
+                return cl_a.tail().cmp(cl_b.tail());
             }
 
             if !seg_a.is_empty() && !seg_b.is_empty() {
-                return seg_a.partial_cmp(seg_b);
+                return seg_a.cmp(seg_b);
             }
 
             if seg_a.is_empty() {
@@ -75,7 +93,7 @@ impl PartialOrd for PartialCharList {
                     Ok(Some(cl)) => PartialCharList(cl),
                     // We're doing SYNTACTIC equality, so instantiation of tail
                     // doesn't matter.
-                    _ => return Some(Ordering::Less),
+                    _ => return Ordering::Less,
                 };
                 seg_a = cl_a.segment_as_str();
             }
@@ -85,29 +103,11 @@ impl PartialOrd for PartialCharList {
                     Ok(Some(cl)) => PartialCharList(cl),
                     // We're doing SYNTACTIC equality, so instantiation of tail
                     // doesn't matter.
-                    _ => return Some(Ordering::Greater),
+                    _ => return Ordering::Greater,
                 };
                 seg_b = cl_b.segment_as_str();
             }
         }
-    }
-}
-
-fn remove_common_prefix(a: &mut &str, b: &mut &str) {
-    let mut i = 0;
-    for (ch_a, ch_b) in a.chars().zip(b.chars()) {
-        if ch_a != ch_b {
-            break;
-        }
-        i += 1;
-    }
-    *a = &mut a[..i];
-    *b = &mut b[..i];
-}
-
-impl Ord for PartialCharList {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.partial_cmp(other).unwrap()
     }
 }
 
@@ -127,6 +127,31 @@ impl Hash for PartialCharList {
 impl From<&str> for PartialCharList {
     fn from(value: &str) -> Self {
         PartialCharList(CharList::from(value))
+    }
+}
+
+impl From<String> for PartialCharList {
+    fn from(value: String) -> Self {
+        PartialCharList(CharList::from(value))
+    }
+}
+
+impl Dup for PartialCharList {
+    fn dup(&self, _duper: &mut super::dup::TmDuplicator) -> Self {
+        // We will NOT be cloning any of the backing `FrontString`s!
+
+        // HACK: VERY INCORRECT IMPLEMENTATION HERE
+        self.clone()
+    }
+}
+
+impl PartialCharList {
+    pub fn cons_partial_char_list(&self, prefix: &PartialCharList) -> Self {
+        PartialCharList(self.0.cons_char_list(&prefix.0))
+    }
+
+    pub fn from_string_and_tail(s: impl Into<String>, tail: RcTm) -> Self {
+        PartialCharList(CharList::from_string_and_tail(s, tail))
     }
 }
 

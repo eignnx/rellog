@@ -1,6 +1,5 @@
 use core::fmt;
 
-use char_list::CharList;
 use nom_i9n::StartCol;
 
 use crate::{
@@ -43,7 +42,7 @@ pub enum Tok {
     Sym(Sym),
     Var(Var),
     Int(Int),
-    Txt(CharList),
+    Txt(String),
 }
 
 impl fmt::Display for Tok {
@@ -65,7 +64,7 @@ impl fmt::Display for Tok {
             Sym(s) => write!(f, "{s}"),
             Var(v) => write!(f, "{v}"),
             Int(i) => write!(f, "{i}"),
-            Txt(s) if s.as_str().contains('\n') => {
+            Txt(s) if s.contains('\n') => {
                 write!(f, "\"\"\"\n{s}\n\"\"\"")
             }
             Txt(s) => write!(f, "\"{s}\""),

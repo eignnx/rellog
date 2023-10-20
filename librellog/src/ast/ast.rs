@@ -24,6 +24,8 @@ use crate::{
     parse::{self, Error},
 };
 
+use super::partial_char_list::PartialCharList;
+
 pub type Rel = Map<Sym, RcTm>;
 
 /// A term.
@@ -32,11 +34,17 @@ pub enum Tm {
     Sym(Sym),
     Var(Var),
     Int(Int),
-    Txt(CharList, RcTm),
+    Txt(PartialCharList),
     Block(Tok, Vector<RcTm>),
     Rel(Rel),
     Cons(RcTm, RcTm),
     Nil,
+}
+
+impl Default for RcTm {
+    fn default() -> Self {
+        Tm::Nil.into()
+    }
 }
 
 impl Dup for Tm {
@@ -55,7 +63,7 @@ impl Dup for Tm {
                     .collect();
                 Tm::Rel(rel)
             }
-            Tm::Txt(cl, tl) => Tm::Txt(cl.clone(), tl.dup(duper)),
+            Tm::Txt(cl) => Tm::Txt(cl.dup(duper)),
             Tm::Sym(_) | Tm::Int(_) | Tm::Nil => self.clone(),
         }
     }
@@ -105,13 +113,21 @@ impl RcTm {
         Self::from(list)
     }
 
+    pub fn try_as_txt(&self) -> Option<&PartialCharList> {
+        if let Tm::Txt(cl) = self.as_ref() {
+            Some(cl)
+        } else {
+            None
+        }
+    }
+
     pub fn try_collect_txt_to_string(&self, buf: &mut String) -> Result<(), ()> {
         let mut rc_tm = self;
         loop {
             match rc_tm.as_ref() {
-                Tm::Txt(head, tail) => {
-                    buf.push_str(head.as_str());
-                    rc_tm = tail;
+                Tm::Txt(cl) => {
+                    buf.push_str(cl.segment_as_str());
+                    rc_tm = cl.tail();
                 }
                 Tm::Nil => break Ok(()),
                 _ => break Err(()),
@@ -121,6 +137,14 @@ impl RcTm {
 
     pub fn sym(s: impl AsRef<str>) -> Self {
         Tm::Sym(IStr::from(s.as_ref())).into()
+    }
+
+    pub fn is_nil(&self) -> bool {
+        matches!(self.as_ref(), Tm::Nil)
+    }
+
+    pub fn txt_from_str(s: impl Into<String>) -> Self {
+        Self(Rc::new(Tm::Txt(PartialCharList(CharList::from(s.into())))))
     }
 }
 
@@ -205,12 +229,6 @@ impl From<Sig> for RcTm {
     }
 }
 
-impl From<String> for RcTm {
-    fn from(s: String) -> Self {
-        Self(Rc::new(Tm::Txt(CharList::from(s), Self(Rc::new(Tm::Nil)))))
-    }
-}
-
 impl From<Rel> for RcTm {
     fn from(rel: Rel) -> Self {
         Self(Rc::new(Tm::Rel(rel)))
@@ -236,7 +254,10 @@ impl ClassifyTerm<Var> for RcTm {
             (Tm::Sym(s1), Tm::Sym(s2)) => s1 == s2,
             (Tm::Var(_), Tm::Var(_)) => true,
             (Tm::Int(n1), Tm::Int(n2)) => n1 == n2,
-            (Tm::Txt(cl1, _), Tm::Txt(cl2, _)) => cl1 == cl2,
+            (Tm::Txt(cl1), Tm::Txt(cl2)) => {
+                // HACK: check all the text in the CharList (but not the tail if it's a non-`Nil` term)
+                cl1.segment_as_str() == cl2.segment_as_str()
+            }
             (Tm::Block(f1, _), Tm::Block(f2, _)) => f1 == f2,
             (Tm::Rel(r1), Tm::Rel(r2)) => r1.keys().eq(r2.keys()),
             (Tm::Cons(_, _), Tm::Cons(_, _)) => true,
@@ -250,7 +271,10 @@ impl DirectChildren<Var> for RcTm {
     fn direct_children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self> + 'a> {
         match self.as_ref() {
             Tm::Sym(_) | Tm::Var(_) | Tm::Int(_) | Tm::Nil => Box::new(iter::empty()),
-            Tm::Txt(_, tail) => Box::new(iter::once(tail)),
+            Tm::Txt(cl) => {
+                // HACK: return the final tail `Tm`
+                Box::new(iter::empty())
+            }
             Tm::Block(_, members) => Box::new(members.iter()),
             Tm::Rel(rel) => Box::new(rel.values()),
             Tm::Cons(head, tail) => Box::new(iter::once(head).chain(iter::once(tail))),
@@ -260,7 +284,11 @@ impl DirectChildren<Var> for RcTm {
     fn map_direct_children<'a>(&'a self, mut f: impl FnMut(&'a Self) -> Self + 'a) -> Self {
         match self.as_ref() {
             Tm::Sym(_) | Tm::Var(_) | Tm::Int(_) | Tm::Nil => self.clone(),
-            Tm::Txt(char_list, tail) => Tm::Txt(char_list.clone(), f(tail)).into(),
+            Tm::Txt(cl) => {
+                // HACK: actually map the tail
+                self.clone()
+                // Tm::Txt(char_list.clone(), f(tail)).into()
+            }
             Tm::Block(functor, members) => {
                 Tm::Block(functor.clone(), members.iter().map(f).collect()).into()
             }

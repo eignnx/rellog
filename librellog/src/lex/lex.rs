@@ -6,7 +6,6 @@ use crate::{
     lex::tok::{At, MakeAt, Tok},
     utils::my_nom::{Res, Span},
 };
-use char_list::CharList;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_until, take_while, take_while1},
@@ -19,7 +18,7 @@ use nom::{
 };
 use nom_i9n::{I9nInput, TokenizedInput};
 
-fn text_literal<'i>(i: Span<'i>) -> Res<'i, CharList> {
+fn text_literal<'i>(i: Span<'i>) -> Res<'i, String> {
     alt((
         move |i: Span<'i>| {
             let start_col = i.get_column() - 1;
@@ -72,13 +71,13 @@ fn text_literal<'i>(i: Span<'i>) -> Res<'i, CharList> {
                 out.pop();
             }
 
-            Ok((i, CharList::from(out)))
+            Ok((i, out))
         },
         move |i: Span<'i>| {
             let (i, _) = tag("\"")(i)?;
             let (i, text) = take_while(|c: char| c != '"')(i)?;
             let (i, _) = tag("\"")(i)?;
-            Ok((i, CharList::from(*text.fragment())))
+            Ok((i, text.fragment().to_string()))
         },
     ))
     .parse(i)

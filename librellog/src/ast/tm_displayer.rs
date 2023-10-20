@@ -177,23 +177,21 @@ impl<'tm> fmt::Display for TmDisplayer<'tm> {
             Tm::Sym(s) => self.fmt_sym(f, s),
             Tm::Var(v) => write!(f, "{v}"),
             Tm::Int(i) => write!(f, "{i}"),
-            Tm::Txt(char_list, tail) => {
+            Tm::Txt(char_list) => {
                 let mut char_list = char_list;
-                let mut tail = tail;
 
-                write!(f, "\"{char_list}")?;
-                while let Tm::Txt(cl, tl) = tail.as_ref() {
+                write!(f, "\"{}", char_list.segment_as_str())?;
+                while let Tm::Txt(cl) = char_list.tail().as_ref() {
                     char_list = cl;
-                    tail = tl;
-                    write!(f, "{char_list}")?;
+                    write!(f, "{}", char_list.segment_as_str())?;
                 }
 
-                if let Tm::Nil = tail.as_ref() {
+                if let Tm::Nil = char_list.tail().as_ref() {
                     write!(f, "\"")
                 } else {
                     // If it's not text, and the tail wasn't Nil, break
                     // and display the tail (either Var or malformed).
-                    write!(f, "[{} {tail}]\"", Tok::Spread)
+                    write!(f, "[{} {}]\"", Tok::Spread, char_list.tail())
                 }
             }
             Tm::Block(functor, members) => self.fmt_block(functor, members, f),

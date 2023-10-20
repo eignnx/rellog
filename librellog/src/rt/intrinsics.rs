@@ -8,7 +8,7 @@ use num::{Integer, ToPrimitive, Zero};
 use rpds::Vector;
 
 use crate::{
-    ast::{RcTm, Rel, Sig, Tm},
+    ast::{partial_char_list::PartialCharList, tm_displayer::TmDisplayer, RcTm, Rel, Sig, Tm},
     data_structures::Int,
     lex, parse,
     rt::Err,
@@ -264,34 +264,19 @@ impl IntrinsicsMap {
         def_intrinsic!(intrs, |_rt, u, [txt_prefix][txt_suffix][txt_compound]| {
             use Tm::{Txt, Var};
             match (txt_prefix.as_ref(), txt_suffix.as_ref(), txt_suffix.as_ref()) {
-                (Txt(ref prefix_head, ref prefix_tail), Txt(suffix_head, suffix_tail), _) => {
-                    let mut prefix_tail = prefix_tail;
-
-                    let mut segments = vec![prefix_head.clone()];
-
-                    while let Tm::Txt(prefix_hd, prefix_tl) = prefix_tail.as_ref() {
-                        segments.push(prefix_hd.clone());
-                        prefix_tail = prefix_tl;
-                    }
-
-                    let mut compound = suffix_head.clone();
-
-                    for segment in segments.into_iter().rev() {
-                        compound = compound.cons_str(segment);
-                    }
-
-                    let compound = Txt(compound, suffix_tail.clone()).into();
+                (Txt(ref prefix), Txt(suffix), _) => {
+                    let compound = Txt(suffix.cons_partial_char_list(prefix)).into();
                     soln_stream::unifying(u, txt_compound, &compound)
                 }
 
                 // -- [prefix "abc"][Suffix][Compound]
                 //  - Compound = "abc[..Suffix]"
-                (Txt(cl, tl), Var(_), _) => {
-                    let Some(u) = u.unify(tl, txt_suffix) else {
-                        return soln_stream::failure();
-                    };
+                (Txt(cl), Var(_), _) => {
 
-                    let consed = Tm::Txt(cl.clone(), txt_suffix.clone()).into();
+                    let consed = Tm::Txt(PartialCharList::from_string_and_tail(
+                        cl.to_string(), // <-- HACK: put text content into new String
+                        txt_suffix.clone()
+                    )).into();
 
                     let Some(u) = u.unify(&consed, txt_compound) else {
                         return soln_stream::failure();
@@ -555,15 +540,15 @@ impl IntrinsicsMap {
                 });
             }
 
-            while let Tm::Txt(cl, tl) = text.as_ref() {
+            while let Tm::Txt(cl) = text.as_ref() {
                 use nu_ansi_term::Color;
-                let to_print = Color::LightGray.italic().paint(cl.as_str());
+                let to_print = Color::LightGray.italic().paint(cl.segment_as_str());
                 match stream {
                     StdStream::StdOut => print!("{to_print}"),
                     StdStream::StdErr => eprint!("{to_print}"),
                     _ => unreachable!(),
                 }
-                text = tl;
+                text = cl.tail();
             }
 
             if !matches!(text.as_ref(), Tm::Nil) {
@@ -643,7 +628,7 @@ impl IntrinsicsMap {
                     soln_stream::unifying(u, &term, term_var)
                 }
                 (_, Tm::Var(..) | Tm::Txt(..)) => {
-                    let term = Tm::Txt(term.to_string().into(), Tm::Nil.into()).into();
+                    let term = Tm::Txt(term.to_string().into()).into();
                     soln_stream::unifying(u, &term, text)
                 }
                 _ => Err::ArgumentTypeError {
@@ -661,11 +646,11 @@ impl IntrinsicsMap {
                 .as_os_str()
                 .to_string_lossy()
                 .into_owned();
-            soln_stream::unifying(u, cwd, &Tm::Txt(dir.into(), Tm::Nil.into()).into())
+            soln_stream::unifying(u, cwd, &Tm::Txt(dir.into()).into())
         });
 
         def_intrinsic!(intrs, |_rt, u, [cd]| {
-            if !matches!(cd.as_ref(), Tm::Txt(_, _)) {
+            if !matches!(cd.as_ref(), Tm::Txt(..)) {
                 return Err::ArgumentTypeError {
                     rel: "[cd]".into(),
                     key: "cd".into(),
@@ -678,9 +663,9 @@ impl IntrinsicsMap {
             let mut path = String::new();
             let mut it = cd;
 
-            while let Tm::Txt(head, tail) = it.as_ref() {
-                path.push_str(head.as_str());
-                it = tail;
+            while let Tm::Txt(cl) = it.as_ref() {
+                path.push_str(cl.segment_as_str());
+                it = cl.tail();
             }
 
             let &Tm::Nil = it.as_ref() else {
