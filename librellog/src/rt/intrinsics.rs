@@ -749,6 +749,19 @@ impl IntrinsicsMap {
             }
         });
 
+        // TODO: once prolog's `forall` is implemented, this can become just
+        // `[directive]`, i.e. a multi-deterministic relation.
+        def_intrinsic!(intrs, |rt, u, [directives]| {
+            let it = rt
+                .db
+                .directives
+                .iter()
+                .cloned()
+                .map(|rel| Tm::Rel(rel).into());
+            let ds = RcTm::list_from_iter(it);
+            soln_stream::unifying(u, directives, &ds)
+        });
+
         ////////////////////// Define `[builtins]` //////////////////////
 
         let builtin_rel_sigs = {
@@ -763,6 +776,8 @@ impl IntrinsicsMap {
             RcTm::list_from_iter(builtin_rel_sigs.into_iter())
         };
 
+        // TODO: #3 once prolog's `forall` is implemented, this can become just
+        // `[builtin]`, i.e. a multi-deterministic relation.
         def_intrinsic!(intrs, |_rt, u, [builtins]| {
             let builtin_rel_sigs = builtin_rel_sigs.clone();
             soln_stream::unifying(u, builtins, &builtin_rel_sigs)
