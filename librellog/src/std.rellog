@@ -171,6 +171,10 @@
     "Succeeds if its argument is an unbound variable."
 ]
 
+[sig [is_num]][help
+    "Succeeds if its argument is an instantiated number."
+]
+
 [sig [rel][key][value]][help
     """
     Extracts a value from a relation given the key name. Faster than searching 

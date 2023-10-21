@@ -1,0 +1,34 @@
+[stacklang Code][Out]
+    - [stacklang Code][in {}][Out]
+
+[stacklang {}][in S][out S]
+[stacklang Code][in Stack0][out Stack]
+    - [eq1 {Cmd ..CodeLeft}][eq2 Code]
+    - [Cmd][in Stack0][out Stack1]
+    - [stacklang CodeLeft][in Stack1][out Stack]
+
+[cmd BinOp][in {A B ..Stack}][out {C ..Stack}]
+    - [member BinOp][list {add sub mul div}]
+    - [formula {B BinOp A}][result C]
+
+[cmd N][in Stack][out {N ..Stack}]
+    - [is_num N]
+
+[cmd {}][in Stack][out {{} ..Stack}]
+[cmd cons][in {A B ..Stack}][out {{A ..B} ..Stack}]
+[cmd car][in {{A ..B} ..Stack}][out {A ..Stack}]
+[cmd cdr][in {{A ..B} ..Stack}][out {B ..Stack}]
+
+[cmd pop][in {A ..Stack}][out Stack]
+[cmd dup][in {A ..Stack}][out {A A ..Stack}]
+[cmd swap][in {A B ..Stack}][out {B A ..Stack}]
+[cmd dig2][in {A B ..Stack}][out {B A B ..Stack}]
+[cmd dig3][in {A B C ..Stack}][out {C A B C ..Stack}]
+
+[cmd print][in {A ..Stack}][out Stack]
+    - [io {println A}]
+
+[cmd {Pro ..Gram}][in Stack0][out {{Pro ..Gram} ..Stack0}]
+
+[cmd exec][in {Code ..Stack0}][out Stack]
+    - [stacklang Code][in Stack0][out Stack]
