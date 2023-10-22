@@ -153,6 +153,20 @@
 
 [[comment "Documentation for builtins"]]
 
+[sig [eq]][help
+    """
+    Succeeds if it can unify all elements of its list argument.
+
+    # Example
+    ```
+    -- [eq {1 1 1}]
+        - [true]
+    -- [eq {A 123}]
+        - A = 123
+    ```
+    """
+]
+
 [sig [rel][attrs]][help
     """
     Relates a relation to a list of its attributes. An attribute is a 

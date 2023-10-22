@@ -118,8 +118,31 @@ impl IntrinsicsMap {
     pub(crate) fn initialize() -> Self {
         let mut intrs = Self::new();
 
-        def_intrinsic!(intrs, |_rt, u, [eq1][eq2]| {
-            soln_stream::unifying(u, eq1, eq2)
+        // A = B
+        // [eq {A B C}]
+        def_intrinsic!(intrs, |_rt, u, [eq]| {
+            let list = eq;
+
+            let Some((list, _)) = list.try_as_list() else {
+                return soln_stream::failure();
+            };
+
+            let mut u = u;
+            let mut it = list.iter();
+
+            let Some(first) = it.next() else {
+                return soln_stream::failure();
+            };
+
+            for x in it {
+                if let Some(uuu) = u.unify(x, first) {
+                    u = uuu;
+                } else {
+                    return soln_stream::failure();
+                }
+            }
+
+            soln_stream::success(u)
         });
 
         def_intrinsic!(intrs, |_rt, u, [rel][attrs]| {
