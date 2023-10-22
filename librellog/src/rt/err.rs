@@ -51,7 +51,7 @@ impl fmt::Display for Err {
                 write!(
                     f,
                     "The `{key}` key of the relation `{rel}` expected a \
-                     `{expected_ty}` argument, but received the term `{recieved_tm}`."
+                     `{expected_ty}` argument, but received: {recieved_tm}."
                 )
             }
             Err::GenericError { msg } => {
