@@ -553,7 +553,12 @@ impl IntrinsicsMap {
             }
         }
 
-        fn io_write_impl(u: UnifierSet, mut text: &RcTm, stream: StdStream) -> Box<dyn SolnStream> {
+        fn io_write_impl(
+            rel_name: &str,
+            u: UnifierSet,
+            mut text: &RcTm,
+            stream: StdStream,
+        ) -> Box<dyn SolnStream> {
             if let StdStream::StdIn = stream {
                 return soln_stream::error(Err::ArgumentTypeError {
                     rel: "[io_write][stream]".into(),
@@ -563,24 +568,45 @@ impl IntrinsicsMap {
                 });
             }
 
-            while let Tm::Txt(cl) = text.as_ref() {
-                use nu_ansi_term::Color;
-                let to_print = Color::LightGray.italic().paint(cl.segment_as_str());
-                match stream {
-                    StdStream::StdOut => print!("{to_print}"),
-                    StdStream::StdErr => eprint!("{to_print}"),
-                    _ => unreachable!(),
-                }
-                text = cl.tail();
-            }
-
-            if !matches!(text.as_ref(), Tm::Nil) {
+            let Some(mut cl) = text.try_as_txt() else {
                 return soln_stream::error(Err::ArgumentTypeError {
-                    rel: "[io_write][stream]".into(),
-                    key: "io_write".into(),
+                    rel: format!("[{rel_name}][stream]"),
+                    key: rel_name.into(),
                     expected_ty: "text".into(),
-                    recieved_tm: "a partial string".into(),
+                    recieved_tm: text.to_string(),
                 });
+            };
+
+            let mut tail = Tm::Nil.into();
+
+            loop {
+                for seg in cl.partial_segments() {
+                    use nu_ansi_term::Color;
+                    let to_print = Color::LightGray.italic().paint(seg.segment_as_str());
+                    match stream {
+                        StdStream::StdOut => print!("{to_print}"),
+                        StdStream::StdErr => eprint!("{to_print}"),
+                        _ => unreachable!(),
+                    }
+                }
+
+                tail = u.reify_term(cl.tail());
+
+                match tail.as_ref() {
+                    Tm::Txt(next_cl) => {
+                        cl = next_cl;
+                        continue;
+                    }
+                    Tm::Nil => break,
+                    other => {
+                        match stream {
+                            StdStream::StdOut => print!("{}", RcTm::from(other.clone())),
+                            StdStream::StdErr => eprint!("{}", RcTm::from(other.clone())),
+                            _ => unreachable!(),
+                        };
+                        break;
+                    }
+                }
             }
 
             match stream {
@@ -601,7 +627,7 @@ impl IntrinsicsMap {
                     recieved_tm: stream.to_string()
                 }.into()
             };
-            io_write_impl(u, text, stream)
+            io_write_impl("io_write", u, text, stream)
         });
 
         def_intrinsic!(intrs, |_rt, u, [text as "io_writeln"][stream as "stream"]| {
@@ -613,7 +639,7 @@ impl IntrinsicsMap {
                     recieved_tm: stream.to_string()
                 }.into()
             };
-            let soln_stream = io_write_impl(u, text, stream);
+            let soln_stream = io_write_impl("io_writeln", u, text, stream);
             match stream { // Print the '\n'.
                 StdStream::StdOut => println!(),
                 StdStream::StdErr => eprintln!(),

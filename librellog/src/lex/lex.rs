@@ -116,7 +116,7 @@ fn int(i: Span) -> Res<Int> {
         .parse(i)
 }
 
-fn one_token(i: Span) -> Res<At<Tok>> {
+pub fn one_token(i: Span) -> Res<At<Tok>> {
     let (i, _) = multispace0(i)?;
     alt((
         int.map(Tok::Int),

@@ -9,13 +9,58 @@ use super::{dup::Dup, RcTm, Tm};
 #[derive(Debug, Clone)]
 pub struct PartialCharList(pub CharList<RcTm>);
 
+impl PartialCharList {
+    pub fn cons_partial_char_list(&self, prefix: &PartialCharList) -> Self {
+        PartialCharList(self.0.cons_char_list(&prefix.0))
+    }
+
+    pub fn from_string_and_tail(s: impl Into<String>, tail: RcTm) -> Self {
+        PartialCharList(CharList::from_string_and_tail(s, tail))
+    }
+
+    /// Returns the tail of the frontmost segment of the underlying `CharList`.
+    pub fn segment_tail(&self) -> &RcTm {
+        self.0.tail()
+    }
+
+    /// Returns the last segment's tail (an `RcTm`).
+    pub fn tail(&self) -> &RcTm {
+        let mut cl = self;
+        while let Tm::Txt(next_cl) = cl.segment_tail().as_ref() {
+            cl = next_cl;
+        }
+        cl.segment_tail()
+    }
+}
+
+impl From<String> for PartialCharList {
+    fn from(value: String) -> Self {
+        PartialCharList(CharList::from(value))
+    }
+}
+
+impl From<&str> for PartialCharList {
+    fn from(value: &str) -> Self {
+        PartialCharList(CharList::from(value))
+    }
+}
+
+impl Dup for PartialCharList {
+    fn dup(&self, duper: &mut super::dup::TmDuplicator) -> Self {
+        // We will NOT be cloning any of the backing `FrontString`s!
+
+        // HACK: VERY INCORRECT IMPLEMENTATION HERE
+        self.clone()
+    }
+}
+
 impl CharListTail for RcTm {
     type Err = TailError;
 
-    fn next_char_list(&self) -> Result<Option<char_list::CharList<Self>>, Self::Err> {
+    fn next_char_list(&self) -> Result<Option<&char_list::CharList<Self>>, Self::Err> {
         match self.as_ref() {
             Tm::Nil => Ok(None),
-            Tm::Txt(PartialCharList(cl)) => Ok(Some(cl.clone())),
+            Tm::Txt(PartialCharList(cl)) => Ok(Some(cl)),
             Tm::Var(v) => Err(TailError::UninstantiatedTail(v.clone())),
             Tm::Sym(..) | Tm::Int(..) | Tm::Block(..) | Tm::Rel(..) | Tm::Cons(..) => {
                 Err(TailError::NonListTail(self.clone()))
@@ -32,6 +77,24 @@ impl CharListTail for RcTm {
                 Err(TailError::NonListTail(self.clone()))
             }
         }
+    }
+}
+
+impl Display for PartialCharList {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut cl = self;
+        write!(f, "{}", cl.segment_as_str())?;
+
+        while let Tm::Txt(next_cl) = cl.segment_tail().as_ref() {
+            write!(f, "{}", cl.segment_as_str())?;
+            cl = next_cl;
+        }
+
+        if !cl.segment_tail().is_nil() {
+            write!(f, "[..{}]", cl.segment_tail())?;
+        }
+
+        Ok(())
     }
 }
 
@@ -90,7 +153,7 @@ impl Ord for PartialCharList {
 
             if seg_a.is_empty() {
                 cl_a = match cl_a.tail().next_char_list() {
-                    Ok(Some(cl)) => PartialCharList(cl),
+                    Ok(Some(cl)) => PartialCharList(cl.clone()),
                     // We're doing SYNTACTIC equality, so instantiation of tail
                     // doesn't matter.
                     _ => return Ordering::Less,
@@ -100,7 +163,7 @@ impl Ord for PartialCharList {
 
             if seg_b.is_empty() {
                 cl_b = match cl_b.tail().next_char_list() {
-                    Ok(Some(cl)) => PartialCharList(cl),
+                    Ok(Some(cl)) => PartialCharList(cl.clone()),
                     // We're doing SYNTACTIC equality, so instantiation of tail
                     // doesn't matter.
                     _ => return Ordering::Greater,
@@ -121,37 +184,6 @@ impl Hash for PartialCharList {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         state.write(self.segment_as_bytes());
         self.tail().hash(state);
-    }
-}
-
-impl From<&str> for PartialCharList {
-    fn from(value: &str) -> Self {
-        PartialCharList(CharList::from(value))
-    }
-}
-
-impl From<String> for PartialCharList {
-    fn from(value: String) -> Self {
-        PartialCharList(CharList::from(value))
-    }
-}
-
-impl Dup for PartialCharList {
-    fn dup(&self, _duper: &mut super::dup::TmDuplicator) -> Self {
-        // We will NOT be cloning any of the backing `FrontString`s!
-
-        // HACK: VERY INCORRECT IMPLEMENTATION HERE
-        self.clone()
-    }
-}
-
-impl PartialCharList {
-    pub fn cons_partial_char_list(&self, prefix: &PartialCharList) -> Self {
-        PartialCharList(self.0.cons_char_list(&prefix.0))
-    }
-
-    pub fn from_string_and_tail(s: impl Into<String>, tail: RcTm) -> Self {
-        PartialCharList(CharList::from_string_and_tail(s, tail))
     }
 }
 

@@ -16,7 +16,7 @@ use nom_i9n::{I9nError, I9nErrorCtx, I9nErrorSituation, I9nInput, TokenizedInput
 use rpds::Vector;
 
 use crate::{
-    ast::{Clause, Item, Module, RcTm, Rel, Tm},
+    ast::{partial_char_list::PartialCharList, Clause, Item, Module, RcTm, Rel, Tm},
     data_structures::{Int, Map, Sym, Var},
     lex::{
         tok::{
@@ -26,6 +26,10 @@ use crate::{
         LexError,
     },
 };
+
+use self::txt_templates::process_txt_template;
+
+mod txt_templates;
 
 type Res<'ts, T> = IResult<Toks<'ts>, T, Error<'ts>>;
 type BaseInput<'ts> = &'ts [At<Tok>];
@@ -378,7 +382,13 @@ fn non_operator_tm(ts: Toks) -> Res<Tm> {
         sym.map(Tm::Sym),
         var.map(Tm::Var),
         num.map(Tm::Int),
-        txt.map(|txt| Tm::Txt(txt.into())),
+        txt.map(|s| {
+            let Some(cl) = process_txt_template(&s) else {
+                // TODO: Error handling
+                return Tm::Txt(PartialCharList::from(s));
+            };
+            Tm::Txt(cl)
+        }),
         rel.map(Tm::Rel),
         list,
         block,

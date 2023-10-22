@@ -132,9 +132,14 @@ impl Repl {
                 [":load" | ":l", fname] => {
                     let mut tok_buf = Vec::new();
                     match self.load_file(&mut tok_buf, fname) {
-                        Ok(()) => println!("# Loaded `{fname}`."),
+                        Ok(()) => {
+                            println!("{}", Color::Yellow.paint(format!("# Loaded `{fname}`.")))
+                        }
                         Err(e) => {
-                            println!("# Could not load file `{fname}`: {e}");
+                            println!(
+                                "{}",
+                                Color::Red.paint(format!("# Error loading file `{fname}`:\n\t{e}"))
+                            );
                         }
                     }
                     continue 'outer;
