@@ -1,11 +1,11 @@
 use std::{collections::HashMap, fmt, num::NonZeroUsize};
 
-use crate::data_structures::Var;
+use crate::{data_structures::Var, rt::UnifierSet};
 
 /// Represents the action of duplicating a term. The same action that Prolog's `copy_term`
 /// predicate does. This means it ought to make *different* copies of variables.
 pub trait Dup {
-    fn dup(&self, duper: &mut TmDuplicator) -> Self;
+    fn dup(&self, duper: &mut TmDuplicator, u: &mut UnifierSet) -> Self;
 }
 
 #[derive(Default)]
@@ -18,10 +18,10 @@ impl TmDuplicator {
     /// If you want to duplicate a term, use this function. It ensures that the
     /// substitution map is reset and the generation is incremented BEFORE the
     /// duplication starts.
-    pub fn duplicate<D: Dup>(&mut self, x: &D) -> D {
+    pub fn duplicate<D: Dup>(&mut self, x: &D, u: &mut UnifierSet) -> D {
         self.reset();
         self.incr_gen();
-        x.dup(self)
+        x.dup(self, u)
     }
 
     fn incr_gen(&mut self) {
@@ -36,7 +36,7 @@ impl TmDuplicator {
         self.substs.clear();
     }
 
-    pub(crate) fn dup_var(&mut self, old: &Var) -> Var {
+    pub fn dup_var(&mut self, old: &Var) -> Var {
         match self.substs.get(old) {
             Some(new) => new.clone(),
             None => {

@@ -107,7 +107,7 @@ impl Rt {
     fn solve_rel<'rtb, 'td, 'it>(
         &'rtb self,
         query: RcTm,
-        u: UnifierSet,
+        mut u: UnifierSet,
         td: &'td RefCell<TmDuplicator>,
     ) -> Box<dyn SolnStream + 'it>
     where
@@ -136,7 +136,7 @@ impl Rt {
             clauses
                 .flat_map(move |clause| {
                     // Make a duplicate of the clause.
-                    let clause = td.borrow_mut().duplicate(clause);
+                    let clause = td.borrow_mut().duplicate(clause, &mut u);
 
                     let head = Tm::Rel(clause.head).into();
 

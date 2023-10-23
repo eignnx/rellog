@@ -6,6 +6,7 @@ use rpds::RedBlackTreeMap;
 use crate::{
     ast::dup::{Dup, TmDuplicator},
     interner::IStr,
+    rt::UnifierSet,
 };
 
 pub type Sym = IStr;
@@ -32,7 +33,7 @@ impl Var {
 }
 
 impl Dup for Var {
-    fn dup(&self, duper: &mut TmDuplicator) -> Self {
+    fn dup(&self, duper: &mut TmDuplicator, _u: &mut UnifierSet) -> Self {
         duper.dup_var(self)
     }
 }

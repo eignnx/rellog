@@ -8,7 +8,7 @@ use num::{Integer, ToPrimitive, Zero};
 use rpds::Vector;
 
 use crate::{
-    ast::{partial_char_list::PartialCharList, tm_displayer::TmDisplayer, RcTm, Rel, Sig, Tm},
+    ast::{partial_char_list::PartialCharList, RcTm, Rel, Sig, Tm},
     data_structures::Int,
     lex, parse,
     rt::Err,
@@ -556,7 +556,7 @@ impl IntrinsicsMap {
         fn io_write_impl(
             rel_name: &str,
             u: UnifierSet,
-            mut text: &RcTm,
+            text: &RcTm,
             stream: StdStream,
         ) -> Box<dyn SolnStream> {
             if let StdStream::StdIn = stream {
@@ -577,6 +577,9 @@ impl IntrinsicsMap {
                 });
             };
 
+            // Beter way to do this? I'm defining a mut var out here to extend
+            // the lifetime for inside the loop.
+            #[allow(unused_assignments)]
             let mut tail = Tm::Nil.into();
 
             loop {

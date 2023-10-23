@@ -1,10 +1,14 @@
 use std::{cmp::Ordering, fmt::Display, hash::Hash, ops::Deref};
 
 use char_list::{CharList, CharListTail};
+use unifier_set::ClassifyTerm;
 
-use crate::data_structures::Var;
+use crate::{data_structures::Var, rt::UnifierSet};
 
-use super::{dup::Dup, RcTm, Tm};
+use super::{
+    dup::{Dup, TmDuplicator},
+    RcTm, Tm,
+};
 
 #[derive(Debug, Clone)]
 pub struct PartialCharList(pub CharList<RcTm>);
@@ -31,6 +35,21 @@ impl PartialCharList {
         }
         cl.segment_tail()
     }
+
+    /// Consolidates all the text in this set of linked `Txt` segments. Note:
+    /// Stops when it hits a `Nil` or a `Var` (or any other non-`Txt` term).
+    pub fn clone_with_new_tail<'a>(
+        &'a self,
+        mut tail_mapper: impl FnMut(&'a RcTm) -> RcTm,
+    ) -> Self {
+        let mut content = String::new();
+
+        for seg in self.partial_segments() {
+            content.push_str(seg.segment_as_str());
+        }
+
+        Self::from_string_and_tail(content, tail_mapper(self.tail()))
+    }
 }
 
 impl From<String> for PartialCharList {
@@ -45,12 +64,28 @@ impl From<&str> for PartialCharList {
     }
 }
 
-impl Dup for PartialCharList {
-    fn dup(&self, duper: &mut super::dup::TmDuplicator) -> Self {
-        // We will NOT be cloning any of the backing `FrontString`s!
+impl ClassifyTerm<Var> for PartialCharList {
+    fn classify_term(&self) -> unifier_set::TermKind<&Var> {
+        unifier_set::TermKind::NonVar
+    }
 
-        // HACK: VERY INCORRECT IMPLEMENTATION HERE
-        self.clone()
+    fn superficially_unifiable(&self, other: &Self) -> bool {
+        // We need to check if the text content (without reifying the tail) is
+        // the same.
+        match cmp_text_content(self.clone(), other.clone()) {
+            Ok(ordering) => ordering.is_eq(),
+            // If the text content is equal but the tails are non-`Nil`, then
+            // ***superficially***, these two are unifiable.
+            Err((_tail_a, _tail_b)) => true,
+        }
+    }
+}
+
+impl Dup for PartialCharList {
+    fn dup(&self, duper: &mut TmDuplicator, u: &mut UnifierSet) -> Self {
+        // We'd PREFER NOT TO clone any of the backing `FrontString`s!
+        // Alas...
+        self.clone_with_new_tail(|tail| u.reify_term(tail).dup(duper, u))
     }
 }
 
@@ -130,46 +165,57 @@ fn remove_common_prefix(a: &mut &str, b: &mut &str) {
     *b = &b[..i];
 }
 
+/// If a determination can be made based on the text content alone, returns
+/// `Ok(Ordering)`, otherwise returns the two tails and an ordering can be
+/// made by the caller.
+fn cmp_text_content(
+    mut cl_a: PartialCharList,
+    mut cl_b: PartialCharList,
+) -> Result<Ordering, (RcTm, RcTm)> {
+    let mut seg_a = cl_a.segment_as_str();
+    let mut seg_b = cl_b.segment_as_str();
+
+    loop {
+        remove_common_prefix(&mut seg_a, &mut seg_b);
+
+        let tail_a = cl_a.tail();
+        let tail_b = cl_b.tail();
+
+        if (seg_a.is_empty() && seg_b.is_empty()) && (!tail_a.is_nil() || !tail_b.is_nil()) {
+            return Err((tail_a.clone(), tail_b.clone()));
+        }
+
+        if !seg_a.is_empty() && !seg_b.is_empty() {
+            return Ok(seg_a.cmp(seg_b));
+        }
+
+        if seg_a.is_empty() {
+            cl_a = match tail_a.next_char_list() {
+                Ok(Some(cl)) => PartialCharList(cl.clone()),
+                // We're doing SYNTACTIC equality, so instantiation of tail
+                // doesn't matter.
+                _ => return Ok(Ordering::Less),
+            };
+            seg_a = cl_a.segment_as_str();
+        }
+
+        if seg_b.is_empty() {
+            cl_b = match tail_b.next_char_list() {
+                Ok(Some(cl)) => PartialCharList(cl.clone()),
+                // We're doing SYNTACTIC equality, so instantiation of tail
+                // doesn't matter.
+                _ => return Ok(Ordering::Greater),
+            };
+            seg_b = cl_b.segment_as_str();
+        }
+    }
+}
+
 impl Ord for PartialCharList {
     fn cmp(&self, other: &Self) -> Ordering {
-        let mut cl_a = self.clone();
-        let mut cl_b = other.clone();
-
-        let mut seg_a = cl_a.segment_as_str();
-        let mut seg_b = cl_b.segment_as_str();
-
-        loop {
-            remove_common_prefix(&mut seg_a, &mut seg_b);
-
-            if (seg_a.is_empty() && seg_b.is_empty())
-                && (!cl_a.tail().is_nil() || !cl_b.tail().is_nil())
-            {
-                return cl_a.tail().cmp(cl_b.tail());
-            }
-
-            if !seg_a.is_empty() && !seg_b.is_empty() {
-                return seg_a.cmp(seg_b);
-            }
-
-            if seg_a.is_empty() {
-                cl_a = match cl_a.tail().next_char_list() {
-                    Ok(Some(cl)) => PartialCharList(cl.clone()),
-                    // We're doing SYNTACTIC equality, so instantiation of tail
-                    // doesn't matter.
-                    _ => return Ordering::Less,
-                };
-                seg_a = cl_a.segment_as_str();
-            }
-
-            if seg_b.is_empty() {
-                cl_b = match cl_b.tail().next_char_list() {
-                    Ok(Some(cl)) => PartialCharList(cl.clone()),
-                    // We're doing SYNTACTIC equality, so instantiation of tail
-                    // doesn't matter.
-                    _ => return Ordering::Greater,
-                };
-                seg_b = cl_b.segment_as_str();
-            }
+        match cmp_text_content(self.clone(), other.clone()) {
+            Ok(ordering) => ordering,
+            Err((tail_a, tail_b)) => tail_a.cmp(&tail_b),
         }
     }
 }

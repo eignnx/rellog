@@ -22,6 +22,7 @@ use crate::{
         tok::{At, Tok},
     },
     parse::{self, Error},
+    rt::UnifierSet,
 };
 
 use super::partial_char_list::PartialCharList;
@@ -48,22 +49,22 @@ impl Default for RcTm {
 }
 
 impl Dup for Tm {
-    fn dup(&self, duper: &mut TmDuplicator) -> Self {
+    fn dup(&self, duper: &mut TmDuplicator, u: &mut UnifierSet) -> Self {
         match self {
-            Tm::Var(v) => Tm::Var(v.dup(duper)),
-            Tm::Cons(h, t) => Tm::Cons(h.dup(duper), t.dup(duper)),
+            Tm::Var(v) => Tm::Var(v.dup(duper, u)),
+            Tm::Cons(h, t) => Tm::Cons(h.dup(duper, u), t.dup(duper, u)),
             Tm::Block(f, ms) => {
-                let ms = ms.iter().map(|tm| tm.dup(duper)).collect();
+                let ms = ms.iter().map(|tm| tm.dup(duper, u)).collect();
                 Tm::Block(f.clone(), ms)
             }
             Tm::Rel(rel) => {
                 let rel = rel
                     .iter()
-                    .map(|(name, tm)| (*name, tm.dup(duper)))
+                    .map(|(name, tm)| (*name, tm.dup(duper, u)))
                     .collect();
                 Tm::Rel(rel)
             }
-            Tm::Txt(cl) => Tm::Txt(cl.dup(duper)),
+            Tm::Txt(cl) => Tm::Txt(cl.dup(duper, u)),
             Tm::Sym(_) | Tm::Int(_) | Tm::Nil => self.clone(),
         }
     }
@@ -187,8 +188,8 @@ macro_rules! tm {
 }
 
 impl Dup for RcTm {
-    fn dup(&self, duper: &mut TmDuplicator) -> Self {
-        self.0.dup(duper).into()
+    fn dup(&self, duper: &mut TmDuplicator, u: &mut UnifierSet) -> Self {
+        self.0.dup(duper, u).into()
     }
 }
 
@@ -254,10 +255,7 @@ impl ClassifyTerm<Var> for RcTm {
             (Tm::Sym(s1), Tm::Sym(s2)) => s1 == s2,
             (Tm::Var(_), Tm::Var(_)) => true,
             (Tm::Int(n1), Tm::Int(n2)) => n1 == n2,
-            (Tm::Txt(cl1), Tm::Txt(cl2)) => {
-                // HACK: check all the text in the CharList (but not the tail if it's a non-`Nil` term)
-                cl1.segment_as_str() == cl2.segment_as_str()
-            }
+            (Tm::Txt(cl1), Tm::Txt(cl2)) => cl1.superficially_unifiable(cl2),
             (Tm::Block(f1, _), Tm::Block(f2, _)) => f1 == f2,
             (Tm::Rel(r1), Tm::Rel(r2)) => r1.keys().eq(r2.keys()),
             (Tm::Cons(_, _), Tm::Cons(_, _)) => true,
@@ -271,10 +269,7 @@ impl DirectChildren<Var> for RcTm {
     fn direct_children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self> + 'a> {
         match self.as_ref() {
             Tm::Sym(_) | Tm::Var(_) | Tm::Int(_) | Tm::Nil => Box::new(iter::empty()),
-            Tm::Txt(cl) => {
-                // HACK: return the final tail `Tm`
-                Box::new(iter::empty())
-            }
+            Tm::Txt(cl) => Box::new(iter::once(cl.segment_tail())),
             Tm::Block(_, members) => Box::new(members.iter()),
             Tm::Rel(rel) => Box::new(rel.values()),
             Tm::Cons(head, tail) => Box::new(iter::once(head).chain(iter::once(tail))),
@@ -284,11 +279,7 @@ impl DirectChildren<Var> for RcTm {
     fn map_direct_children<'a>(&'a self, mut f: impl FnMut(&'a Self) -> Self + 'a) -> Self {
         match self.as_ref() {
             Tm::Sym(_) | Tm::Var(_) | Tm::Int(_) | Tm::Nil => self.clone(),
-            Tm::Txt(cl) => {
-                // HACK: actually map the tail
-                self.clone()
-                // Tm::Txt(char_list.clone(), f(tail)).into()
-            }
+            Tm::Txt(cl) => Tm::Txt(cl.clone_with_new_tail(f)).into(),
             Tm::Block(functor, members) => {
                 Tm::Block(functor.clone(), members.iter().map(f).collect()).into()
             }
@@ -383,14 +374,14 @@ pub struct Clause {
 }
 
 impl Dup for Clause {
-    fn dup(&self, duper: &mut TmDuplicator) -> Self {
+    fn dup(&self, duper: &mut TmDuplicator, u: &mut UnifierSet) -> Self {
         let head = self
             .head
             .iter()
-            .map(|(name, tm)| (*name, tm.dup(duper)))
+            .map(|(name, tm)| (*name, tm.dup(duper, u)))
             .collect();
 
-        let body = self.body.as_ref().map(|body| body.dup(duper));
+        let body = self.body.as_ref().map(|body| body.dup(duper, u));
 
         Self { head, body }
     }
