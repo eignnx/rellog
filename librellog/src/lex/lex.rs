@@ -99,7 +99,10 @@ fn var_or_sym(i: Span) -> Res<Tok> {
     )))
     .map(|span| span.fragment().into())
     .map(|sym: IStr| {
-        if sym.to_str().starts_with(char::is_uppercase) {
+        if sym
+            .to_str()
+            .starts_with(|c: char| c.is_uppercase() || c == '_')
+        {
             Tok::Var(sym.into())
         } else if sym.to_str().starts_with(char::is_lowercase) {
             Tok::Sym(sym)
