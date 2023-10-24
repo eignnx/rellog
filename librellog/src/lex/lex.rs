@@ -87,9 +87,7 @@ fn text_literal<'i>(i: Span<'i>) -> Res<'i, CharList> {
 fn var_or_sym(i: Span) -> Res<Tok> {
     let quoted_sym = delimited(
         tag("'"),
-        recognize(take_while(|c: char| {
-            c != '\'' && (c.is_alphanumeric() || c == '_')
-        })),
+        recognize(take_while(|c: char| c != '\'')),
         tag("'"),
     )
     .map(|span: Span| span.fragment().into())
