@@ -225,7 +225,7 @@ dependencies = [
 
 [[package]]
 name = "char-list"
-version = "0.3.0"
+version = "0.4.0"
 dependencies = [
  "assert2",
  "embed-doc-image",
@@ -560,6 +560,7 @@ version = "0.1.0"
 dependencies = [
  "assert2",
  "char-list 0.1.0",
+ "heck",
  "lasso",
  "magic_static",
  "nom",

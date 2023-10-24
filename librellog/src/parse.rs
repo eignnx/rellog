@@ -266,7 +266,7 @@ fn attr(ts: Toks) -> Res<(Sym, RcTm)> {
         // [AttrVarSameName]
         var.map(|v| {
             // `lower` created on separated line so INTERNER isn't shared AND mutated.
-            let lower = v.to_str().to_lowercase();
+            let lower = format!("{}", heck::AsSnakeCase(&v.to_str()[..]));
             (lower.into(), Tm::Var(v))
         }),
         // [attr_sym_same_name]

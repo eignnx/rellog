@@ -16,6 +16,7 @@ nom_i9n = { path = "../nom_i9n" }
 nu-ansi-term = "0.46.0"
 num = "0.4.1"
 nom = "7.1.1"
+heck = "0.4.1"
 
 [dev-dependencies]
 assert2 = "0.3.6"
