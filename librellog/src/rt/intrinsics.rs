@@ -261,6 +261,25 @@ impl IntrinsicsMap {
             }
         });
 
+        def_intrinsic!(intrs, |_rt, u, [pascal_case][snake_case]| {
+            match (pascal_case.as_ref(), snake_case.as_ref()) {
+                (Tm::Sym(pc), _) => {
+                    let lower = format!("{}", heck::AsSnakeCase(&pc.to_str()[..]));
+                    let lower_sym = Tm::Sym(lower.into()).into();
+                    soln_stream::unifying(u, &lower_sym, snake_case)
+                }
+                (_, Tm::Sym(sc)) => {
+                    let lower = format!("{}", heck::AsPascalCase(&sc.to_str()[..]));
+                    let lower_sym = Tm::Sym(lower.into()).into();
+                    soln_stream::unifying(u, &lower_sym, pascal_case)
+                }
+                _ => soln_stream::error(Err::GenericError {
+                    msg: "`[snake_case][pascal_case]` requires either one or two \
+                          ground symbols as arguments.".into()
+                }),
+            }
+        });
+
         def_intrinsic!(intrs, |_rt, u, [txt_prefix][txt_suffix][txt_compound]| {
             use Tm::{Txt, Var};
             match (txt_prefix.as_ref(), txt_suffix.as_ref(), txt_suffix.as_ref()) {
