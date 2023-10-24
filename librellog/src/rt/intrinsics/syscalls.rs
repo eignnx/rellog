@@ -1,4 +1,7 @@
-use std::io::{stderr, stdout, Write};
+use std::{
+    io::{stderr, stdout, Write},
+    os::raw::c_int,
+};
 
 use crate::{
     ast::{RcTm, Tm},
@@ -13,26 +16,25 @@ use crate::{
 use super::IntrinsicsMap;
 
 #[derive(Clone, Copy)]
-#[allow(clippy::enum_variant_names)]
-enum StdStream {
+enum Fd {
     StdIn,
     StdOut,
     StdErr,
-    Fd(std::os::raw::c_int),
+    Raw(std::os::raw::c_int),
 }
 
-impl std::fmt::Display for StdStream {
+impl std::fmt::Display for Fd {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            StdStream::StdIn => write!(f, "stdin"),
-            StdStream::StdOut => write!(f, "stdout"),
-            StdStream::StdErr => write!(f, "stderr"),
-            StdStream::Fd(fd) => write!(f, "{fd}"),
+            Fd::StdIn => write!(f, "stdin"),
+            Fd::StdOut => write!(f, "stdout"),
+            Fd::StdErr => write!(f, "stderr"),
+            Fd::Raw(fd) => write!(f, "{fd}"),
         }
     }
 }
 
-impl TryFrom<&RcTm> for StdStream {
+impl TryFrom<&RcTm> for Fd {
     type Error = ();
     fn try_from(value: &RcTm) -> Result<Self, Self::Error> {
         match value.as_ref() {
@@ -42,13 +44,17 @@ impl TryFrom<&RcTm> for StdStream {
             Tm::Int(i) if *i == 0.into() => Ok(Self::StdIn),
             Tm::Int(i) if *i == 1.into() => Ok(Self::StdOut),
             Tm::Int(i) if *i == 2.into() => Ok(Self::StdErr),
+            Tm::Int(fd) => {
+                let fd: c_int = fd.try_into().map_err(|_| ())?;
+                Ok(Self::Raw(fd))
+            }
             _ => Err(()),
         }
     }
 }
 
-fn io_write_impl(u: UnifierSet, mut text: &RcTm, stream: StdStream) -> Box<dyn SolnStream> {
-    if let StdStream::StdIn = stream {
+fn io_write_impl(u: UnifierSet, mut text: &RcTm, stream: Fd) -> Box<dyn SolnStream> {
+    if let Fd::StdIn = stream {
         return soln_stream::error(Err::ArgumentTypeError {
             rel: "[io_write][stream]".into(),
             key: "stream".into(),
@@ -61,8 +67,8 @@ fn io_write_impl(u: UnifierSet, mut text: &RcTm, stream: StdStream) -> Box<dyn S
         use nu_ansi_term::Color;
         let to_print = Color::LightGray.italic().paint(cl.as_str());
         match stream {
-            StdStream::StdOut => print!("{to_print}"),
-            StdStream::StdErr => eprint!("{to_print}"),
+            Fd::StdOut => print!("{to_print}"),
+            Fd::StdErr => eprint!("{to_print}"),
             _ => unreachable!(),
         }
         text = tl;
@@ -78,8 +84,8 @@ fn io_write_impl(u: UnifierSet, mut text: &RcTm, stream: StdStream) -> Box<dyn S
     }
 
     match stream {
-        StdStream::StdOut => stdout().flush().unwrap(),
-        StdStream::StdErr => stderr().flush().unwrap(),
+        Fd::StdOut => stdout().flush().unwrap(),
+        Fd::StdErr => stderr().flush().unwrap(),
         _ => {}
     }
 
@@ -88,7 +94,7 @@ fn io_write_impl(u: UnifierSet, mut text: &RcTm, stream: StdStream) -> Box<dyn S
 
 pub fn def_syscall_intrinsics(intrs: &mut IntrinsicsMap) {
     def_intrinsic!(intrs, |_rt, u, [text as "io_write"][stream as "stream"]| {
-        let Ok(stream) = StdStream::try_from(stream) else {
+        let Ok(stream) = Fd::try_from(stream) else {
             return Err::ArgumentTypeError {
                 rel: "[io_write][stream]".into(),
                 key: "stream".into(),
@@ -100,7 +106,7 @@ pub fn def_syscall_intrinsics(intrs: &mut IntrinsicsMap) {
     });
 
     def_intrinsic!(intrs, |_rt, u, [text as "io_writeln"][stream as "stream"]| {
-        let Ok(stream) = StdStream::try_from(stream) else {
+        let Ok(stream) = Fd::try_from(stream) else {
             return Err::ArgumentTypeError {
                 rel: "[io_writeln][stream]".into(),
                 key: "stream".into(),
@@ -110,8 +116,8 @@ pub fn def_syscall_intrinsics(intrs: &mut IntrinsicsMap) {
         };
         let soln_stream = io_write_impl(u, text, stream);
         match stream { // Print the '\n'.
-            StdStream::StdOut => println!(),
-            StdStream::StdErr => eprintln!(),
+            Fd::StdOut => println!(),
+            Fd::StdErr => eprintln!(),
             _ => unreachable!()
         }
         soln_stream
