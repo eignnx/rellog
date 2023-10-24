@@ -10,7 +10,7 @@ use super::{
     RcTm, Tm,
 };
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct PartialCharList(pub CharList<RcTm>);
 
 impl PartialCharList {
@@ -115,19 +115,14 @@ impl CharListTail for RcTm {
     }
 }
 
-impl Display for PartialCharList {
+impl std::fmt::Debug for PartialCharList {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut cl = self;
-        write!(f, "{}", cl.segment_as_str())?;
-
-        while let Tm::Txt(next_cl) = cl.segment_tail().as_ref() {
-            write!(f, "{}", cl.segment_as_str())?;
-            cl = next_cl;
-        }
-
-        if !cl.segment_tail().is_nil() {
-            write!(f, "[..{}]", cl.segment_tail())?;
-        }
+        write!(
+            f,
+            "Pcl(\"{}\")->{:?}",
+            self.segment_as_str(),
+            self.segment_tail()
+        )?;
 
         Ok(())
     }

@@ -30,7 +30,7 @@ impl fmt::Display for DisplayUnifierSet {
                     }
                 }
                 match root_term.classify_term() {
-                    TermKind::NonVar => writeln!(f, " = {root_term}")?,
+                    TermKind::NonVar => writeln!(f, " = {root_term:?}")?,
                     TermKind::Var(v) if v.is_original() => writeln!(f, " = {v}")?,
                     _ => {}
                 }

@@ -1,4 +1,4 @@
-use std::fmt::{self, Display, Formatter};
+use std::fmt::{self, Display, Formatter, Write};
 
 use rpds::Vector;
 
@@ -177,21 +177,23 @@ impl<'tm> fmt::Display for TmDisplayer<'tm> {
             Tm::Sym(s) => self.fmt_sym(f, s),
             Tm::Var(v) => write!(f, "{v}"),
             Tm::Int(i) => write!(f, "{i}"),
-            Tm::Txt(char_list) => {
-                let mut char_list = char_list;
-
-                write!(f, "\"{}", char_list.segment_as_str())?;
-                while let Tm::Txt(cl) = char_list.tail().as_ref() {
-                    char_list = cl;
-                    write!(f, "{}", char_list.segment_as_str())?;
+            Tm::Txt(cl) => {
+                // I'm assuming all variables have been reified before we attempt
+                // to display this term to the user.
+                f.write_char('"')?;
+                for seg in cl.partial_segments() {
+                    f.write_str(seg.segment_as_str())?;
+                    f.write_char('!')?;
                 }
 
-                if let Tm::Nil = char_list.tail().as_ref() {
-                    write!(f, "\"")
+                let tail = cl.tail();
+
+                if let Tm::Nil = tail.as_ref() {
+                    f.write_char('\"')
                 } else {
                     // If it's not text, and the tail wasn't Nil, break
                     // and display the tail (either Var or malformed).
-                    write!(f, "[{} {}]\"", Tok::Spread, char_list.tail())
+                    write!(f, "[{}{}]\"", Tok::Spread, tail)
                 }
             }
             Tm::Block(functor, members) => self.fmt_block(functor, members, f),

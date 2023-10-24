@@ -15,7 +15,7 @@ pub fn process_txt_template(content: &str) -> Option<PartialCharList> {
         return Some(content.into());
     }
 
-    let (before_tail, tail) = find_tail_brackets(&content)?;
+    let (before_tail, tail) = find_tail_brackets(content)?;
 
     let src: Span = tail.into();
     let tokens = all_consuming(terminated(many0(one_token), multispace0))
@@ -82,8 +82,8 @@ mod txt_template_tests {
         check!(before == "Once upon a time");
         check!(after == "[..Rest]");
 
-        let cl = process_txt_template(content.into()).unwrap();
+        let cl = process_txt_template(content).unwrap();
         check!(cl.tail() == &RcTm::from(Tm::Var(Var::from("Rest"))));
-        check!(format!("{cl}") == format!("{content}"));
+        check!(format!("{cl:?}") == format!("{content}"));
     }
 }

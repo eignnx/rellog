@@ -8,7 +8,7 @@ use num::{Integer, ToPrimitive, Zero};
 use rpds::Vector;
 
 use crate::{
-    ast::{partial_char_list::PartialCharList, RcTm, Rel, Sig, Tm},
+    ast::{RcTm, Rel, Sig, Tm},
     data_structures::Int,
     lex, parse,
     rt::Err,
@@ -296,10 +296,7 @@ impl IntrinsicsMap {
                 //  - Compound = "abc[..Suffix]"
                 (Txt(cl), Var(_), _) => {
 
-                    let consed = Tm::Txt(PartialCharList::from_string_and_tail(
-                        cl.to_string(), // <-- HACK: put text content into new String
-                        txt_suffix.clone()
-                    )).into();
+                    let consed = Tm::Txt(cl.clone_with_new_tail(|_| txt_suffix.clone())).into();
 
                     let Some(u) = u.unify(&consed, txt_compound) else {
                         return soln_stream::failure();
