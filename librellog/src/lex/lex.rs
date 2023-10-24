@@ -14,7 +14,7 @@ use nom::{
     combinator::{all_consuming, fail, recognize, verify},
     error::{context, VerboseError},
     multi::many0,
-    sequence::{terminated, tuple},
+    sequence::{delimited, terminated, tuple},
     Finish, Parser,
 };
 use nom_i9n::{I9nInput, TokenizedInput};
@@ -84,27 +84,33 @@ fn text_literal<'i>(i: Span<'i>) -> Res<'i, CharList> {
     .parse(i)
 }
 
-fn any_symbol(i: Span) -> Res<IStr> {
-    recognize(tuple((
+fn var_or_sym(i: Span) -> Res<Tok> {
+    let quoted_sym = delimited(
+        tag("'"),
+        recognize(take_while(|c: char| {
+            c != '\'' && (c.is_alphanumeric() || c == '_')
+        })),
+        tag("'"),
+    )
+    .map(|span: Span| span.fragment().into())
+    .map(|sym: IStr| Tok::Sym(sym));
+
+    let unquoted_sym_or_var = recognize(tuple((
         verify(anychar::<Span, _>, |&c| c.is_alphabetic() || c == '_'),
         take_while(|c: char| c.is_alphanumeric() || c == '_'),
     )))
     .map(|span| span.fragment().into())
-    .parse(i)
-}
+    .map(|sym: IStr| {
+        if sym.to_str().starts_with(char::is_uppercase) {
+            Tok::Var(sym.into())
+        } else if sym.to_str().starts_with(char::is_lowercase) {
+            Tok::Sym(sym)
+        } else {
+            unreachable!()
+        }
+    });
 
-fn var_or_sym(i: Span) -> Res<Tok> {
-    any_symbol
-        .map(|sym| {
-            if sym.to_str().starts_with(char::is_uppercase) {
-                Tok::Var(sym.into())
-            } else if sym.to_str().starts_with(char::is_lowercase) {
-                Tok::Sym(sym)
-            } else {
-                unreachable!()
-            }
-        })
-        .parse(i)
+    alt((quoted_sym, unquoted_sym_or_var)).parse(i)
 }
 
 fn int(i: Span) -> Res<Int> {
