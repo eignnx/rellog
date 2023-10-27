@@ -159,6 +159,13 @@
     "Relates an attribute (a `[key Value]` pair) to its key and value."
 ]
 
+[sig [rel][key][value]][help
+    """
+    Extracts a value from a relation given the key name. Faster than searching 
+    through a list of the relation's attributes.
+    """
+]
+
 [sig [gt][lt]][help
     "True if the number `Gt` is greater than the number `Lt`."
 ]
@@ -173,13 +180,6 @@
 
 [sig [is_num]][help
     "Succeeds if its argument is an instantiated number."
-]
-
-[sig [rel][key][value]][help
-    """
-    Extracts a value from a relation given the key name. Faster than searching 
-    through a list of the relation's attributes.
-    """
 ]
 
 [sig [txt_prefix][txt_suffix][txt_compound]][help
