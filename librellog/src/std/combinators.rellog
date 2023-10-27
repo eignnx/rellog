@@ -1,0 +1,29 @@
+[[comment "`c8r` abbreviates 'combinator.'"]]
+[c8r {i X}][ret {X}]
+[c8r {k X Y}][ret {X}]
+[c8r {b F G X}][ret {F {G X}}]
+[c8r {c F G X}][ret {{F X} G}]
+[c8r {s F G X}][ret {F X {G X}}]
+[c8r {m X}][ret {X X}]
+[c8r {y F}][ret {F {y F}}]
+[c8r {iota X}][ret {X s k}]
+
+
+[sig [program][val]][help
+    """
+    Input a program like `[program {iota i 1 2}][Val]`, then backtrack to see
+    the reduction steps.
+    """
+]
+[program {X}][val X]
+    | [must_be_num X]
+    | [must_be_sym X]
+[program {{A..As}..Bs}][Val]
+    - [prefix {A..As}][suffix Bs][compound ProgramNext]
+    - [program ProgramNext][Val]
+[Program][Val]
+    - [c8r Pat][Ret]
+    - [compound Program][prefix Pat][suffix ProgramRem]
+    - [prefix Ret][suffix ProgramRem][compound ProgramNext]
+    - [program ProgramNext][Val]
+[Program][val Program]
