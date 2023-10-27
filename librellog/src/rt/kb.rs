@@ -37,6 +37,11 @@ impl KnowledgeBase {
 
         Some(arg_indexed.into_iter())
     }
+
+    pub fn clear(&mut self) {
+        self.directives.clear();
+        self.relations.clear();
+    }
 }
 
 impl From<ast::Module> for KnowledgeBase {

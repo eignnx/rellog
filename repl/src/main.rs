@@ -10,18 +10,11 @@ fn main() {
 
     println!("Rellog REPL");
 
-    let mut repl = repl::Repl::loading_std_lib();
+    let mut repl = repl::Repl::new_loading_std_lib();
 
     if let Some(fname) = std::env::args().nth(1) {
         let mut tok_buf = Vec::new();
-        match repl.load_file(&mut tok_buf, fname.clone()) {
-            Ok(()) => {}
-            Err(e) => {
-                println!("Could not load file {fname}.");
-                println!("Error: {e}");
-            }
-        }
-        println!("Loaded `{fname}`.");
+        let _ = repl.load_file(&mut tok_buf, fname.clone());
     } else {
         println!("Running in interactive mode.");
         println!("Type `:help` for a list of commands.");

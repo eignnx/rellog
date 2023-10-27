@@ -1,5 +1,6 @@
 use std::{
     cell::RefCell,
+    collections::BTreeSet,
     io::{self, Read},
     path::PathBuf,
 };
@@ -11,7 +12,7 @@ use librellog::{
         tok::{At, Tok},
     },
     parse,
-    rt::{Rt, UnifierSet},
+    rt::{kb::KnowledgeBase, Rt, UnifierSet},
     utils::display_unifier_set::DisplayUnifierSet,
 };
 use nu_ansi_term::Color;
@@ -23,48 +24,69 @@ use crate::{
 };
 
 pub struct Repl {
-    current_file: String,
-    // module: KnowledgeBase,
+    files_loaded: BTreeSet<String>,
+    files_failed_to_load: BTreeSet<String>,
     config: RellogReplConfigHandle,
     line_editor: Reedline,
     rt: Rt,
 }
 
 impl Repl {
-    pub fn loading_std_lib() -> Self {
-        Self::loading_file("./librellog/src/std/std.rellog")
+    pub fn new_loading_std_lib() -> Self {
+        Self::new_loading_files(vec!["./librellog/src/std/std.rellog".to_string()])
     }
 
-    pub fn loading_file(fname: &str) -> Self {
+    pub fn new_loading_files(fnames: Vec<String>) -> Self {
+        let kb = KnowledgeBase::default();
+        let rt = Rt::new(kb);
         let config = RellogReplConfigHandle::default();
-        let mut tok_buf = Vec::new();
-
-        let module = match load_module_from_file(&mut tok_buf, fname) {
-            Ok(module) => module,
-            Err(e) => {
-                println!("Error loading module `{fname}`:");
-                println!("    {e}");
-                ast::Module::default()
-            }
-        };
-        let rt = Rt::new(module.clone());
-
-        Self {
-            current_file: fname.to_owned(),
-            // module,
+        let mut repl = Self {
+            files_loaded: BTreeSet::new(),
+            files_failed_to_load: BTreeSet::new(),
             line_editor: config.create_editor(),
             config,
             rt,
+        };
+
+        let mut tok_buf = Vec::new();
+        for fname in fnames {
+            let _ = repl.load_file(&mut tok_buf, fname);
         }
+
+        repl
     }
 
     pub fn load_file<'ts>(
         &mut self,
         tok_buf: &'ts mut Vec<At<Tok>>,
-        fname: impl AsRef<str>,
+        fname: String,
     ) -> AppRes<'ts, ()> {
-        let loaded_module = load_module_from_file(tok_buf, fname)?;
+        let loaded_module = match load_module_from_file(tok_buf, fname.clone()) {
+            Ok(m) => m,
+            Err(AppErr::FileOpen(fname, io_err)) => {
+                println!(
+                    "{}",
+                    Color::Red.paint(format!("# Error loading file `{}`: {}", &fname, &io_err))
+                );
+                return Err(AppErr::FileOpen(fname, io_err));
+            }
+            Err(e) => {
+                println!("{}", Color::Red.paint(format!("# Error loading file: {e}")));
+                self.files_failed_to_load.insert(fname);
+                return Err(e);
+            }
+        };
+        let nrels = loaded_module.relations.len();
+        let ndirs = loaded_module.directives.len();
         self.rt.db.import(loaded_module);
+        println!(
+            "{}",
+            Color::Yellow.paint(format!(
+                "# Loaded `{}` ({nrels} relations, {ndirs} directives).",
+                fname
+            ))
+        );
+        self.files_loaded.insert(fname);
         Ok(())
     }
 
@@ -99,28 +121,18 @@ impl Repl {
                     break 'outer;
                 }
                 [":reload" | ":r"] => {
-                    println!(
-                        "{}",
-                        Color::Yellow
-                            .paint(format!("# Reloading source from {}...", self.current_file))
-                    );
-                    self.rt.db = match load_module_from_file(&mut tok_buf, &self.current_file) {
-                        Ok(m) => {
-                            println!(
-                                "{}",
-                                Color::Yellow.paint(format!(
-                                    "# {} relation definitions loaded.",
-                                    m.relations.len()
-                                ))
-                            );
-                            m.into()
-                        }
-                        Err(e) => {
-                            println!("{}", Color::Red.paint(format!("# Error loading file: {e}")));
-                            println!("{}", Color::Red.paint("# Defaulting to empty module."));
-                            Default::default()
-                        }
-                    };
+                    self.rt.db.clear();
+
+                    let to_load: Vec<String> = self
+                        .files_loaded
+                        .union(&self.files_failed_to_load)
+                        .cloned()
+                        .collect();
+
+                    for fname in to_load {
+                        let _ = self.load_file(&mut tok_buf, fname);
+                    }
+
                     continue 'outer;
                 }
                 [":load" | ":l"] => {
@@ -131,12 +143,7 @@ impl Repl {
                 }
                 [":load" | ":l", fname] => {
                     let mut tok_buf = Vec::new();
-                    match self.load_file(&mut tok_buf, fname) {
-                        Ok(()) => println!("# Loaded `{fname}`."),
-                        Err(e) => {
-                            println!("# Could not load file `{fname}`: {e}");
-                        }
-                    }
+                    let _ = self.load_file(&mut tok_buf, fname.to_string());
                     continue 'outer;
                 }
                 _ => {}
@@ -241,17 +248,13 @@ impl Repl {
     }
 }
 
-fn load_module_from_file(
-    tok_buf: &mut Vec<At<Tok>>,
-    fname: impl AsRef<str>,
-) -> AppRes<ast::Module> {
-    let f = std::fs::File::open(fname.as_ref())
-        .map_err(|e| AppErr::FileOpen(fname.as_ref().into(), e))?;
+fn load_module_from_file(tok_buf: &mut Vec<At<Tok>>, fname: String) -> AppRes<ast::Module> {
+    let f = std::fs::File::open(&fname).map_err(|e| AppErr::FileOpen(fname.clone(), e))?;
     let mut r = io::BufReader::new(f);
     let mut src = String::new();
     r.read_to_string(&mut src)
-        .map_err(|e| AppErr::FileRead(fname.as_ref().into(), e))?;
-    load_module_from_string(tok_buf, src, fname.as_ref().into())
+        .map_err(|e| AppErr::FileRead(fname.clone(), e))?;
+    load_module_from_string(tok_buf, src, fname.into())
 }
 
 fn load_module_from_string(

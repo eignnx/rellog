@@ -385,6 +385,11 @@ impl Module {
         let tokens = lex::tokenize_into(token_buf, LocatedSpan::new(src.as_ref()), filename)?;
         parse::entire_module(tokens)
     }
+
+    pub fn include(&mut self, mut other: Module) {
+        self.directives.append(&mut other.directives);
+        self.relations.append(&mut other.relations);
+    }
 }
 
 impl fmt::Display for Module {
