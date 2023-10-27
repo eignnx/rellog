@@ -12,7 +12,7 @@
     - [formula {B BinOp A}][result C]
 
 [cmd N][in Stack][out {N ..Stack}]
-    - [is_num N]
+    - [must_be_num N]
 
 [cmd {}][in Stack][out {{} ..Stack}]
 [cmd cons][in {A B ..Stack}][out {{A ..B} ..Stack}]

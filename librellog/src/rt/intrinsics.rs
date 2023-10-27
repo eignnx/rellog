@@ -227,16 +227,41 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [tm as "is_var"]| {
+        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_var"]| {
             match u.reify_term(tm).as_ref() {
                 Tm::Var(_) => soln_stream::success(u),
                 _ => soln_stream::failure(),
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [tm as "is_num"]| {
+        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_num"]| {
             match u.reify_term(tm).as_ref() {
-                Tm::Int(_) => soln_stream::success(u),
+                Tm::Int(..) => soln_stream::success(u),
+                Tm::Var(..) => soln_stream::error(Err::InstantiationError(tm.clone())),
+                _ => soln_stream::failure(),
+            }
+        });
+
+        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_sym"]| {
+            match u.reify_term(tm).as_ref() {
+                Tm::Sym(..) => soln_stream::success(u),
+                Tm::Var(..) => soln_stream::error(Err::InstantiationError(tm.clone())),
+                _ => soln_stream::failure(),
+            }
+        });
+
+        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_txt"]| {
+            match u.reify_term(tm).as_ref() {
+                Tm::Txt(..) => soln_stream::success(u),
+                Tm::Var(..) => soln_stream::error(Err::InstantiationError(tm.clone())),
+                _ => soln_stream::failure(),
+            }
+        });
+
+        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_rel"]| {
+            match u.reify_term(tm).as_ref() {
+                Tm::Rel(..) => soln_stream::success(u),
+                Tm::Var(..) => soln_stream::error(Err::InstantiationError(tm.clone())),
                 _ => soln_stream::failure(),
             }
         });

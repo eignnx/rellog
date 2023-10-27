@@ -45,14 +45,14 @@
 [can_be [list {}]]
 [can_be [list {X ..Xs}]]
 [can_be [list L]]
-    - [is_var L]
+    - [must_be_var L]
 
 [can_be [int N]]
-    | [is_num N]
-    | [is_var N]
+    | [must_be_num N]
+    | [must_be_var N]
 
-[must_be [int N]]
-    - [is_num N]
+[must_be [num N]]
+    - [must_be_num N]
 
 [sig [list][last]][help "Relates a list to its last element."]
 [list {Last}][Last]
@@ -120,7 +120,7 @@
     """
 ]
 [formula N][result N]
-    - [is_num N]
+    - [must_be_num N]
 [formula {A0 mul B0}][result C]
     - [formula A0][result A]
     - [formula B0][result B]
@@ -174,12 +174,24 @@
     "True if the number `Gte` is greater than or equal to the number `Lte`."
 ]
 
-[sig [is_var]][help
+[sig [must_be_var]][help
     "Succeeds if its argument is an unbound variable."
 ]
 
-[sig [is_num]][help
+[sig [must_be_num]][help
     "Succeeds if its argument is an instantiated number."
+]
+
+[sig [must_be_sym]][help
+    "Succeeds if its argument is an instantiated symbol."
+]
+
+[sig [must_be_txt]][help
+    "Succeeds if its argument is an instantiated text string."
+]
+
+[sig [must_be_rel]][help
+    "Succeeds if its argument is an instantiated relation structure."
 ]
 
 [sig [txt_prefix][txt_suffix][txt_compound]][help
