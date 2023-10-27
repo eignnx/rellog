@@ -110,10 +110,14 @@ impl Repl {
             match query_parts[..] {
                 ["help" | ":help" | ":h" | "?"] => {
                     println!("Enter a RELLOG TERM or one of these REPL COMMANDS:");
-                    println!("  :h | :help | ?    Displays this help text.");
-                    println!("  :r | :reload      Reloads the source file.");
+                    println!("  :help | :h | ?    Displays this help text.");
+                    println!("  :load | :l        Load the source given source file.");
+                    println!("  :reload | :r      Reloads the source file(s).");
+                    println!("  :unload | :u      Unloads the given source file.");
                     println!("  [Builtins]        Show a list of builtin relations.");
-                    println!("  [Sig][Help]       Show help text for a relation given by `Sig`.");
+                    println!("  [help Sig]        Show help text for a relation given by `Sig`.");
+                    println!("  :quit | :exit     Exit the repl.");
+                    println!("   | :q | :wq");
                     continue 'outer;
                 }
                 [":quit" | ":q" | ":exit" | ":wq"] => {
@@ -121,21 +125,10 @@ impl Repl {
                     break 'outer;
                 }
                 [":reload" | ":r"] => {
-                    self.rt.db.clear();
-
-                    let to_load: Vec<String> = self
-                        .files_loaded
-                        .union(&self.files_failed_to_load)
-                        .cloned()
-                        .collect();
-
-                    for fname in to_load {
-                        let _ = self.load_file(&mut tok_buf, fname);
-                    }
-
+                    self.reload(&mut tok_buf);
                     continue 'outer;
                 }
-                [":load" | ":l"] => {
+                [":load" | ":l" | ":unload" | ":u"] => {
                     println!(
                         "# Which file would you like to load? Please specify `{query_buf} FILENAME`"
                     );
@@ -144,6 +137,40 @@ impl Repl {
                 [":load" | ":l", fname] => {
                     let mut tok_buf = Vec::new();
                     let _ = self.load_file(&mut tok_buf, fname.to_string());
+                    continue 'outer;
+                }
+                [":unload" | ":u", fname] => {
+                    let a = self.files_loaded.remove(fname);
+                    let b = self.files_failed_to_load.remove(fname);
+                    if a || b {
+                        println!(
+                            "{}",
+                            Color::Yellow
+                                .paint(format!("# Removing file `{fname}` from reload list."))
+                        );
+                    } else {
+                        println!(
+                            "{}",
+                            Color::Yellow.paint(format!(
+                                "# The file `{fname}` already does not appear in the reload list:"
+                            ))
+                        );
+                        for fname in self.files_loaded.difference(&self.files_failed_to_load) {
+                            println!(
+                                "{}",
+                                Color::Yellow.paint(format!("#     - `{fname}` (loaded)"))
+                            );
+                        }
+                        for fname in self.files_failed_to_load.difference(&self.files_loaded) {
+                            println!(
+                                "{}",
+                                Color::Yellow.paint(format!("#     - `{fname}` (failed to load)"))
+                            );
+                        }
+                        continue 'outer;
+                    }
+                    println!("{}", Color::Yellow.paint("# Reloading..."));
+                    self.reload(&mut tok_buf);
                     continue 'outer;
                 }
                 _ => {}
@@ -244,6 +271,20 @@ impl Repl {
                     Color::Yellow.paint("# No additional solutions found.")
                 );
             }
+        }
+    }
+
+    fn reload(&mut self, tok_buf: &mut Vec<At<Tok>>) {
+        self.rt.db.clear();
+
+        let to_load: Vec<String> = self
+            .files_loaded
+            .union(&self.files_failed_to_load)
+            .cloned()
+            .collect();
+
+        for fname in to_load {
+            let _ = self.load_file(tok_buf, fname);
         }
     }
 }
