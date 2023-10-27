@@ -32,7 +32,7 @@ pub struct Repl {
 
 impl Repl {
     pub fn loading_std_lib() -> Self {
-        Self::loading_file("./librellog/src/std.rellog")
+        Self::loading_file("./librellog/src/std/std.rellog")
     }
 
     pub fn loading_file(fname: &str) -> Self {
