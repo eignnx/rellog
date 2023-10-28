@@ -1,9 +1,10 @@
 # Rellog
+
 It means "Relational Prolog".
 
 ## Idea
 
-Instead of predicates, this implementation focuses on relations. While a Prolog predicate can be thought of a symbol and an ordered tuple of arguments, a relation is an unordered collection of attributes, where an attribute is a name-value pair.
+Instead of predicates, this implementation focuses on relations. While a Prolog predicate can be thought of a symbol and an ordered tuple of arguments, a relation is an unordered collection name-value pairs (called attributes).
 
 While in Prolog you might write
 
@@ -11,9 +12,9 @@ While in Prolog you might write
 append([1, 2], [3, 4], Compound)
 ```
 
-in Rellog you could write any of
+in Rellog you could write any of the following:
 
-```yaml
+```clojure
 [prefix {1, 2}][suffix {3, 4}][compound Compound]
 [prefix {1, 2}][suffix {3, 4}][Compound]
 [suffix {3, 4}][prefix {1, 2}][Compound]
@@ -24,7 +25,8 @@ in Rellog you could write any of
 ```
 
 ## Example
-```yaml
+
+```clojure
 [prefix {}][Suffix][compound Suffix]
 [prefix {A ...As}][Suffix][compound {A ...Compound}]
     - [prefix As][suffix Suffix][Compound]
@@ -37,13 +39,20 @@ in Rellog you could write any of
 
 Note that conjunctions are expressed as indented `-`-preceeded lists.
 
-## Use
+## Installation
 
-To open a repl,
+First download and build Rellog. You'll need a relatively recent (as of October 2023) Rust compiler. If you have Rust installed, you'll need to make sure you're using the nightly compiler.
 
 ```shell
 $ git clone https://github.com/eignnx/rellog.git
 $ cd rellog
+$ rustup override set nightly
+$ cargo build
+```
+
+It may take a few minutes to build, but afterwards you can open a REPL session:
+
+```shell
 $ cargo run
 ```
 
@@ -65,15 +74,15 @@ $ cargo run
 
 ### Overview: The Big Ideas
 
-Rellog is all about ***relations***. A relation is a set of association of values.
+Rellog is all about ***relations***. A relation is a set of associations of values (kinda like a set of dictionaries each of which have the same schema).
 
 An example of a relation might be a student-teacher relationship. In Rellog, the sentence "Gideon and Aditya are students of Dr. Blum" could be expressed as two facts about the world:
 
-```yaml
-# Fact #1:
+```clojure
+[[comment "Fact #1:"]]
 [student gideon][teacher dr_blum]
 
-# Fact #2:
+[[comment "# Fact #2:"]]
 [student aditya][teacher dr_blum]
 ```
 
@@ -87,9 +96,9 @@ A signature is a set of symbols which are the names of the relation's ***keys***
 
 If you're familiar with Excel, think of a relation as a ***spreadsheet***. A relation's signature then is just the spreadsheet's ***column names***.
 
-Here's a bigger example involving multiple relations. First I'll write the Rellog code, then I'll write an english summary.
+Here's a bigger example involving multiple relations.
 
-```yaml
+```clojure
 [course cmpsc385][instructor dr_null]
 [course cmpsc375][instructor dr_blum]
 [course cmpsc439][instructor dr_na]
@@ -113,7 +122,7 @@ An interesting question to ask might be "who are all the students of Dr. Na?"
 
 We can pose this question as a Rellog query in the REPL:
 
-```yaml
+```clojure
 -- [instructor dr_na][Course];
    [Course][Student]
 
@@ -126,7 +135,7 @@ We can pose this question as a Rellog query in the REPL:
 
 We could even define the `[student][teacher]` relation in Rellog by writing a fact with a collection of conditions:
 
-```yaml
+```clojure
 [Student][Teacher]
     - [instructor Teacher][Course]
     - [Course][Student]
@@ -134,7 +143,7 @@ We could even define the `[student][teacher]` relation in Rellog by writing a fa
 
 This rule says:
 
-> A student called `Student` has a teacer called `Teacher` if:
+> A student called `Student` has a teacher called `Teacher` if:
 > 1. `Teacher` is the instructor of a course called `Course`, and
 > 2. `Student` is a student in that same course `Course`.
 
@@ -157,7 +166,7 @@ There are many relations predefined for you to use in your Rellog code. Use the 
 
     - Sig = [prefix][suffix][compound]
     - Help =
-        """
+       """
        Relates a list `Compound` to some partitioning 
        of itself into a `Prefix` and a `Suffix`. Also 
        works for text strings.
@@ -168,16 +177,13 @@ The `[sig][help]` relation is good to use to document your own relations too.
 
 There's also the `[help]` relation. It performs a side-effect when queried (so it's not a pure relation). It prints out the `Help` text associated with the signature passed in:
 
-
-<code>
+```
 -- [help [pred][succ]]
-<br/>
-<br/>
-<i>Relation: [pred][succ]<br/>
---------------<br/>
+
+Relation: [pred][succ]<br/>
+--------------
 Relates two adjacent integers: a predecessor and a successor.
-</i>
-</code><br/><br/>
+```
 
 
 It's just a little easier on the eyes.
@@ -194,11 +200,10 @@ A clause is a top-level definition. A clause is either:
     [human chomsky]
     [human you]
     ```
-    Most facts are unconditionally true. But here's an example of a fact that could fail depending on its argument:
+    Here's another example of a fact:
     ```yaml
     [nonempty_list {A ..B}]
     ```
-    The query `[nonempty_list {}]` would fail.
 1. A **rule**:
 
     A rule has conditions. Heres an example of a rule:
@@ -212,14 +217,14 @@ A clause is a top-level definition. A clause is either:
     ```yaml
     -- [mortal socrates]
         - [true] # Exactly 1 solution found.
-
+    
     -- [mortal Who]
         - Who = socrates
-
+    
     |   - Who = chomsky
-
+    
     |   - Who = you # Exactly 1 solution found.
-
+    
     -- [mortal somebody_new]
         - [false] # The query has no solutions.
     ```
@@ -244,6 +249,8 @@ my_dog
 area_51
 
 multiply
+
+'NotAVariable'
 ```
 
 #### Integers
@@ -253,11 +260,12 @@ Arbitrarily-sized integers (positive or negative whole numbers)
 `0`, `17`, `-3`, `93740925370000349251`
 
 #### Text Strings
+
 - Represent textual data.
 - Useful when text must be constructed or parsed.
 - **Warning: Text is still a work in progress.**
 ##### Examples
-```yaml
+```python
 "Hello?"
 
 "Text strings may contain spaces and punctuation."
@@ -277,21 +285,24 @@ Double linebreaks create a new paragraph.
 ```
 
 #### Variables
-- Must start with a capital letter.
+- Must start with a capital letter or an underscore (`_`).
 - Very similar to variables in *algebra*.
 - Less similar to the variables in *imperative programming languages*.
 - May be *known* (bound to a specific value) or *unknown* (not yet bound to a value).
 
 ##### Examples
-`X`, `ListReversed`, `State0`
+
+`X`, `ListReversed`, `State0`, `_123`
 
 #### Relations
+
 - Sets of ***key-value pairs***. We call a key-value pair an ***attribute***.
-- The set of keys defines the name of a relation e.i. the set $\lbrace k1, k2, k3 \rbrace$ corresponds to a relation whose ***signature*** is `[k1][k2][k3]`.
+- The set of keys defines the name of a relation e.i. the set `{k1, k2, k3}` corresponds to a relation whose ***signature*** is `[k1][k2][k3]`.
 - The following 2 relations are the same because order does not matter.
     - `[list][member]`
     - `[member][list]`
 - ***Note:*** you cannot put any whitespace between the `]` and the `[` within relation value, i.e. this is two separate relations, not one:
+  
     ```yaml
     [list]   [member]
     ```
@@ -324,6 +335,8 @@ typedef struct Person {
     uint8_t age;
     long bank_balance_cents;
 } Person;
+
+(Person) { .name = "casey", .age = 29, .bank_balance_cents = -4400 }
 ```
 
 Or in Python like this:
@@ -336,6 +349,8 @@ class Person:
     name: str
     age: int
     bank_balance_cents: int
+    
+Person(name='casey', age=29, bank_balance_cents=-4400)
 ```
 
 In Rellog, this kind of person is representable by values with signature `[name][age][bank_balance_cents]`.
@@ -346,6 +361,7 @@ An example value of this type would be:
 ```
 
 #### Lists
+
 Lists are defined inductively by this relation:
 ```yaml
 [list {}]
@@ -386,17 +402,38 @@ The following is an abbreviation used to write out lists:
 {{a b c} -31415 [x 3][y -1]}
 ```
 
+#### Blocks
+
+Represent sequences of code.
+
+Use `-` for conjunction ("and"), and `|` for disjunction ("or").
+
+##### Examples
+
+```yaml
+- [first_condition "asdf"]
+- [second][condition {1 2 3}]
+
+# Another way to write conjunction ("and"):
+[first_condition "asdf"]; [second][condition {1 2 3}]
+
+| [either][This]
+| [or][that 49]
+| [or][even][this]
+```
+
 ### The REPL
 
-The REPL (Read-Eval-Print Loop) is the interactive environment where rellog code can be loaded and run.
+The REPL (Read-Eval-Print Loop) is the interactive environment where Rellog code can be loaded and run.
 
-#### REPL Comands
+#### REPL Commands
 
 There are several commands that directly interact with the REPL. Most of them begin with a colon (`:`).
 
-| Repl Command               | Description |
+| REPL Command            | Description |
 | -------------------------- | ----------- |
 | `:h`, `:help`, `help`, `?` | Show the help menu. |
-| `:r`, `:reload` | Reload the currently loaded source file (WIP) |
-| `:l <path>`, `:load <path>` | Load a source file located at `<path>`. Use in conjunction with `[cd]` to change the current working directory. |
+| `:r`, `:reload` | Reload the currently loaded source files. |
+| `:l <PATH>`, `:load <PATH>` | Load a source file located at `<path>`. Use in conjunction with `[cd]` to change the current working directory, and `[cwd]` to see the current working directory. |
+| `:u <PATH>`, `:unload <PATH>` | Sometimes you want to stop paying attention to a file (maybe it was deleted and is no longer relevant). You can tell the REPL to forget about the file with `:unload`. |
 | `:q`, `:quit`, `:e`, `:exit`, `:wq` | Quit the REPL. Can also be done with `CTRL-C` or `CTRL-D`. |
