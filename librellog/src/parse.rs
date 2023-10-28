@@ -19,6 +19,7 @@ use rpds::Vector;
 use crate::{
     ast::{Clause, Item, Module, RcTm, Rel, Tm},
     data_structures::{Int, Map, Sym, Var},
+    interner::IStr,
     lex::{
         tok::{
             At,
@@ -374,6 +375,18 @@ fn and_list(ts: Toks) -> Res<Tm> {
     Ok((ts, Tm::Block(Dash, terms)))
 }
 
+fn eq_nesting(ts: Toks) -> Res<Tm> {
+    let (ts, (first, rest)) = tuple((
+        non_operator_tm,
+        many1(preceded(tok(Equal), non_operator_tm)),
+    ))
+    .parse(ts)?;
+
+    let list = RcTm::list_from_iter(iter::once(first).chain(rest).map(Into::into));
+    let eq_rel = Tm::Rel([(IStr::from("eq"), list)].into_iter().collect());
+    Ok((ts, eq_rel))
+}
+
 fn non_operator_tm(ts: Toks) -> Res<Tm> {
     alt((
         sym.map(Tm::Sym),
@@ -387,13 +400,14 @@ fn non_operator_tm(ts: Toks) -> Res<Tm> {
     ))
     .parse(ts)
 }
+
 fn parenthesized_tm(ts: Toks) -> Res<Tm> {
     let (ts, (_, t, _)) = tuple((tok(OParen), tm, tok(CParen))).parse(ts)?;
     Ok((ts, t))
 }
 
 fn operator_tm(ts: Toks) -> Res<Tm> {
-    and_list(ts)
+    alt((and_list, eq_nesting)).parse(ts)
 }
 
 pub fn tm(ts: Toks) -> Res<Tm> {

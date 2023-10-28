@@ -142,6 +142,7 @@ fn one_token(i: Span) -> Res<At<Tok>> {
         tag(",").map(|_| Tok::Comma),
         tag(";").map(|_| Tok::Semicolon),
         tag("..").map(|_| Tok::Spread),
+        tag("=").map(|_| Tok::Equal),
     ))
     .map(|t| t.at(i))
     .parse(i)
