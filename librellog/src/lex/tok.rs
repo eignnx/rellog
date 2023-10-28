@@ -40,6 +40,9 @@ pub enum Tok {
     /// The "cons operator" which looks like `..`
     Spread,
 
+    /// The equal sign `=`.
+    Equal,
+
     Sym(Sym),
     Var(Var),
     Int(Int),
@@ -48,27 +51,27 @@ pub enum Tok {
 
 impl fmt::Display for Tok {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        use Tok::*;
         match self {
-            OBrack => write!(f, "["),
-            CBrack => write!(f, "]"),
-            COBrack => write!(f, "]["),
-            OBrace => write!(f, "{{"),
-            CBrace => write!(f, "}}"),
-            OParen => write!(f, "("),
-            CParen => write!(f, ")"),
-            Dash => write!(f, "-"),
-            Pipe => write!(f, "|"),
-            Comma => write!(f, ","),
-            Semicolon => write!(f, ";"),
-            Spread => write!(f, ".."),
-            Sym(s) => write!(f, "{s}"),
-            Var(v) => write!(f, "{v}"),
-            Int(i) => write!(f, "{i}"),
-            Txt(s) if s.as_str().contains('\n') => {
+            Tok::OBrack => write!(f, "["),
+            Tok::CBrack => write!(f, "]"),
+            Tok::COBrack => write!(f, "]["),
+            Tok::OBrace => write!(f, "{{"),
+            Tok::CBrace => write!(f, "}}"),
+            Tok::OParen => write!(f, "("),
+            Tok::CParen => write!(f, ")"),
+            Tok::Dash => write!(f, "-"),
+            Tok::Pipe => write!(f, "|"),
+            Tok::Comma => write!(f, ","),
+            Tok::Semicolon => write!(f, ";"),
+            Tok::Spread => write!(f, ".."),
+            Tok::Equal => write!(f, "="),
+            Tok::Sym(s) => write!(f, "{s}"),
+            Tok::Var(v) => write!(f, "{v}"),
+            Tok::Int(i) => write!(f, "{i}"),
+            Tok::Txt(s) if s.as_str().contains('\n') => {
                 write!(f, "\"\"\"\n{s}\n\"\"\"")
             }
-            Txt(s) => write!(f, "\"{s}\""),
+            Tok::Txt(s) => write!(f, "\"{s}\""),
         }
     }
 }
