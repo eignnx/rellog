@@ -166,6 +166,18 @@
     """
 ]
 
+[sig [eq]][help
+    """
+    Unifies together the elements of the provided list.
+    
+    Syntax sugar allows these to be equivalent expressions:
+
+    -- A = B = C
+
+    -- [eq {A B C}]
+    """
+]
+
 [sig [gt][lt]][help
     "True if the number `Gt` is greater than the number `Lt`."
 ]

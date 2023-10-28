@@ -389,6 +389,7 @@ fn eq_nesting(ts: Toks) -> Res<Tm> {
 
 fn non_operator_tm(ts: Toks) -> Res<Tm> {
     alt((
+        parenthesized_tm,
         sym.map(Tm::Sym),
         var.map(Tm::Var),
         num.map(Tm::Int),
@@ -396,7 +397,6 @@ fn non_operator_tm(ts: Toks) -> Res<Tm> {
         rel.map(Tm::Rel),
         list,
         block,
-        parenthesized_tm,
     ))
     .parse(ts)
 }
