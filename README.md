@@ -31,13 +31,13 @@ in Rellog you could write any of the following:
 [prefix {A ...As}][Suffix][compound {A ...Compound}]
     - [prefix As][suffix Suffix][Compound]
 
-[forwards {}][backwards {}]
-[forwards {A ...As}][Backwards]
-    - [forwards As][backwards AsBackwards]
-    - [prefix AsBackwards][suffix {A}][compound Backwards]
+[forward {}][backward {}]
+[forward {A ...As}][Backward]
+    - [forward As][backward AsBackward]
+    - [prefix AsBackward][suffix {A}][compound Backward]
 ```
 
-Note that conjunctions are expressed as indented `-`-preceeded lists.
+Note that conjunctions are expressed as indented `-`-preceded lists.
 
 ## Installation
 
@@ -69,6 +69,7 @@ $ cargo run
     - [Variables](#variables)
     - [Relations](#relations)
     - [Lists](#lists)
+    - [Blocks](#blocks)
 - [The REPL](#the-repl)
 
 
@@ -234,13 +235,12 @@ A clause is a top-level definition. A clause is either:
 Rellog has the following kinds of values:
 
 #### Symbols
-Identifiers for concepts.
-
-Have no meaning on their own. 
-
-Implemented as interned strings.
+- Identifiers for concepts.
+- Have no meaning on their own. 
+- Implemented as interned strings.
 
 ##### Examples
+
 ```yaml
 socrates
 
@@ -404,9 +404,9 @@ The following is an abbreviation used to write out lists:
 
 #### Blocks
 
-Represent sequences of code.
-
-Use `-` for conjunction ("and"), and `|` for disjunction ("or").
+- Represent sequences of code.
+- Use `-` for conjunction ("and"), and `|` for disjunction ("or").
+- Semicolon (`;`) can be used for single-line conjunction blocks (useful in the REPL).
 
 ##### Examples
 
