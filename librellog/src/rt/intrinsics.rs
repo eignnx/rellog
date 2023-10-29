@@ -1,4 +1,5 @@
 use std::{
+    cell::RefCell,
     collections::BTreeMap,
     fmt::{Debug, Display},
     io::{stderr, stdout, Write},
@@ -8,7 +9,7 @@ use num::{Integer, ToPrimitive, Zero};
 use rpds::Vector;
 
 use crate::{
-    ast::{RcTm, Rel, Sig, Tm},
+    ast::{dup::TmDuplicator, RcTm, Rel, Sig, Tm},
     data_structures::Int,
     lex, parse,
     rt::Err,
@@ -22,18 +23,31 @@ use crate::{
 
 use super::Rt;
 
+pub struct IntrState<'a> {
+    rt: &'a Rt,
+    td: &'a RefCell<TmDuplicator>,
+}
+
 pub struct Intrinsic {
     signature: Sig,
-    func: Box<dyn Fn(&Rt, UnifierSet, Rel) -> Box<dyn SolnStream>>,
+    func: Box<dyn Fn(&mut IntrState<'_>, UnifierSet, Rel) -> Box<dyn SolnStream>>,
 }
 
 impl Intrinsic {
-    pub fn apply(&self, rt: &Rt, u: UnifierSet, rel: Rel) -> Box<dyn SolnStream> {
+    pub fn apply(
+        &self,
+        rt: &Rt,
+        td: &RefCell<TmDuplicator>,
+        u: UnifierSet,
+        rel: Rel,
+    ) -> Box<dyn SolnStream> {
         if self.signature != Sig::from(rel.clone()) {
             return soln_stream::failure();
         }
 
-        (self.func)(rt, u, rel)
+        let mut state = IntrState { rt, td };
+
+        (self.func)(&mut state, u, rel)
     }
 }
 
@@ -58,9 +72,9 @@ macro_rules! ident_of_binding {
 }
 
 macro_rules! def_intrinsic {
-    ($intrs:expr, |$rt:ident, $u:ident, $([$ident:ident $(as $name:literal)?])+| $body:expr) => {
+    ($intrs:expr, |$state:ident, $u:ident, $([$ident:ident $(as $name:literal)?])+| $body:expr) => {
         let sig = [$(name_of_binding!($ident $(as $name)?),)+];
-        $intrs.def(&sig, move |rt, u, rel| {
+        $intrs.def(&sig, move |mut state, u, rel| {
             $(
             let ident_of_binding!($ident $(as $name)?) = match rel.get(&name_of_binding!($ident $(as $name)?).into()) {
                 Some(x) => u.reify_term(x),
@@ -69,7 +83,7 @@ macro_rules! def_intrinsic {
             let ident_of_binding!($ident $(as $name)?) = &ident_of_binding!($ident $(as $name)?);
             )+
 
-            let $rt = rt;
+            let $state = state;
             let $u = u;
 
             $body
@@ -102,7 +116,7 @@ impl IntrinsicsMap {
     fn def(
         &mut self,
         sig: &[&str],
-        func: impl Fn(&Rt, UnifierSet, Rel) -> Box<dyn SolnStream> + 'static,
+        func: impl Fn(&mut IntrState<'_>, UnifierSet, Rel) -> Box<dyn SolnStream> + 'static,
     ) {
         let sig: Sig = sig.iter().map(|s| s.into()).collect::<Vector<_>>().into();
 
@@ -306,6 +320,11 @@ impl IntrinsicsMap {
             }else{
                 soln_stream::failure()
             }
+        });
+
+        def_intrinsic!(intrs, |state, u, [original][duplicate]| {
+            let new = state.td.borrow_mut().duplicate(original);
+            soln_stream::unifying(u, &new, duplicate)
         });
 
         def_intrinsic!(intrs, |_rt, u, [pascal_case][snake_case]| {
@@ -783,7 +802,7 @@ impl IntrinsicsMap {
             soln_stream::unifying(u, output, &list)
         });
 
-        def_intrinsic!(intrs, |rt, u, [recursion_limit]| {
+        def_intrinsic!(intrs, |state, u, [recursion_limit]| {
             match recursion_limit.as_ref() {
                 Tm::Int(i) => {
                     if i <= &Zero::zero() {
@@ -798,11 +817,11 @@ impl IntrinsicsMap {
                         }
                         .into();
                     }
-                    rt.max_recursion_depth.set(i.to_usize().unwrap());
+                    state.rt.max_recursion_depth.set(i.to_usize().unwrap());
                     soln_stream::success(u)
                 }
                 Tm::Var(..) => {
-                    let limit = Tm::Int(rt.max_recursion_depth.get().into()).into();
+                    let limit = Tm::Int(state.rt.max_recursion_depth.get().into()).into();
                     soln_stream::unifying(u, &limit, recursion_limit)
                 }
                 _ => Err::ArgumentTypeError {
@@ -817,8 +836,9 @@ impl IntrinsicsMap {
 
         // TODO: once prolog's `forall` is implemented, this can become just
         // `[directive]`, i.e. a multi-deterministic relation.
-        def_intrinsic!(intrs, |rt, u, [directives]| {
-            let it = rt
+        def_intrinsic!(intrs, |state, u, [directives]| {
+            let it = state
+                .rt
                 .db
                 .directives
                 .iter()

@@ -178,6 +178,16 @@
     """
 ]
 
+[sig [original][duplicate]][help
+    """
+    Creates a duplicate of `Original` and unifies it with `Duplicate`.
+    """
+]
+
+[sig [snake_case][pascal_case]][help
+    "Convert symbols between snake_case and PascalCase."
+]
+
 [sig [gt][lt]][help
     "True if the number `Gt` is greater than the number `Lt`."
 ]

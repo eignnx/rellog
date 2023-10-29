@@ -126,7 +126,7 @@ impl Rt {
             None => {
                 // If it can't be found in the loaded module, check the intrinsics.
                 return match self.intrs.index_match(rel) {
-                    Some(intr) => intr.apply(self, u, rel.clone()),
+                    Some(intr) => intr.apply(self, td, u, rel.clone()),
                     None => Err::NoSuchRelation(rel.clone().into()).into(),
                 };
             }
