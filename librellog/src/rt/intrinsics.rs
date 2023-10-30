@@ -1,6 +1,6 @@
 use std::{
     cell::RefCell,
-    collections::{BTreeMap, BTreeSet, HashSet},
+    collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Display},
     io::{stderr, stdout, Write},
 };
@@ -19,7 +19,7 @@ use crate::{
         UnifierSet,
     },
     tm,
-    utils::{cloning_iter::CloningIterator, int_counter::IntCounter},
+    utils::int_counter::IntCounter,
 };
 
 use super::Rt;
@@ -75,7 +75,7 @@ macro_rules! ident_of_binding {
 macro_rules! def_intrinsic {
     ($intrs:expr, |$state:ident, $u:ident, $([$ident:ident $(as $name:literal)?])+| $body:expr) => {
         let sig = [$(name_of_binding!($ident $(as $name)?),)+];
-        $intrs.def(&sig, move |mut state, u, rel| {
+        $intrs.def(&sig, move |state, u, rel| {
             $(
             let ident_of_binding!($ident $(as $name)?) = match rel.get(&name_of_binding!($ident $(as $name)?).into()) {
                 Some(x) => u.reify_term(x),
