@@ -67,6 +67,7 @@
 [elementwise Goal]
     - [rel Goal][Attrs]
     - [splatted Attrs][Unsplatted][ListsSplatted]
+    - [rel GoalNew][attrs Unsplatted]
     - [elementwise_impl GoalNew][ListsSplatted]
 
 
