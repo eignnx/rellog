@@ -28,16 +28,25 @@ in Rellog you could write any of the following:
 
 ```clojure
 [prefix {}][Suffix][compound Suffix]
-[prefix {A ...As}][Suffix][compound {A ...Compound}]
+[prefix {A ..As}][Suffix][compound {A ..Compound}]
     - [prefix As][suffix Suffix][Compound]
 
 [forward {}][backward {}]
-[forward {A ...As}][Backward]
+[forward {A ..As}][Backward]
     - [forward As][backward AsBackward]
     - [prefix AsBackward][suffix {A}][compound Backward]
 ```
 
 Note that conjunctions are expressed as indented `-`-preceded lists.
+
+## Goals
+
+* Focus on relations between values rather than names of relations.
+* Be easy to type. Avoid unusual symbols (like backtick, ampersand, caret, fore/backslash, tilde).
+* Have clean, simple syntax for grammars (DCGs).
+* Have efficient string types that still feel like lists.
+* Prioritize automatic choicepoint elimination rather than efficiency. This makes irrelevant many common uses of "cut."
+* Avoid the trailing period problem that prolog suffers from.
 
 ## Installation
 
