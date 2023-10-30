@@ -58,7 +58,7 @@
 [[example
     """
     -- [elementwise
-           [base [splat {1 2 3}]
+            [base [splat {1 2 3}]
            ][exponent [scalar 3]
            ][power [splat Out]]
        ]
@@ -67,9 +67,7 @@
 [elementwise Goal]
     - [rel Goal][Attrs]
     - [splatted Attrs][Unsplatted][ListsSplatted]
-    - [attrs Unsplatted][rel GoalNew]
-    - [dbg [goal GoalNew]]
-    - [dbg [ListsSplatted]]
+    - [elementwise_impl GoalNew][ListsSplatted]
 
 
 [splatted {}][unsplatted {}][lists_splatted {}]
@@ -83,6 +81,24 @@
     - [attr Attr0][Key][value [Scalar]]
     - [Attr][Key][value Scalar]
     - [splatted Attrs0][unsplatted Attrs][ListsSplatted]
+
+
+[elementwise_impl _Goal][lists_splatted {}]
+
+[elementwise_impl _Goal][lists_splatted {[Var][list {}]}]
+[elementwise_impl Goal][lists_splatted {[Var][list {X..Xs}]}]
+    - [original Goal][duplicate GoalCopy][renaming {Var}][renamed {VarCopy}]
+    - VarCopy = X
+    - [call GoalCopy]
+    - [elementwise_impl Goal][lists_splatted {[Var][list Xs]}]
+
+[elementwise_impl _Goal][lists_splatted {[var V1][list {}] [var V2][list {}]}]
+[elementwise_impl Goal][lists_splatted {[var V1][list {X1..Xs1}] [var V2][list {X2..Xs2}]}]
+    - [original Goal][duplicate GoalCopy][renaming {V1 V2}][renamed {V1Copy V2Copy}]
+    - V1Copy = X1
+    - V2Copy = X2
+    - [call GoalCopy]
+    - [elementwise_impl Goal][lists_splatted {[var V1][list Xs1] [var V2][list Xs2]}]
 
 
 [dbg Term]
