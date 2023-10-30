@@ -1,16 +1,17 @@
 use std::{
     cell::RefCell,
-    collections::BTreeMap,
+    collections::{BTreeMap, BTreeSet, HashSet},
     fmt::{Debug, Display},
     io::{stderr, stdout, Write},
 };
 
 use num::{Integer, ToPrimitive, Zero};
 use rpds::Vector;
+use unifier_set::DirectChildren;
 
 use crate::{
     ast::{dup::TmDuplicator, RcTm, Rel, Sig, Tm},
-    data_structures::Int,
+    data_structures::{Int, Var},
     lex, parse,
     rt::Err,
     rt::{
@@ -18,7 +19,7 @@ use crate::{
         UnifierSet,
     },
     tm,
-    utils::int_counter::IntCounter,
+    utils::{cloning_iter::CloningIterator, int_counter::IntCounter},
 };
 
 use super::Rt;
@@ -322,8 +323,66 @@ impl IntrinsicsMap {
             }
         });
 
+        def_intrinsic!(intrs, |_state, u, [term][variables]| {
+            let vars: BTreeSet<Var> = term.variables().cloned().collect();
+            let vars = RcTm::list_from_iter(vars.into_iter().map(RcTm::from));
+            soln_stream::unifying(u, &vars, variables)
+        });
+
         def_intrinsic!(intrs, |state, u, [original][duplicate]| {
             let new = state.td.borrow_mut().duplicate(original);
+            soln_stream::unifying(u, &new, duplicate)
+        });
+
+        def_intrinsic!(intrs, |state, u, [original][duplicate][renaming][renamed]| {
+            let Some((renaming_set, None)) = renaming.try_as_set_from_list() else {
+                return soln_stream::error(Err::ArgumentTypeError {
+                    rel: "[original][duplicate][renaming_vars][renamed_vars]".to_string(),
+                    key: "renaming_vars".to_string(),
+                    expected_ty: "list".to_string(),
+                    recieved_tm: renaming.to_string(),
+                });
+            };
+
+            let new = state.td.borrow_mut()
+                .duplicate_conditionally(original, Box::new(move |var| {
+                    renaming_set.contains(&RcTm::from(var))
+                }));
+
+            let Some((renaming_list, None)) = renaming.try_as_list() else {
+                return soln_stream::error(Err::ArgumentTypeError {
+                    rel: "[original][duplicate][renaming_vars][renamed_vars]".to_string(),
+                    key: "renaming_vars".to_string(),
+                    expected_ty: "list".to_string(),
+                    recieved_tm: renaming.to_string(),
+                });
+            };
+
+            let Some(renaming_list_vars) = renaming_list.iter()
+                .map(RcTm::try_as_var)
+                .collect::<Option<Vec<_>>>() else {
+                return soln_stream::error(Err::ArgumentTypeError {
+                    rel: "[original][duplicate][renaming_vars][renamed_vars]".to_string(),
+                    key: "renaming_vars".to_string(),
+                    expected_ty: "list of variables".to_string(),
+                    recieved_tm: renaming.to_string(),
+                });
+            };
+
+            let renamed_vec = renaming_list_vars.iter()
+                .map(|var| {
+                    let td_borrow = state.td.borrow();
+                    td_borrow.substs().get(var).unwrap_or(var).clone()
+                })
+                .map(RcTm::from)
+                .collect::<Vec<RcTm>>();
+
+            let renamed_tm = RcTm::list_from_iter(renamed_vec.into_iter());
+
+            let Some(u) = u.unify(renamed, &renamed_tm) else {
+                return soln_stream::failure()
+            };
+
             soln_stream::unifying(u, &new, duplicate)
         });
 

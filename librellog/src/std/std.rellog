@@ -178,9 +178,30 @@
     """
 ]
 
+[sig [term][variables]][help
+    "Relates a term to the list of variables contained in that term."
+]
+
 [sig [original][duplicate]][help
     """
     Creates a duplicate of `Original` and unifies it with `Duplicate`.
+    """
+]
+
+[sig [original][duplicate][renaming][renamed]][help
+    """
+    Creates a duplicate of `Original` and unifies it with `Duplicate`.
+
+    The variables in the list `Renaming` that appear in `Original` will be
+    renamed and their new names will be put in the list `Renamed`.
+
+    # Example
+
+    ```
+    -- [original [a A][b B][ab {A B}]][Duplicate][renaming {A Z}][Renamed]
+        - Duplicate = [a A_1][B][ab {A_1 B}]
+        - Renamed = {A_1 Z}
+    ```
     """
 ]
 

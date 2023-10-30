@@ -81,6 +81,29 @@ impl RcTm {
         }
     }
 
+    pub fn try_as_set_from_list(&self) -> Option<(HashSet<RcTm>, Option<Var>)> {
+        let mut set = HashSet::new();
+        let mut current = self;
+
+        while let Tm::Cons(x, xs) = current.as_ref() {
+            set.insert(x.clone());
+            current = xs;
+        }
+
+        match current.as_ref() {
+            Tm::Nil => Some((set, None)),
+            Tm::Var(var) => Some((set, Some(var.clone()))),
+            _ => None,
+        }
+    }
+
+    pub fn try_as_var(&self) -> Option<Var> {
+        match self.as_ref() {
+            Tm::Var(v) => Some(v.clone()),
+            _ => None,
+        }
+    }
+
     pub fn try_as_sym(&self) -> Option<Sym> {
         match self.as_ref() {
             Tm::Sym(s) => Some(*s),

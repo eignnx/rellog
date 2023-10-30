@@ -12,6 +12,7 @@ pub trait Dup {
 pub struct TmDuplicator {
     substs: HashMap<Var, Var>,
     gen: Option<NonZeroUsize>,
+    should_rename_var: Option<Box<dyn Fn(Var) -> bool>>,
 }
 
 impl TmDuplicator {
@@ -36,16 +37,39 @@ impl TmDuplicator {
         self.substs.clear();
     }
 
-    pub(crate) fn dup_var(&mut self, old: &Var) -> Var {
+    pub fn dup_var(&mut self, old: &Var) -> Var {
         match self.substs.get(old) {
             Some(new) => new.clone(),
-            None => {
+            None if self.should_rename_var(old) => {
                 let gen = self.gen.expect("Don't generate Vars with None generation.");
                 let new = old.with_gen(gen);
                 self.substs.insert(old.clone(), new.clone());
                 new
             }
+            None => old.clone(),
         }
+    }
+
+    fn should_rename_var(&self, var: &Var) -> bool {
+        self.should_rename_var
+            .as_ref()
+            .map(|predicate| predicate(var.clone()))
+            .unwrap_or(true)
+    }
+
+    pub fn duplicate_conditionally<D: Dup>(
+        &mut self,
+        x: &D,
+        cond: Box<impl Fn(Var) -> bool + 'static>,
+    ) -> D {
+        let old_cond = self.should_rename_var.replace(cond);
+        let new = self.duplicate(x);
+        self.should_rename_var = old_cond;
+        new
+    }
+
+    pub fn substs(&self) -> &HashMap<Var, Var> {
+        &self.substs
     }
 }
 
