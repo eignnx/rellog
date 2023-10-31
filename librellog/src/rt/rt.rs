@@ -26,6 +26,7 @@ pub struct Rt {
     pub recursion_depth: Cell<usize>,
     pub max_recursion_depth: Cell<usize>,
     pub debug_mode: Cell<bool>,
+    pub query_stack: RefCell<Vec<RcTm>>,
 }
 
 impl Rt {
@@ -36,6 +37,7 @@ impl Rt {
             recursion_depth: 0.into(),
             max_recursion_depth: DEFAULT_MAX_RECURSION_DEPTH.into(),
             debug_mode: false.into(),
+            query_stack: vec![].into(),
         }
     }
 
@@ -49,6 +51,7 @@ impl Rt {
         'rtb: 'it,
         'td: 'it,
     {
+        self.query_stack.borrow_mut().clear();
         self.recursion_depth.set(0);
         self.solve_query_impl(query, u, td)
     }
@@ -63,8 +66,12 @@ impl Rt {
         'rtb: 'it,
         'td: 'it,
     {
+        self.query_stack.borrow_mut().push(query.clone());
         if self.debug_mode.get() {
-            eprintln!("[depth:{}] Enter: `{query}`", self.recursion_depth.get());
+            eprintln!(
+                "[depth:{:0>2}] Enter: `{query}`",
+                self.recursion_depth.get()
+            );
         }
 
         if self.recursion_depth.get() >= self.max_recursion_depth.get() {
@@ -218,6 +225,13 @@ impl Rt {
         &self,
     ) -> impl ExactSizeIterator<Item = Result<UnifierSet, Err>> + '_ {
         DeferredIter::new(|| {
+            if self.debug_mode.get() {
+                eprintln!(
+                    "[depth:{:0>2}] Exit:  `{}`",
+                    self.recursion_depth.get(),
+                    self.query_stack.borrow_mut().pop().unwrap(),
+                );
+            }
             self.decr_recursion_depth();
         })
     }

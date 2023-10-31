@@ -229,6 +229,9 @@ impl Repl {
                     }
                     Err(e) => {
                         println!("{}", Color::Red.paint(format!("Exception: {e}")));
+                        for (i, q) in self.rt.query_stack.borrow().iter().enumerate().rev() {
+                            println!("{}", Color::Red.paint(format!("# ^[depth:{i:0>2}]: `{q}`")));
+                        }
                         continue 'outer;
                     }
                 };
@@ -284,6 +287,18 @@ impl Repl {
                     "   - [false] {}",
                     Color::Yellow.paint("# No additional solutions found.")
                 );
+            }
+
+            if self.rt.debug_mode.get() {
+                for (i, q) in self.rt.query_stack.borrow().iter().enumerate().rev() {
+                    println!(
+                        "{}",
+                        Color::Yellow.paint(format!(
+                            "# ^[depth:{i:0>2}]: `{}`",
+                            Color::LightYellow.paint(q.to_string())
+                        ))
+                    );
+                }
             }
         }
     }
