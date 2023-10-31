@@ -116,10 +116,12 @@ impl Repl {
                     println!("  :load | :l        Load the source given source file.");
                     println!("  :reload | :r      Reloads the source file(s).");
                     println!("  :unload | :u      Unloads the given source file.");
+                    println!("  :debug | :d       Enters/exits debugging mode.");
                     println!("  [Builtins]        Show a list of builtin relations.");
                     println!("  [help Sig]        Show help text for a relation given by `Sig`.");
-                    println!("  :quit | :exit     Exit the repl.");
-                    println!("   | :q | :wq");
+                    println!("  :quit | :q |      Exit the repl.");
+                    println!("… :exit | :e |");
+                    println!("… :wq");
                     continue 'outer;
                 }
                 [":quit" | ":q" | ":exit" | ":wq"] => {
