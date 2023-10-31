@@ -85,11 +85,15 @@ impl Rt {
                 self.decr_recursion_depth();
                 Err::AttemptToQueryNonCallable(query.clone()).into()
             }
-            Tm::Var(_) => {
+            Tm::Var(v) => {
                 let reified = u.reify_term(&query);
                 if query == reified {
                     self.decr_recursion_depth();
-                    Err::InstantiationError(query.clone()).into()
+                    Err::InstantiationError {
+                        rel: format!("<dynamic call of `{v}`>"),
+                        tm: query.clone(),
+                    }
+                    .into()
                 } else {
                     Box::new(
                         self.solve_query_impl(reified, u, td)

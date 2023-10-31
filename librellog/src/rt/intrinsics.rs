@@ -29,9 +29,11 @@ pub struct IntrState<'a> {
     td: &'a RefCell<TmDuplicator>,
 }
 
+type IntrinsicFn = Box<dyn Fn(&mut IntrState<'_>, UnifierSet, Rel) -> Box<dyn SolnStream>>;
+
 pub struct Intrinsic {
     signature: Sig,
-    func: Box<dyn Fn(&mut IntrState<'_>, UnifierSet, Rel) -> Box<dyn SolnStream>>,
+    func: IntrinsicFn,
 }
 
 impl Intrinsic {
@@ -73,7 +75,7 @@ macro_rules! ident_of_binding {
 }
 
 macro_rules! def_intrinsic {
-    ($intrs:expr, |$state:ident, $u:ident, $([$ident:ident $(as $name:literal)?])+| $body:expr) => {
+    ($intrs:expr, |$state:ident, $u:ident, $([$ident:ident $(as $name:literal)?])+ as $rel:ident| $body:expr) => {
         let sig = [$(name_of_binding!($ident $(as $name)?),)+];
         $intrs.def(&sig, move |state, u, rel| {
             $(
@@ -86,6 +88,7 @@ macro_rules! def_intrinsic {
 
             let $state = state;
             let $u = u;
+            let $rel = RcTm::from(rel);
 
             $body
         });
@@ -133,7 +136,7 @@ impl IntrinsicsMap {
     pub(crate) fn initialize() -> Self {
         let mut intrs = Self::new();
 
-        def_intrinsic!(intrs, |_rt, u, [terms as "eq"]| {
+        def_intrinsic!(intrs, |_rt, u, [terms as "eq"] as _rel| {
             let Some((list, None)) = terms.try_as_list() else {
                 return soln_stream::error(Err::ArgumentTypeError {
                     rel: "[eq]".into(),
@@ -159,13 +162,16 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [rel][attrs]| {
+        def_intrinsic!(intrs, |_rt, u, [rel][attrs] as rel_called| {
             match (rel.as_ref(), attrs.as_ref()) {
                 (Tm::Var(_), Tm::Cons(_, _)) => {
                     let var = rel;
                     let attrs: Vector<RcTm> = match attrs.try_as_list().unwrap() {
                         (vec, None) => vec,
-                        (_vec, Some(_tail_var)) => return soln_stream::error(Err::InstantiationError(attrs.clone()))
+                        (_vec, Some(_tail_var)) => return soln_stream::error(Err::InstantiationError {
+                            rel: rel_called.to_string(),
+                            tm:attrs.clone()
+                        })
                     };
 
                     let rel: Result<Rel, Err> = attrs.into_iter()
@@ -177,9 +183,12 @@ impl IntrinsicsMap {
                                     .next()
                                     .expect("There's exactly one key-value pair in here"))
                             }
-                            Tm::Var(_) => Err(Err::InstantiationError(attr.clone())),
+                            Tm::Var(_) => Err(Err::InstantiationError {
+                                rel: rel_called.to_string(),
+                                tm: attr.clone(),
+                            }),
                             _ => Err(Err::ArgumentTypeError {
-                                rel: "[rel][attrs]".into(),
+                                rel: rel_called.to_string(),
                                 key: "attrs".into(),
                                 expected_ty: "size-1 attribute relation".into(),
                                 recieved_tm: attr.to_string()
@@ -201,13 +210,19 @@ impl IntrinsicsMap {
                     soln_stream::unifying(u, attrs, &list)
                 }
 
-                (Tm::Var(_), Tm::Var(_)) => Err::InstantiationError(rel.clone()).into(),
+                (Tm::Var(_), Tm::Var(_)) => Err::InstantiationError {
+                    rel: rel_called.to_string(),
+                    tm: rel.clone(),
+                }.into(),
 
-                (_, _) => Err::GenericError { msg: "[rel][attrs] takes a relation and a list of attributes".into() }.into(),
+                (_, _) => Err::GenericError {
+                    rel: rel_called.to_string(),
+                    msg: "[rel][attrs] takes a relation and a list of attributes".into()
+                }.into(),
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [attr][key][value]| {
+        def_intrinsic!(intrs, |_rt, u, [attr][key][value] as rel| {
             match (attr.as_ref(), key.as_ref(), value.as_ref()) {
 
                 // [[mode [attr in][key inout][value inout]]]
@@ -223,7 +238,10 @@ impl IntrinsicsMap {
 
                 (Tm::Rel(_non_attr_rel), _, _) => {
                     // Is this good advice?
-                    soln_stream::error(Err::GenericError { msg: "use [rel][attr] instead".into() })
+                    soln_stream::error(Err::GenericError {
+                        rel: rel.to_string(),
+                        msg: "use [rel][attr] instead".into()
+                    })
                 }
 
                 // [[mode [attr inout][key in][value inout]]]
@@ -232,13 +250,19 @@ impl IntrinsicsMap {
                     soln_stream::unifying(u, attr, &a)
                 }
 
-                (Tm::Var(_), Tm::Var(_), _) => Err::InstantiationError(key.clone()).into(),
+                (Tm::Var(_), Tm::Var(_), _) => Err::InstantiationError {
+                    rel: rel.to_string(),
+                    tm: key.clone()
+                }.into(),
 
-                _ => Err::GenericError { msg: "bad arguments to [attr][key][value]".into() }.into()
+                _ => Err::GenericError {
+                    rel: rel.to_string(),
+                    msg: "bad arguments to [attr][key][value]".into()
+                }.into()
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [gt][lt]| {
+        def_intrinsic!(intrs, |_rt, u, [gt][lt] as rel| {
             match (gt.as_ref(), lt.as_ref()) {
                 (Tm::Int(gt), Tm::Int(lt)) => {
                     if gt > lt {
@@ -247,11 +271,14 @@ impl IntrinsicsMap {
                         soln_stream::failure()
                     }
                 }
-                _ => Err::GenericError { msg: "[gt][lt] accepts two concrete numbers".into() }.into(),
+                _ => Err::GenericError {
+                    rel: rel.to_string(),
+                    msg: "[gt][lt] accepts two concrete numbers".into()
+                }.into(),
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [gte][lte]| {
+        def_intrinsic!(intrs, |_rt, u, [gte][lte] as rel| {
             match (gte.as_ref(), lte.as_ref()) {
                 (Tm::Int(gte), Tm::Int(lte)) => {
                     if gte >= lte {
@@ -260,60 +287,87 @@ impl IntrinsicsMap {
                         soln_stream::failure()
                     }
                 }
-                _ => Err::GenericError { msg: "[gte][lte] accepts two concrete numbers".into() }.into()
+                _ => Err::GenericError {
+                    rel: rel.to_string(),
+                    msg: "[gte][lte] accepts two concrete numbers".into()
+                }.into()
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_var"]| {
+        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_var"] as _rel| {
             match u.reify_term(tm).as_ref() {
                 Tm::Var(_) => soln_stream::success(u),
                 _ => soln_stream::failure(),
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_num"]| {
+        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_num"] as rel| {
             match u.reify_term(tm).as_ref() {
                 Tm::Int(..) => soln_stream::success(u),
-                Tm::Var(..) => soln_stream::error(Err::InstantiationError(tm.clone())),
+                Tm::Var(..) => soln_stream::error(Err::InstantiationError{
+                    rel: rel.to_string(),
+                    tm: tm.clone()
+                }),
                 _ => soln_stream::failure(),
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_sym"]| {
+        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_sym"] as rel| {
             match u.reify_term(tm).as_ref() {
                 Tm::Sym(..) => soln_stream::success(u),
-                Tm::Var(..) => soln_stream::error(Err::InstantiationError(tm.clone())),
+                Tm::Var(..) => soln_stream::error(Err::InstantiationError{
+                    rel: rel.to_string(),
+                    tm: tm.clone()
+                }),
                 _ => soln_stream::failure(),
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_txt"]| {
+        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_txt"] as rel| {
             match u.reify_term(tm).as_ref() {
                 Tm::Txt(..) => soln_stream::success(u),
-                Tm::Var(..) => soln_stream::error(Err::InstantiationError(tm.clone())),
+                Tm::Var(..) => soln_stream::error(Err::InstantiationError{
+                    rel: rel.to_string(),
+                    tm: tm.clone()
+                }),
                 _ => soln_stream::failure(),
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_rel"]| {
+        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_rel"] as rel_called| {
             match u.reify_term(tm).as_ref() {
                 Tm::Rel(..) => soln_stream::success(u),
-                Tm::Var(..) => soln_stream::error(Err::InstantiationError(tm.clone())),
+                Tm::Var(..) => soln_stream::error(Err::InstantiationError{
+                    rel: rel_called.to_string(),
+                    tm: tm.clone()
+                }),
                 _ => soln_stream::failure(),
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [rel][key][value]| {
+        def_intrinsic!(intrs, |_rt, u, [rel][key][value] as rel_called| {
             let rel = match rel.as_ref() {
                 Tm::Rel(rel) => rel,
-                Tm::Var(_) => return Err::InstantiationError(rel.clone()).into(),
-                _ => return Err::GenericError { msg: "[Rel][key][value] requires a relation for `Rel`.".into() }.into()
+                Tm::Var(_) => return Err::InstantiationError{
+                    rel: rel_called.to_string(),
+                    tm: rel.clone()
+                }.into(),
+                _ => return Err::GenericError {
+                    rel: rel_called.to_string(),
+                    msg: "[Rel][key][value] requires a relation for `Rel`.".into()
+                }.into()
             };
 
             let key = match key.as_ref() {
                 Tm::Sym(key) => key,
-                Tm::Var(_) => return Err::InstantiationError(key.clone()).into(),
-                _ => return Err::GenericError { msg: "[rel][Key][value] requires a ground term for `Key`.".into() }.into()
+                Tm::Var(_) => return Err::InstantiationError{
+                    rel: rel_called.to_string(),
+                    tm: key.clone()
+                }.into(),
+                _ => return Err::GenericError {
+                    rel: rel_called.to_string(),
+                    msg: "[rel][Key][value] requires a ground term for `Key`.".into()
+                }.into()
             };
 
             if let Some(found) = rel.get(key) {
@@ -323,21 +377,21 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_state, u, [term][variables]| {
+        def_intrinsic!(intrs, |_state, u, [term][variables] as _rel| {
             let vars: BTreeSet<Var> = term.variables().cloned().collect();
             let vars = RcTm::list_from_iter(vars.into_iter().map(RcTm::from));
             soln_stream::unifying(u, &vars, variables)
         });
 
-        def_intrinsic!(intrs, |state, u, [original][duplicate]| {
+        def_intrinsic!(intrs, |state, u, [original][duplicate] as _rel| {
             let new = state.td.borrow_mut().duplicate(original);
             soln_stream::unifying(u, &new, duplicate)
         });
 
-        def_intrinsic!(intrs, |state, u, [original][duplicate][renaming][renamed]| {
+        def_intrinsic!(intrs, |state, u, [original][duplicate][renaming][renamed] as rel| {
             let Some((renaming_set, None)) = renaming.try_as_set_from_list() else {
                 return soln_stream::error(Err::ArgumentTypeError {
-                    rel: "[original][duplicate][renaming_vars][renamed_vars]".to_string(),
+                    rel: rel.to_string(),
                     key: "renaming_vars".to_string(),
                     expected_ty: "list".to_string(),
                     recieved_tm: renaming.to_string(),
@@ -351,7 +405,7 @@ impl IntrinsicsMap {
 
             let Some((renaming_list, None)) = renaming.try_as_list() else {
                 return soln_stream::error(Err::ArgumentTypeError {
-                    rel: "[original][duplicate][renaming_vars][renamed_vars]".to_string(),
+                    rel: rel.to_string(),
                     key: "renaming_vars".to_string(),
                     expected_ty: "list".to_string(),
                     recieved_tm: renaming.to_string(),
@@ -362,7 +416,7 @@ impl IntrinsicsMap {
                 .map(RcTm::try_as_var)
                 .collect::<Option<Vec<_>>>() else {
                 return soln_stream::error(Err::ArgumentTypeError {
-                    rel: "[original][duplicate][renaming_vars][renamed_vars]".to_string(),
+                    rel: rel.to_string(),
                     key: "renaming_vars".to_string(),
                     expected_ty: "list of variables".to_string(),
                     recieved_tm: renaming.to_string(),
@@ -386,7 +440,7 @@ impl IntrinsicsMap {
             soln_stream::unifying(u, &new, duplicate)
         });
 
-        def_intrinsic!(intrs, |_rt, u, [pascal_case][snake_case]| {
+        def_intrinsic!(intrs, |_rt, u, [pascal_case][snake_case] as rel| {
             match (pascal_case.as_ref(), snake_case.as_ref()) {
                 (Tm::Sym(pc), _) => {
                     let lower = format!("{}", heck::AsSnakeCase(&pc.to_str()[..]));
@@ -399,13 +453,14 @@ impl IntrinsicsMap {
                     soln_stream::unifying(u, &lower_sym, pascal_case)
                 }
                 _ => soln_stream::error(Err::GenericError {
+                    rel: rel.to_string(),
                     msg: "`[snake_case][pascal_case]` requires either one or two \
                           ground symbols as arguments.".into()
                 }),
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [txt_prefix][txt_suffix][txt_compound]| {
+        def_intrinsic!(intrs, |_rt, u, [txt_prefix][txt_suffix][txt_compound] as rel| {
             use Tm::{Txt, Var};
             match (txt_prefix.as_ref(), txt_suffix.as_ref(), txt_suffix.as_ref()) {
                 (Txt(ref prefix_head, ref prefix_tail), Txt(suffix_head, suffix_tail), _) => {
@@ -445,6 +500,7 @@ impl IntrinsicsMap {
                 }
 
                 _ => Err::GenericError {
+                        rel: rel.to_string(),
                         msg: "only modes supported for `[txt_prefix][txt_suffix][txt_compound]`:\n\
                             \t[[mode txt_[prefix in][suffix  in][compound out]]]\n\
                             \t[[mode txt_[prefix in][suffix out][compound out]]]\n\
@@ -453,7 +509,7 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [sum][x][y]| {
+        def_intrinsic!(intrs, |_rt, u, [sum][x][y] as rel| {
             match (sum.as_ref(), x.as_ref(), y.as_ref()) {
                 (_, Tm::Int(x), Tm::Int(y)) => {
                     let res = Tm::Int(x + y).into();
@@ -473,14 +529,26 @@ impl IntrinsicsMap {
                     let res = Tm::Int(sum - x).into();
                     soln_stream::unifying(u, y, &res)
                 }
-                (_, Tm::Var(_), Tm::Var(_)) => Err::InstantiationError(x.clone()).into(),
-                (Tm::Var(_), _, Tm::Var(_)) => Err::InstantiationError(y.clone()).into(),
-                (Tm::Var(_), Tm::Var(_), _) => Err::InstantiationError(x.clone()).into(),
-                _ => Err::GenericError { msg: "[sum][x][y] only relates numbers.".into() }.into()
+                (_, Tm::Var(_), Tm::Var(_)) => Err::InstantiationError{
+                    rel: rel.to_string(),
+                    tm: x.clone(),
+                }.into(),
+                (Tm::Var(_), _, Tm::Var(_)) => Err::InstantiationError {
+                    rel: rel.to_string(),
+                    tm: y.clone(),
+                }.into(),
+                (Tm::Var(_), Tm::Var(_), _) => Err::InstantiationError {
+                    rel: rel.to_string(),
+                    tm: x.clone(),
+                }.into(),
+                _ => Err::GenericError {
+                    rel: rel.to_string(),
+                    msg: "[sum][x][y] only relates numbers.".into()
+                }.into()
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [product][x][y]| {
+        def_intrinsic!(intrs, |_rt, u, [product][x][y] as rel| {
             match (product.as_ref(), x.as_ref(), y.as_ref()) {
                 (_, Tm::Int(x), Tm::Int(y)) => {
                     let res = Tm::Int(x * y).into();
@@ -492,6 +560,7 @@ impl IntrinsicsMap {
                 (Tm::Int(product), _, Tm::Int(y)) => {
                     if y.is_zero() {
                         return Err::GenericError {
+                            rel: rel.to_string(),
                             msg: "Division by zero required to solve query [product _][X][y 0].".into()
                         }.into();
                     }
@@ -504,23 +573,37 @@ impl IntrinsicsMap {
                 (Tm::Int(product), Tm::Int(x), _) => {
                     if x.is_zero() {
                         return Err::GenericError {
+                            rel: rel.to_string(),
                             msg: "Division by zero required to solve query [product #][x 0][Y].".into()
                         }.into();
                     }
                     let res = Tm::Int(product / x).into();
                     soln_stream::unifying(u, y, &res)
                 }
-                (_, Tm::Var(_), Tm::Var(_)) => Err::InstantiationError(x.clone()).into(),
-                (Tm::Var(_), _, Tm::Var(_)) => Err::InstantiationError(y.clone()).into(),
-                (Tm::Var(_), Tm::Var(_), _) => Err::InstantiationError(x.clone()).into(),
-                _ => Err::GenericError { msg: "[product][x][y] only relates numbers.".into() }.into()
+                (_, Tm::Var(_), Tm::Var(_)) => Err::InstantiationError{
+                    rel: rel.to_string(),
+                    tm: x.clone(),
+                }.into(),
+                (Tm::Var(_), _, Tm::Var(_)) => Err::InstantiationError {
+                    rel: rel.to_string(),
+                    tm: y.clone(),
+                }.into(),
+                (Tm::Var(_), Tm::Var(_), _) => Err::InstantiationError {
+                    rel: rel.to_string(),
+                    tm: x.clone(),
+                }.into(),
+                _ => Err::GenericError {
+                    rel: rel.to_string(),
+                    msg: "[product][x][y] only relates numbers.".into()
+                }.into()
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [difference][minuend][subtrahend]| {
+        def_intrinsic!(intrs, |_rt, u, [difference][minuend][subtrahend] as rel| {
             match (difference.as_ref(), minuend.as_ref(), subtrahend.as_ref()) {
                 (a, b, c) if ![a, b, c].into_iter().all(|tm| matches!(*tm, Tm::Int(_) | Tm::Var(_))) => {
                     Err::GenericError {
+                        rel: rel.to_string(),
                         msg: "The arguments to [difference][minuend][subtrahend] must all be unifyable with integers.".into()
                     }.into()
                 }
@@ -540,15 +623,17 @@ impl IntrinsicsMap {
                     soln_stream::unifying(u, subtrahend, &sub)
                 }
                 _ => Err::GenericError {
+                    rel: rel.to_string(),
                     msg: "[difference][minuend][subtrahend] is not implemented for that mode.".into()
                 }.into(),
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [quotient][remainder][numerator][denominator]| {
+        def_intrinsic!(intrs, |_rt, u, [quotient][remainder][numerator][denominator] as rel| {
             match (quotient.as_ref(), remainder.as_ref(), numerator.as_ref(), denominator.as_ref()) {
                 (a, b, c, d) if ![a, b, c, d].into_iter().all(|tm| matches!(*tm, Tm::Int(_) | Tm::Var(_))) => {
                     Err::GenericError {
+                        rel: rel.to_string(),
                         msg: "The arguments to [numerator][denominator][quotient][remainder] must all be unifyable with integers.".into()
                     }.into()
                 }
@@ -557,6 +642,7 @@ impl IntrinsicsMap {
                 (_, _, Tm::Int(numer), Tm::Int(denom)) => {
                     if denom.is_zero() {
                         return Err::GenericError {
+                            rel: rel.to_string(),
                             msg: "Division by zero required to solve query [numerator #][denominator 0][Quotient][Remainder].".into()
                         }.into();
                     }
@@ -576,6 +662,7 @@ impl IntrinsicsMap {
                 (Tm::Int(quot), Tm::Int(rem), Tm::Int(numer), _) => {
                     if quot.is_zero() {
                         return Err::GenericError {
+                            rel: rel.to_string(),
                             msg: "Division by zero required to solve query [quotient 0][remainder #][numerator #][Denominator].".into()
                         }.into();
                     }
@@ -618,6 +705,7 @@ impl IntrinsicsMap {
                     }.into();
 
                     Err::GenericError {
+                        rel: rel.to_string(),
                         msg: format!(
                             "[numerator][denominator][quotient][remainder] is not \
                             implemented for mode `{mode}`.")
@@ -626,9 +714,12 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [pred][succ]| {
+        def_intrinsic!(intrs, |_rt, u, [pred][succ] as rel| {
             match (pred.as_ref(), succ.as_ref()) {
-                (Tm::Var(_), Tm::Var(_)) => Err::InstantiationError(pred.clone()).into(),
+                (Tm::Var(_), Tm::Var(_)) => Err::InstantiationError {
+                    rel: rel.to_string(),
+                    tm: pred.clone()
+                }.into(),
                 (Tm::Var(_), Tm::Int(s)) => {
                     let p = Tm::Int(s - 1).into();
                     soln_stream::unifying(u, pred, &p)
@@ -644,15 +735,18 @@ impl IntrinsicsMap {
                         soln_stream::failure()
                     }
                 }
-                _ => Err::GenericError { msg: "[pred][succ] only relates numbers.".into() }.into()
+                _ => Err::GenericError {
+                    rel: rel.to_string(),
+                    msg: "[pred][succ] only relates numbers.".into()
+                }.into()
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [_yes as "true"]| {
+        def_intrinsic!(intrs, |_rt, u, [_yes as "true"] as _rel| {
             soln_stream::success(u)
         });
 
-        def_intrinsic!(intrs, |_rt, _u, [_no as "false"]| {
+        def_intrinsic!(intrs, |_rt, _u, [_no as "false"] as _rel| {
             soln_stream::failure()
         });
 
@@ -728,10 +822,10 @@ impl IntrinsicsMap {
             soln_stream::success(u)
         }
 
-        def_intrinsic!(intrs, |_rt, u, [text as "io_write"][stream as "stream"]| {
+        def_intrinsic!(intrs, |_rt, u, [text as "io_write"][stream as "stream"] as rel| {
             let Ok(stream) = StdStream::try_from(stream) else {
                 return Err::ArgumentTypeError {
-                    rel: "[io_write][stream]".into(),
+                    rel: rel.to_string(),
                     key: "stream".into(),
                     expected_ty: "stream indicator".into(),
                     recieved_tm: stream.to_string()
@@ -740,10 +834,10 @@ impl IntrinsicsMap {
             io_write_impl(u, text, stream)
         });
 
-        def_intrinsic!(intrs, |_rt, u, [text as "io_writeln"][stream as "stream"]| {
+        def_intrinsic!(intrs, |_rt, u, [text as "io_writeln"][stream as "stream"] as rel| {
             let Ok(stream) = StdStream::try_from(stream) else {
                 return Err::ArgumentTypeError {
-                    rel: "[io_writeln][stream]".into(),
+                    rel: rel.to_string(),
                     key: "stream".into(),
                     expected_ty: "stream indicator".into(),
                     recieved_tm: stream.to_string()
@@ -758,7 +852,7 @@ impl IntrinsicsMap {
             soln_stream
         });
 
-        def_intrinsic!(intrs, |_rt, u, [term][text]| {
+        def_intrinsic!(intrs, |_rt, u, [term][text] as rel| {
             match (term.as_ref(), text.as_ref()) {
                 (Tm::Var(..), _) => {
                     let term_var = term;
@@ -791,7 +885,7 @@ impl IntrinsicsMap {
                     soln_stream::unifying(u, &term, text)
                 }
                 _ => Err::ArgumentTypeError {
-                        rel: "[term][text]".into(),
+                        rel: rel.to_string(),
                         key: "text".into(),
                         expected_ty: "text".into(),
                         recieved_tm: text.to_string(),
@@ -799,7 +893,7 @@ impl IntrinsicsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [cwd]| {
+        def_intrinsic!(intrs, |_rt, u, [cwd] as _rel| {
             let dir: String = std::env::current_dir()
                 .unwrap()
                 .as_os_str()
@@ -808,10 +902,10 @@ impl IntrinsicsMap {
             soln_stream::unifying(u, cwd, &Tm::Txt(dir.into(), Tm::Nil.into()).into())
         });
 
-        def_intrinsic!(intrs, |_rt, u, [cd]| {
+        def_intrinsic!(intrs, |_rt, u, [cd] as rel| {
             if !matches!(cd.as_ref(), Tm::Txt(_, _)) {
                 return Err::ArgumentTypeError {
-                    rel: "[cd]".into(),
+                    rel: rel.to_string(),
                     key: "cd".into(),
                     expected_ty: "text".into(),
                     recieved_tm: cd.to_string(),
@@ -829,7 +923,7 @@ impl IntrinsicsMap {
 
             let &Tm::Nil = it.as_ref() else {
                 return Err::UnexpectedPartialList {
-                    rel: "[cd]".into(),
+                    rel: rel.to_string(),
                     key: "cd".into(),
                     partial: cd.clone(),
                 }
@@ -843,7 +937,7 @@ impl IntrinsicsMap {
             soln_stream::success(u)
         });
 
-        def_intrinsic!(intrs, |_rt, u, [output as "ls"]| {
+        def_intrinsic!(intrs, |_rt, u, [output as "ls"] as _rel| {
             let read_dir = match std::fs::read_dir(".") {
                 Ok(rd) => rd,
                 Err(e) => return soln_stream::error(e.into())
@@ -861,17 +955,19 @@ impl IntrinsicsMap {
             soln_stream::unifying(u, output, &list)
         });
 
-        def_intrinsic!(intrs, |state, u, [recursion_limit]| {
+        def_intrinsic!(intrs, |state, u, [recursion_limit] as rel| {
             match recursion_limit.as_ref() {
                 Tm::Int(i) => {
                     if i <= &Zero::zero() {
                         return Err::GenericError {
+                            rel: rel.to_string(),
                             msg: "Recursion limit must be positive".into(),
                         }
                         .into();
                     }
                     if i >= &Int::from(usize::MAX) {
                         return Err::GenericError {
+                            rel: rel.to_string(),
                             msg: format!("Recursion limit must be less than {}", usize::MAX),
                         }
                         .into();
@@ -884,7 +980,7 @@ impl IntrinsicsMap {
                     soln_stream::unifying(u, &limit, recursion_limit)
                 }
                 _ => Err::ArgumentTypeError {
-                    rel: "[recursion_limit]".into(),
+                    rel: rel.to_string(),
                     key: "recursion_limit".into(),
                     expected_ty: "int or var".into(),
                     recieved_tm: format!("{recursion_limit}"),
@@ -895,7 +991,7 @@ impl IntrinsicsMap {
 
         // TODO: once prolog's `forall` is implemented, this can become just
         // `[directive]`, i.e. a multi-deterministic relation.
-        def_intrinsic!(intrs, |state, u, [directives]| {
+        def_intrinsic!(intrs, |state, u, [directives] as _rel| {
             let it = state
                 .rt
                 .db
@@ -923,7 +1019,7 @@ impl IntrinsicsMap {
 
         // TODO: #3 once prolog's `forall` is implemented, this can become just
         // `[builtin]`, i.e. a multi-deterministic relation.
-        def_intrinsic!(intrs, |_rt, u, [builtins]| {
+        def_intrinsic!(intrs, |_rt, u, [builtins] as _rel| {
             let builtin_rel_sigs = builtin_rel_sigs.clone();
             soln_stream::unifying(u, builtins, &builtin_rel_sigs)
         });

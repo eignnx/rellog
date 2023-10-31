@@ -5,7 +5,10 @@ use crate::ast::{RcTm, Sig};
 #[derive(Debug, Clone)]
 pub enum Err {
     AttemptToQueryNonCallable(RcTm),
-    InstantiationError(RcTm),
+    InstantiationError {
+        rel: String,
+        tm: RcTm,
+    },
     NoSuchRelation(Sig),
     ArgumentTypeError {
         rel: String,
@@ -16,6 +19,7 @@ pub enum Err {
         recieved_tm: String,
     },
     GenericError {
+        rel: String,
         msg: String,
     },
     UnexpectedPartialList {
@@ -36,8 +40,11 @@ impl fmt::Display for Err {
             Err::AttemptToQueryNonCallable(tm) => {
                 write!(f, "The term `{tm}` is not callable.")
             }
-            Err::InstantiationError(tm) => {
-                write!(f, "The term `{tm}` is not sufficiently instantiated.")
+            Err::InstantiationError { rel, tm } => {
+                write!(
+                    f,
+                    "In `{rel}`: The term `{tm}` is not sufficiently instantiated."
+                )
             }
             Err::NoSuchRelation(sig) => {
                 write!(f, "No relation exists with signature `{sig}`.")
@@ -54,8 +61,8 @@ impl fmt::Display for Err {
                      `{expected_ty}` argument, but received the term `{recieved_tm}`."
                 )
             }
-            Err::GenericError { msg } => {
-                write!(f, "Generic error: {msg}")
+            Err::GenericError { rel, msg } => {
+                write!(f, "Generic error from `{rel}`: {msg}")
             }
             Err::UnexpectedPartialList { rel, key, partial } => {
                 write!(f, "The relation `{rel}` received a partial list for it's `{key}` argument: {partial}")
