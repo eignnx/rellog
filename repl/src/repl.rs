@@ -94,7 +94,9 @@ impl Repl {
         let mut tok_buf = Vec::new();
 
         'outer: loop {
-            self.config.set_repl_mode(ReplMode::TopLevel);
+            let debug = self.rt.debug_mode.get();
+            self.config.set_repl_mode(ReplMode::TopLevel { debug });
+
             let query_buf = match self.line_editor.read_line(&self.config) {
                 Ok(Signal::Success(s)) => s,
                 Ok(Signal::CtrlC | Signal::CtrlD) => break 'outer,
@@ -123,6 +125,16 @@ impl Repl {
                 [":quit" | ":q" | ":exit" | ":wq"] => {
                     println!("Exiting Rellog REPL...");
                     break 'outer;
+                }
+                [":debug" | ":d"] => {
+                    let new_mode = !self.rt.debug_mode.get();
+                    self.rt.debug_mode.set(new_mode);
+                    if new_mode {
+                        println!("{}", Color::Yellow.paint("# Entering debug mode."));
+                    } else {
+                        println!("{}", Color::Yellow.paint("# Exiting debug mode."));
+                    }
+                    continue 'outer;
                 }
                 [":reload" | ":r"] => {
                     self.reload(&mut tok_buf);

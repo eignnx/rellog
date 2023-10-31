@@ -25,6 +25,7 @@ pub struct Rt {
     pub intrs: IntrinsicsMap,
     pub recursion_depth: Cell<usize>,
     pub max_recursion_depth: Cell<usize>,
+    pub debug_mode: Cell<bool>,
 }
 
 impl Rt {
@@ -34,6 +35,7 @@ impl Rt {
             intrs: IntrinsicsMap::initialize(),
             recursion_depth: 0.into(),
             max_recursion_depth: DEFAULT_MAX_RECURSION_DEPTH.into(),
+            debug_mode: false.into(),
         }
     }
 
@@ -61,6 +63,10 @@ impl Rt {
         'rtb: 'it,
         'td: 'it,
     {
+        if self.debug_mode.get() {
+            eprintln!("[depth:{}] Enter: `{query}`", self.recursion_depth.get());
+        }
+
         if self.recursion_depth.get() >= self.max_recursion_depth.get() {
             return Err::MaxRecursionDepthExceeded {
                 query: u.reify_term(&query),

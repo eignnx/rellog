@@ -13,7 +13,7 @@ impl Prompt for RellogReplConfigHandle {
         let cfg = self.read().unwrap();
 
         match &cfg.repl_mode {
-            ReplMode::TopLevel => match &cfg.prompt_edit_mode {
+            ReplMode::TopLevel { .. } => match &cfg.prompt_edit_mode {
                 PromptEditMode::Default => "".into(),
                 PromptEditMode::Emacs => "(emacs)".into(),
                 PromptEditMode::Vi(PromptViMode::Insert) => "(vi:insert)".into(),
@@ -28,7 +28,8 @@ impl Prompt for RellogReplConfigHandle {
         let mut cfg = self.write().unwrap();
         cfg.prompt_edit_mode = edit_mode;
         match &cfg.repl_mode {
-            ReplMode::TopLevel => "-- ".into(),
+            ReplMode::TopLevel { debug } if !debug => "-- ".into(),
+            ReplMode::TopLevel { .. } => "[[debug]]\n-- ".into(),
             ReplMode::PrintingSolns => "".into(),
         }
     }

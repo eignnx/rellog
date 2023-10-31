@@ -11,7 +11,7 @@ mod validator;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReplMode {
-    TopLevel,
+    TopLevel { debug: bool },
     PrintingSolns,
 }
 
@@ -23,7 +23,7 @@ pub struct RellogReplConfig {
 impl Default for RellogReplConfig {
     fn default() -> Self {
         Self {
-            repl_mode: ReplMode::TopLevel,
+            repl_mode: ReplMode::TopLevel { debug: false },
             prompt_edit_mode: PromptEditMode::Vi(PromptViMode::Insert),
         }
     }
