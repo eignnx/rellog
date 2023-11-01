@@ -10,6 +10,7 @@ use crate::{
 };
 
 use super::{
+    breakpoint::Breakpoint,
     err::Err,
     intrinsics::IntrinsicsMap,
     kb::KnowledgeBase,
@@ -27,6 +28,7 @@ pub struct Rt {
     pub max_recursion_depth: Cell<usize>,
     pub debug_mode: Cell<bool>,
     pub query_stack: RefCell<Vec<RcTm>>,
+    pub debugger: RefCell<Option<Box<dyn Breakpoint>>>,
 }
 
 impl Rt {
@@ -38,7 +40,13 @@ impl Rt {
             max_recursion_depth: DEFAULT_MAX_RECURSION_DEPTH.into(),
             debug_mode: false.into(),
             query_stack: vec![].into(),
+            debugger: None.into(),
         }
+    }
+
+    pub fn with_debugger(self, debugger: impl Breakpoint + 'static) -> Self {
+        self.debugger.replace(Some(Box::new(debugger)));
+        self
     }
 
     pub fn solve_query<'rtb, 'td, 'it>(
@@ -67,12 +75,7 @@ impl Rt {
         'td: 'it,
     {
         self.query_stack.borrow_mut().push(query.clone());
-        if self.debug_mode.get() {
-            eprintln!(
-                "[depth:{:0>2}] Enter: `{query}`",
-                self.recursion_depth.get()
-            );
-        }
+        self.maybe_breakpoint("ENTER");
 
         if self.recursion_depth.get() >= self.max_recursion_depth.get() {
             return Err::MaxRecursionDepthExceeded {
@@ -234,6 +237,20 @@ impl Rt {
             }
             self.decr_recursion_depth();
         })
+    }
+
+    pub fn current_query(&self) -> RcTm {
+        self.query_stack
+            .borrow()
+            .last()
+            .expect("can't get here without init'ing qstack")
+            .clone()
+    }
+
+    fn maybe_breakpoint(&self, title: &str) {
+        if let Some(debugger) = self.debugger.borrow_mut().as_mut() {
+            debugger.breakpoint(self, title);
+        }
     }
 }
 

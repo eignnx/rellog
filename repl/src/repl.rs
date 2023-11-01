@@ -20,6 +20,7 @@ use reedline::{Reedline, Signal};
 
 use crate::{
     app_err::{AppErr, AppRes},
+    debugger::Debugger,
     line_editor_config::{RellogReplConfigHandle, ReplMode},
 };
 
@@ -38,7 +39,7 @@ impl Repl {
 
     pub fn new_loading_files(fnames: Vec<String>) -> Self {
         let kb = KnowledgeBase::default();
-        let rt = Rt::new(kb);
+        let rt = Rt::new(kb).with_debugger(Debugger::default());
         let config = RellogReplConfigHandle::default();
         let mut repl = Self {
             files_loaded: BTreeSet::new(),

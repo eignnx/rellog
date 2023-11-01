@@ -1,6 +1,7 @@
 #![deny(unused_must_use)]
 
 mod app_err;
+mod debugger;
 mod line_editor_config;
 mod repl;
 

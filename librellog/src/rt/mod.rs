@@ -1,5 +1,6 @@
 //! Defines the rellog runtime.
 
+pub mod breakpoint;
 mod err;
 pub mod intrinsics;
 pub mod kb;
