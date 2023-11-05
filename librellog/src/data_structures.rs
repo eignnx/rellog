@@ -60,7 +60,7 @@ impl Deref for Var {
 impl fmt::Display for Var {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if let Some(gen) = self.gen {
-            write!(f, "{}_{}", self.istr, gen)
+            write!(f, "{}${}", self.istr, gen)
         } else {
             write!(f, "{}", self.istr)
         }

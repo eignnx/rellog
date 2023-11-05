@@ -10,7 +10,7 @@ use crate::{
 };
 
 use super::{
-    breakpoint::Breakpoint,
+    breakpoint::{Breakpoint, Event},
     err::Err,
     intrinsics::IntrinsicsMap,
     kb::KnowledgeBase,
@@ -74,8 +74,8 @@ impl Rt {
         'rtb: 'it,
         'td: 'it,
     {
-        self.query_stack.borrow_mut().push(query.clone());
-        self.maybe_breakpoint("ENTER");
+        self.query_stack.borrow_mut().push(u.reify_term(&query));
+        self.maybe_breakpoint(Event::Call);
 
         if self.recursion_depth.get() >= self.max_recursion_depth.get() {
             return Err::MaxRecursionDepthExceeded {
@@ -228,13 +228,7 @@ impl Rt {
         &self,
     ) -> impl ExactSizeIterator<Item = Result<UnifierSet, Err>> + '_ {
         DeferredIter::new(|| {
-            if self.debug_mode.get() {
-                eprintln!(
-                    "[depth:{:0>2}] Exit:  `{}`",
-                    self.recursion_depth.get(),
-                    self.query_stack.borrow_mut().pop().unwrap(),
-                );
-            }
+            self.maybe_breakpoint(Event::Exit);
             self.decr_recursion_depth();
         })
     }
@@ -247,9 +241,9 @@ impl Rt {
             .clone()
     }
 
-    fn maybe_breakpoint(&self, title: &str) {
+    fn maybe_breakpoint(&self, event: Event) {
         if let Some(debugger) = self.debugger.borrow_mut().as_mut() {
-            debugger.breakpoint(self, title);
+            debugger.breakpoint(self, event);
         }
     }
 }
