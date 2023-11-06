@@ -13,14 +13,18 @@ impl Prompt for RellogReplConfigHandle {
         let cfg = self.read().unwrap();
 
         match &cfg.repl_mode {
-            ReplMode::TopLevel { .. } => match &cfg.prompt_edit_mode {
-                PromptEditMode::Default => "".into(),
-                PromptEditMode::Emacs => "(emacs)".into(),
-                PromptEditMode::Vi(PromptViMode::Insert) => "(vi:insert)".into(),
-                PromptEditMode::Vi(PromptViMode::Normal) => "(vi:normal)".into(),
-                PromptEditMode::Custom(c) => format!("({c})").into(),
-            },
-            ReplMode::PrintingSolns => "[ENTER to show next solution, CTRL-C to break]".into(),
+            ReplMode::TopLevel { .. } | ReplMode::PrintingSolns { debug: true } => {
+                match &cfg.prompt_edit_mode {
+                    PromptEditMode::Default => "".into(),
+                    PromptEditMode::Emacs => "(emacs)".into(),
+                    PromptEditMode::Vi(PromptViMode::Insert) => "(vi:insert)".into(),
+                    PromptEditMode::Vi(PromptViMode::Normal) => "(vi:normal)".into(),
+                    PromptEditMode::Custom(c) => format!("({c})").into(),
+                }
+            }
+            ReplMode::PrintingSolns { debug: false } => {
+                "[ENTER to show next solution, CTRL-C to break]".into()
+            }
         }
     }
 
@@ -28,9 +32,11 @@ impl Prompt for RellogReplConfigHandle {
         let mut cfg = self.write().unwrap();
         cfg.prompt_edit_mode = edit_mode;
         match &cfg.repl_mode {
-            ReplMode::TopLevel { debug } if !debug => "-- ".into(),
-            ReplMode::TopLevel { .. } => "[[debug]]\n-- ".into(),
-            ReplMode::PrintingSolns => "".into(),
+            ReplMode::TopLevel { debug: false } => "-- ".into(),
+            ReplMode::TopLevel { debug: true } | ReplMode::PrintingSolns { debug: true } => {
+                "[[debug]]\n-- ".into()
+            }
+            ReplMode::PrintingSolns { debug: false } => "".into(),
         }
     }
 

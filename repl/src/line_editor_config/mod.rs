@@ -12,7 +12,16 @@ mod validator;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReplMode {
     TopLevel { debug: bool },
-    PrintingSolns,
+    PrintingSolns { debug: bool },
+}
+
+impl ReplMode {
+    pub fn toggle_debug(&mut self) {
+        match self {
+            ReplMode::TopLevel { debug } => *debug = !*debug,
+            ReplMode::PrintingSolns { debug } => *debug = !*debug,
+        }
+    }
 }
 
 pub struct RellogReplConfig {
@@ -64,6 +73,10 @@ impl RellogReplConfigHandle {
 
     pub fn set_repl_mode(&self, mode: ReplMode) {
         self.write().unwrap().repl_mode = mode;
+    }
+
+    pub fn toggle_debug_mode(&self) {
+        self.write().unwrap().repl_mode.toggle_debug();
     }
 
     fn read(

@@ -4,7 +4,7 @@ use std::{
     io::{self, Read},
     ops::ControlFlow,
     path::PathBuf,
-    sync::{Arc, Mutex},
+    sync::Arc,
 };
 
 use librellog::{
@@ -201,7 +201,9 @@ impl Repl {
         let mut solns = self.rt.solve_query(query, u, &td);
         let mut or_bar_printed = false;
 
-        self.line_editor.set_repl_mode(ReplMode::PrintingSolns);
+        let debug = self.rt.debug_mode.get();
+        self.line_editor
+            .set_repl_mode(ReplMode::PrintingSolns { debug });
 
         while let Some(soln) = solns.next() {
             let soln = match soln {

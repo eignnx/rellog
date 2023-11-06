@@ -48,6 +48,7 @@ impl librellog::rt::breakpoint::Breakpoint for Debugger {
                 Signal::CtrlC => {
                     println!("Exiting debugger...");
                     rt.debug_mode.set(false);
+                    self.line_editor.toggle_debug_mode();
                     return;
                 }
                 Signal::CtrlD => {
@@ -109,6 +110,7 @@ impl Debugger {
                 }
                 "nodebug" | "nodbg" | "dbg" | "d" => {
                     rt.debug_mode.set(false);
+                    self.line_editor.toggle_debug_mode();
                     ControlFlow::Break(())
                 }
                 "filters" | "f" | "watch_critera" | "wc" => {
@@ -145,11 +147,11 @@ impl Debugger {
                             println!("# Unknown debugger event: `{e_sym}`");
                             println!("# Valid events are:");
                             println!("#   - call");
-                            println!("#   - exit");
-                            println!("#   - redo");
-                            println!("#   - fail");
-                            println!("#   - exception");
-                            println!("#   - unify");
+                            println!("#   - exit      (TODO)");
+                            println!("#   - redo      (TODO)");
+                            println!("#   - fail      (TODO)");
+                            println!("#   - exception (TODO)");
+                            println!("#   - unify     (TODO");
                             println!();
                             ControlFlow::Continue(())
                         }
@@ -168,11 +170,11 @@ impl Debugger {
                             println!("# Unknown debugger event: `{e_sym}`");
                             println!("# Valid events are:");
                             println!("#   - call");
-                            println!("#   - exit");
-                            println!("#   - redo");
-                            println!("#   - fail");
-                            println!("#   - exception");
-                            println!("#   - unify");
+                            println!("#   - exit      (TODO)");
+                            println!("#   - redo      (TODO)");
+                            println!("#   - fail      (TODO)");
+                            println!("#   - exception (TODO)");
+                            println!("#   - unify     (TODO");
                             println!();
                             ControlFlow::Continue(())
                         }
@@ -195,27 +197,25 @@ impl Debugger {
     }
 
     fn print_help(&self) {
-        println!("[[debugger_help]]");
-        println!("{{");
-        println!("#  :help | :h | ?             Show debugger help.");
-        println!("#  :nodebug | :d | :nodbg     Quit debugger.");
-        println!("#  :step | <ENTER>            Advance to the goal to be solved.");
-        println!("#  (:watch | :w) WATCH_CRIT   Add a watch criterion.");
+        println!("# Debugger Help");
+        println!("#  help | h                Show debugger help.");
+        println!("#  nodebug | d | nodbg     Quit debugger.");
+        println!("#  step | <ENTER>          Advance to the goal to be solved.");
+        println!("#  (watch | w) WATCH_CRIT  Add a watch criterion.");
         println!("#");
-        println!("#  Watch Criteria");
+        println!("# Watch Criteria");
         println!("#  VAR | _             Matches any event.");
         println!("#  [e EVENT]           Matches a specific event.");
         println!("#  [w GOAL]            Matches a specific rellog goal (may contain vars).");
         println!("#  [e EVENT][w GOAL]   Matches a specific term at a specific event.");
         println!("#");
-        println!("#  Events");
+        println!("# Events");
         println!("#  call        When a query is called.");
         println!("#  exit        When a query exits successfully.");
         println!("#  redo        When a query is called.");
         println!("#  fail        When a query is called.");
         println!("#  exception   When a query raises an exception.");
         println!("#  unify       When a query head is unified.");
-        println!("}}");
         println!();
     }
 }

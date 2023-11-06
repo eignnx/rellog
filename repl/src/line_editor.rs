@@ -23,6 +23,10 @@ impl LineEditor {
         self.repl_config.borrow_mut().set_repl_mode(mode);
     }
 
+    pub fn toggle_debug_mode(&self) {
+        self.repl_config.borrow_mut().toggle_debug_mode();
+    }
+
     pub fn read_line(&self) -> Result<Signal, impl std::error::Error> {
         let dyn_prompt = self.repl_config.borrow();
         self.line_editor.borrow_mut().read_line(&*dyn_prompt)
