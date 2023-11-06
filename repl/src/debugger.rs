@@ -1,5 +1,5 @@
 use core::fmt;
-use std::{collections::BTreeSet, io::Write, ops::ControlFlow, str::FromStr};
+use std::{collections::BTreeSet, ops::ControlFlow, str::FromStr, sync::Arc};
 
 use librellog::{
     ast::{RcTm, Tm},
@@ -7,15 +7,19 @@ use librellog::{
     rt::{breakpoint::Event, Rt, UnifierSet},
 };
 use nu_ansi_term::Color;
+use reedline::Signal;
 
-#[derive(Debug)]
+use crate::line_editor::LineEditor;
+
 pub struct Debugger {
+    line_editor: Arc<LineEditor>,
     pub watch_criteria: BTreeSet<WatchCriterion>,
 }
 
-impl Default for Debugger {
-    fn default() -> Self {
+impl Debugger {
+    pub fn new(line_editor: Arc<LineEditor>) -> Self {
         Self {
+            line_editor,
             watch_criteria: [WatchCriterion::Any].into_iter().collect(),
         }
     }
@@ -39,37 +43,39 @@ impl librellog::rt::breakpoint::Breakpoint for Debugger {
             println!("  {}", Color::Yellow.paint(format!("{query}")));
             println!("]]");
 
-            print!("[[dbg]]-- ");
-            std::io::stdout().flush().unwrap();
-            let mut src_buf = String::new();
-            // let _ = std::io::stdin().read_line(&mut src_buf).unwrap();
-            let _ = std::io::stdin().read_line(&mut src_buf).unwrap();
+            let src_buf = match self.line_editor.read_line().unwrap() {
+                Signal::Success(line) => line,
+                Signal::CtrlC => {
+                    println!("Exiting debugger...");
+                    rt.debug_mode.set(false);
+                    return;
+                }
+                Signal::CtrlD => {
+                    println!("Exiting...");
+                    std::process::exit(0);
+                }
+            };
             println!();
 
+            if src_buf.trim().is_empty() {
+                // Step.
+                println!("# Stepping...");
+                break;
+            }
+
             let mut tok_buf = Vec::new();
-            let ts = match librellog::lex::tokenize_into(
-                &mut tok_buf,
-                &src_buf[..],
-                "<debugger cmd input>".into(),
-            ) {
+            let filename = "<debugger cmd input>".into();
+
+            let ts = match librellog::lex::tokenize_into(&mut tok_buf, &src_buf[..], filename) {
                 Ok(ts) => ts,
-                Err(_) if src_buf.trim().is_empty() => {
-                    // Step.
-                    println!("# Stepping...");
-                    break;
-                }
                 Err(e) => {
                     println!("Command error: {e}");
                     continue;
                 }
             };
+
             let cmd = match librellog::parse::entire_term(ts) {
                 Ok(tm) => tm,
-                Err(_) if src_buf.trim().is_empty() => {
-                    // Step.
-                    println!("# Stepping...");
-                    break;
-                }
                 Err(e) => {
                     println!("Command error: {e}");
                     continue;
@@ -85,32 +91,6 @@ impl librellog::rt::breakpoint::Breakpoint for Debugger {
             }
         }
     }
-}
-
-macro_rules! rel_match {
-    ($expr:expr, { $( $([$key:ident = $value:pat])+ $(| $([$key2:ident = $value2:ident])+)* => $block:expr, )* else => $default:expr }) => {
-        loop {
-            $(
-                $(
-                    let $key = $expr.get(&IStr::from(stringify!($key)));
-                )+
-                if let ( $(Some($value),)+ ) = ( $($key, )+ ) {
-                    break $block;
-                }
-
-                $(
-                    $(
-                        let $key2 = $expr.get(&IStr::from(stringify!($key2)));
-                    )+
-                    if let ( $(Some($value2),)+ ) = ( $($key2, )+ ) {
-                        break $block;
-                    }
-                )*
-            )*
-
-            break $default;
-        }
-    };
 }
 
 impl Debugger {
@@ -154,7 +134,7 @@ impl Debugger {
                 self.watch_criteria.insert(WatchCriterion::Any);
                 ControlFlow::Break(())
             }
-            Tm::Rel(rel) => rel_match!(
+            Tm::Rel(rel) => librellog::rel_match!(
                 rel,
                 {
                     [event = e_sym] | [e = e_sym] => {
