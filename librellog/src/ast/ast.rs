@@ -240,6 +240,12 @@ impl From<Rel> for RcTm {
     }
 }
 
+impl From<&Tok> for RcTm {
+    fn from(value: &Tok) -> Self {
+        Self(Rc::new(Tm::Sym(value.to_string().into())))
+    }
+}
+
 impl fmt::Display for RcTm {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", TmDisplayer::default().with_tm(self.as_ref()))

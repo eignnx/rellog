@@ -12,7 +12,8 @@ use unifier_set::DirectChildren;
 use crate::{
     ast::{dup::TmDuplicator, RcTm, Rel, Sig, Tm},
     data_structures::{Int, Var},
-    lex, parse,
+    lex::{self, tok::Tok},
+    parse,
     rt::Err,
     rt::{
         soln_stream::{self, SolnStream},
@@ -890,6 +891,47 @@ impl IntrinsicsMap {
                         expected_ty: "text".into(),
                         recieved_tm: text.to_string(),
                     }.into()
+            }
+        });
+
+        def_intrinsic!(intrs, |_rt, u, [block][functor][members] as rel| {
+            match (block.as_ref(), functor.as_ref(), members.as_ref()) {
+                (Tm::Block(f, ms), _, _) => {
+                    let f = f.into();
+                    let ms = RcTm::list_from_iter(ms.iter().cloned());
+                    let Some(u) = u.unify(functor, &f).and_then(|u| u.unify(members, &ms)) else {
+                        return soln_stream::failure();
+                    };
+                    soln_stream::success(u)
+                }
+                (_, Tm::Sym(f), ms) if matches!(ms, Tm::Cons(..) | Tm::Nil) => {
+                    let tok = match f.to_str().as_ref() {
+                        "-" => Tok::Dash,
+                        "|" => Tok::Pipe,
+                        _ => return soln_stream::error(Err::ArgumentTypeError {
+                            rel: rel.to_string(),
+                            key: "functor".to_string(),
+                            expected_ty: "either the symbol `'-'` or the symbol `'|'`".to_string(),
+                            recieved_tm: functor.to_string()
+                        }),
+                    };
+
+                    let Some((members, None)) = members.try_as_list() else {
+                        return soln_stream::error(Err::UnexpectedPartialList {
+                            rel: rel.to_string(),
+                            key: "members".to_string(),
+                            partial: members.try_as_list().unwrap().1.unwrap().into(),
+                        });
+                    };
+                    let b = Tm::Block(tok, members).into();
+                    soln_stream::unifying(u, block, &b)
+                }
+                _ => soln_stream::error(Err::GenericError {
+                    rel: rel.to_string(),
+                    msg: "The builtin [block][functor][members] accepts a \
+                          block, either the symbol `'-'` or the symbol `'|'`, \
+                          and a concrete list of members, respectively.".to_string()
+                }),
             }
         });
 

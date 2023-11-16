@@ -1,0 +1,31 @@
+[Rule][Output]
+    - [Rule][before {}][after Output]
+
+[Rule][Before][After]
+    - [must_be_txt Rule]
+    - [prefix Before][suffix Rule][compound After]
+
+[Rule][Before][After]
+    - [Block Rule][functor '-'][Members]
+    - [rules Members][Before][After]
+
+[Rule][Before][After]
+    - [must_be_rel Rule]
+    - [clause Rule][Head][Body]
+    
+
+[rules {}][before S][after S]
+[rules {Rule ..Rules}][Before][After]
+    - [Rule][Before][after Middle]
+    - [prefix S0][suffix Middle][compound AfterRule]
+    - [Rules][before AfterRule][After]
+
+[story]
+    - "Once upon a time there was a "
+    - [Animal]
+    - " who was very hungry."
+
+[animal lion]
+    - "lion"
+[animal bear]
+    - "bear"
