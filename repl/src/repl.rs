@@ -2,11 +2,13 @@ use std::{
     cell::RefCell,
     collections::BTreeSet,
     io::{self, Read},
+    ops::ControlFlow,
     path::PathBuf,
+    sync::Arc,
 };
 
 use librellog::{
-    ast::{self, dup::TmDuplicator},
+    ast::{self, dup::TmDuplicator, RcTm},
     lex::{
         self,
         tok::{At, Tok},
@@ -16,19 +18,20 @@ use librellog::{
     utils::display_unifier_set::DisplayUnifierSet,
 };
 use nu_ansi_term::Color;
-use reedline::{Reedline, Signal};
+use reedline::Signal;
 
 use crate::{
     app_err::{AppErr, AppRes},
-    line_editor_config::{RellogReplConfigHandle, ReplMode},
+    debugger::Debugger,
+    line_editor::LineEditor,
+    line_editor_config::ReplMode,
 };
 
 pub struct Repl {
+    rt: Rt,
+    line_editor: Arc<LineEditor>,
     files_loaded: BTreeSet<String>,
     files_failed_to_load: BTreeSet<String>,
-    config: RellogReplConfigHandle,
-    line_editor: Reedline,
-    rt: Rt,
 }
 
 impl Repl {
@@ -37,15 +40,14 @@ impl Repl {
     }
 
     pub fn new_loading_files(fnames: Vec<String>) -> Self {
+        let line_editor = Arc::new(LineEditor::new());
         let kb = KnowledgeBase::default();
-        let rt = Rt::new(kb);
-        let config = RellogReplConfigHandle::default();
+        let rt = Rt::new(kb).with_debugger(Debugger::new(line_editor.clone()));
         let mut repl = Self {
+            rt,
+            line_editor,
             files_loaded: BTreeSet::new(),
             files_failed_to_load: BTreeSet::new(),
-            line_editor: config.create_editor(),
-            config,
-            rt,
         };
 
         let mut tok_buf = Vec::new();
@@ -94,8 +96,10 @@ impl Repl {
         let mut tok_buf = Vec::new();
 
         'outer: loop {
-            self.config.set_repl_mode(ReplMode::TopLevel);
-            let query_buf = match self.line_editor.read_line(&self.config) {
+            let debug = self.rt.debug_mode.get();
+            self.line_editor.set_repl_mode(ReplMode::TopLevel { debug });
+
+            let query_buf = match self.line_editor.read_line() {
                 Ok(Signal::Success(s)) => s,
                 Ok(Signal::CtrlC | Signal::CtrlD) => break 'outer,
                 Err(e) => {
@@ -109,20 +113,22 @@ impl Repl {
 
             match query_parts[..] {
                 ["help" | ":help" | ":h" | "?"] => {
-                    println!("Enter a RELLOG TERM or one of these REPL COMMANDS:");
-                    println!("  :help | :h | ?    Displays this help text.");
-                    println!("  :load | :l        Load the source given source file.");
-                    println!("  :reload | :r      Reloads the source file(s).");
-                    println!("  :unload | :u      Unloads the given source file.");
-                    println!("  [Builtins]        Show a list of builtin relations.");
-                    println!("  [help Sig]        Show help text for a relation given by `Sig`.");
-                    println!("  :quit | :exit     Exit the repl.");
-                    println!("   | :q | :wq");
+                    print_help();
                     continue 'outer;
                 }
                 [":quit" | ":q" | ":exit" | ":wq"] => {
                     println!("Exiting Rellog REPL...");
                     break 'outer;
+                }
+                [":debug" | ":d"] => {
+                    let new_mode = !self.rt.debug_mode.get();
+                    self.rt.debug_mode.set(new_mode);
+                    if new_mode {
+                        println!("{}", Color::Yellow.paint("# Entering debug mode."));
+                    } else {
+                        println!("{}", Color::Yellow.paint("# Exiting debug mode."));
+                    }
+                    continue 'outer;
                 }
                 [":reload" | ":r"] => {
                     self.reload(&mut tok_buf);
@@ -176,102 +182,114 @@ impl Repl {
                 _ => {}
             }
 
-            let mut buf = Vec::new();
-            let tokens = match lex::tokenize_into(&mut buf, &query_buf[..], "<user input>".into()) {
-                Ok(ts) => ts,
-                Err(le) => {
-                    println!("{}", Color::Red.paint(format!("Tokenization error: {le}")));
-                    continue 'outer;
-                }
+            let query = match parse_term(&query_buf[..]) {
+                Some(value) => value,
+                None => continue 'outer,
             };
 
-            let mut no_solns_yet_found = true;
+            match self.solve_and_display_solns(query) {
+                ControlFlow::Continue(_) => continue 'outer,
+                ControlFlow::Break(_) => break 'outer,
+            }
+        }
+    }
 
-            let query = match parse::entire_term(tokens) {
-                Ok(q) => q,
+    fn solve_and_display_solns(&mut self, query: RcTm) -> ControlFlow<(), ()> {
+        let mut no_solns_yet_found = true;
+        let u = UnifierSet::new();
+        let td = RefCell::new(TmDuplicator::default());
+        let mut solns = self.rt.solve_query(query, u, &td);
+        let mut or_bar_printed = false;
+
+        let debug = self.rt.debug_mode.get();
+        self.line_editor
+            .set_repl_mode(ReplMode::PrintingSolns { debug });
+
+        while let Some(soln) = solns.next() {
+            let soln = match soln {
+                Ok(soln) => {
+                    let disp = DisplayUnifierSet {
+                        u: soln.clone(),
+                        display_or_bar: or_bar_printed,
+                    };
+                    print!("{disp}");
+                    no_solns_yet_found = false;
+                    soln
+                }
                 Err(e) => {
-                    println!("Parse error: {e}");
-                    continue 'outer;
+                    println!("{}", Color::Red.paint(format!("Exception: {e}")));
+                    for (i, q) in self.rt.query_stack.borrow().iter().enumerate().rev() {
+                        println!("{}", Color::Red.paint(format!("# ^[depth:{i:0>2}]: `{q}`")));
+                    }
+                    return ControlFlow::Continue(());
                 }
             };
 
-            let u = UnifierSet::new();
-            let td = RefCell::new(TmDuplicator::default());
-            let mut solns = self.rt.solve_query(query, u, &td);
-            let mut or_bar_printed = false;
-
-            self.config.set_repl_mode(ReplMode::PrintingSolns);
-
-            while let Some(soln) = solns.next() {
-                let soln = match soln {
-                    Ok(soln) => {
-                        let disp = DisplayUnifierSet {
-                            u: soln.clone(),
-                            display_or_bar: or_bar_printed,
-                        };
-                        print!("{disp}");
-                        no_solns_yet_found = false;
-                        soln
-                    }
-                    Err(e) => {
-                        println!("{}", Color::Red.paint(format!("Exception: {e}")));
-                        continue 'outer;
-                    }
-                };
-
-                // If we *know* there are no more solutions...
-                match solns.size_hint() {
-                    (_, Some(0)) if soln.is_empty() => {
-                        let msg = Color::Yellow.paint("# The query holds unconditionally.");
-                        println!(" {msg}");
-                        continue 'outer;
-                    }
-                    (_, Some(0)) => {
-                        let msg = Color::Yellow.paint("# Exactly 1 solution found.");
-                        println!(" {msg}");
-                        continue 'outer;
-                    }
-                    (lo, Some(hi)) if lo == hi => {
-                        let msg = Color::Yellow.paint(format!("# {lo} solution(s) remain."));
-                        println!(" {msg}");
-                    }
-                    (_, Some(hi)) => {
-                        let msg =
-                            Color::Yellow.paint(format!("# At most {hi} solution(s) remain."));
-                        println!(" {msg}");
-                    }
-                    _ => {}
+            // If we *know* there are no more solutions...
+            match solns.size_hint() {
+                (_, Some(0)) if soln.is_empty() => {
+                    let msg = Color::Yellow.paint("# The query holds unconditionally.");
+                    println!(" {msg}");
+                    return ControlFlow::Continue(());
                 }
-
-                match self.line_editor.read_line(&self.config).unwrap() {
-                    Signal::Success(_) => {}
-                    Signal::CtrlC => {
-                        println!("...");
-                        continue 'outer;
-                    }
-                    Signal::CtrlD => break 'outer,
+                (_, Some(0)) => {
+                    let msg = Color::Yellow.paint("# Exactly 1 solution found.");
+                    println!(" {msg}");
+                    return ControlFlow::Continue(());
                 }
-
-                print!("\n|"); // Print an "or"; more solns incoming.
-                or_bar_printed = true;
+                (lo, Some(hi)) if lo == hi => {
+                    let msg = Color::Yellow.paint(format!("# {lo} solution(s) remain."));
+                    println!(" {msg}");
+                }
+                (_, Some(hi)) => {
+                    let msg = Color::Yellow.paint(format!("# At most {hi} solution(s) remain."));
+                    println!(" {msg}");
+                }
+                _ => {}
             }
 
-            if !or_bar_printed {
-                print!(" ");
+            match self.line_editor.read_line().unwrap() {
+                Signal::Success(_) => {}
+                Signal::CtrlC => {
+                    println!("...");
+                    return ControlFlow::Continue(());
+                }
+                Signal::CtrlD => return ControlFlow::Break(()),
             }
 
-            if no_solns_yet_found {
+            print!("\n|"); // Print an "or"; more solns incoming.
+            or_bar_printed = true;
+        }
+
+        if !or_bar_printed {
+            print!(" ");
+        }
+
+        if no_solns_yet_found {
+            println!(
+                "   - [false] {}",
+                Color::Yellow.paint("# The query has no solutions.")
+            );
+        } else {
+            println!(
+                "   - [false] {}",
+                Color::Yellow.paint("# No additional solutions found.")
+            );
+        }
+
+        if self.rt.debug_mode.get() {
+            for (i, q) in self.rt.query_stack.borrow().iter().enumerate().rev() {
                 println!(
-                    "   - [false] {}",
-                    Color::Yellow.paint("# The query has no solutions.")
-                );
-            } else {
-                println!(
-                    "   - [false] {}",
-                    Color::Yellow.paint("# No additional solutions found.")
+                    "{}",
+                    Color::Yellow.paint(format!(
+                        "# ^[depth:{i:0>2}]: `{}`",
+                        Color::LightYellow.paint(q.to_string())
+                    ))
                 );
             }
         }
+
+        ControlFlow::Continue(())
     }
 
     fn reload(&mut self, tok_buf: &mut Vec<At<Tok>>) {
@@ -287,6 +305,39 @@ impl Repl {
             let _ = self.load_file(tok_buf, fname);
         }
     }
+}
+
+fn print_help() {
+    println!("Enter a RELLOG TERM or one of these REPL COMMANDS:");
+    println!("  :help | :h | ?    Displays this help text.");
+    println!("  :load | :l        Load the source given source file.");
+    println!("  :reload | :r      Reloads the source file(s).");
+    println!("  :unload | :u      Unloads the given source file.");
+    println!("  :debug | :d       Enters/exits debugging mode.");
+    println!("  [Builtins]        Show a list of builtin relations.");
+    println!("  [help Sig]        Show help text for a relation given by `Sig`.");
+    println!("  :quit | :q |      Exit the repl.");
+    println!("… :exit | :e |");
+    println!("… :wq");
+}
+
+fn parse_term(src: &str) -> Option<RcTm> {
+    let mut buf = Vec::new();
+    let tokens = match lex::tokenize_into(&mut buf, src, "<user input>".into()) {
+        Ok(ts) => ts,
+        Err(le) => {
+            println!("{}", Color::Red.paint(format!("Tokenization error: {le}")));
+            return None;
+        }
+    };
+    let query = match parse::entire_term(tokens) {
+        Ok(q) => q,
+        Err(e) => {
+            println!("Parse error: {e}");
+            return None;
+        }
+    };
+    Some(query)
 }
 
 fn load_module_from_file(tok_buf: &mut Vec<At<Tok>>, fname: String) -> AppRes<ast::Module> {

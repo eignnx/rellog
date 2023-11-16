@@ -11,8 +11,17 @@ mod validator;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ReplMode {
-    TopLevel,
-    PrintingSolns,
+    TopLevel { debug: bool },
+    PrintingSolns { debug: bool },
+}
+
+impl ReplMode {
+    pub fn toggle_debug(&mut self) {
+        match self {
+            ReplMode::TopLevel { debug } => *debug = !*debug,
+            ReplMode::PrintingSolns { debug } => *debug = !*debug,
+        }
+    }
 }
 
 pub struct RellogReplConfig {
@@ -23,7 +32,7 @@ pub struct RellogReplConfig {
 impl Default for RellogReplConfig {
     fn default() -> Self {
         Self {
-            repl_mode: ReplMode::TopLevel,
+            repl_mode: ReplMode::TopLevel { debug: false },
             prompt_edit_mode: PromptEditMode::Vi(PromptViMode::Insert),
         }
     }
@@ -64,6 +73,10 @@ impl RellogReplConfigHandle {
 
     pub fn set_repl_mode(&self, mode: ReplMode) {
         self.write().unwrap().repl_mode = mode;
+    }
+
+    pub fn toggle_debug_mode(&self) {
+        self.write().unwrap().repl_mode.toggle_debug();
     }
 
     fn read(

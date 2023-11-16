@@ -185,6 +185,33 @@ macro_rules! tm {
     };
 }
 
+#[macro_export]
+macro_rules! rel_match {
+    ($expr:expr, { $( $([$key:ident = $value:pat])+ $(| $([$key2:ident = $value2:ident])+)* => $block:expr, )* else => $default:expr }) => {
+        loop {
+            $(
+                $(
+                    let $key = $expr.get(&IStr::from(stringify!($key)));
+                )+
+                if let ( $(Some($value),)+ ) = ( $($key, )+ ) {
+                    break $block;
+                }
+
+                $(
+                    $(
+                        let $key2 = $expr.get(&IStr::from(stringify!($key2)));
+                    )+
+                    if let ( $(Some($value2),)+ ) = ( $($key2, )+ ) {
+                        break $block;
+                    }
+                )*
+            )*
+
+            break $default;
+        }
+    };
+}
+
 impl Dup for RcTm {
     fn dup(&self, duper: &mut TmDuplicator) -> Self {
         self.0.dup(duper).into()

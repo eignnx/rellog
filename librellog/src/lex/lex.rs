@@ -84,6 +84,11 @@ fn text_literal<'i>(i: Span<'i>) -> Res<'i, CharList> {
     .parse(i)
 }
 
+pub fn matches_variable(src: &str) -> bool {
+    src.starts_with(|c: char| c.is_uppercase() || c == '_')
+        && src.chars().skip(1).all(|c| c.is_alphanumeric())
+}
+
 fn var_or_sym(i: Span) -> Res<Tok> {
     let quoted_sym = delimited(
         tag("'"),
@@ -99,10 +104,7 @@ fn var_or_sym(i: Span) -> Res<Tok> {
     )))
     .map(|span| span.fragment().into())
     .map(|sym: IStr| {
-        if sym
-            .to_str()
-            .starts_with(|c: char| c.is_uppercase() || c == '_')
-        {
+        if matches_variable(sym.to_str().as_ref()) {
             Tok::Var(sym.into())
         } else if sym.to_str().starts_with(char::is_lowercase) {
             Tok::Sym(sym)

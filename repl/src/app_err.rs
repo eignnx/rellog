@@ -10,6 +10,7 @@ pub enum AppErr<'ts> {
     FileRead(String, std::io::Error),
     Lex(lex::LexError),
     Parse(parse::Error<'ts>),
+    IoError(Box<dyn std::error::Error>),
 }
 
 impl<'ts> From<lex::LexError> for AppErr<'ts> {
@@ -41,6 +42,7 @@ impl<'ts> fmt::Display for AppErr<'ts> {
             ),
             AppErr::Lex(le) => write!(f, "Unable to tokenize: {le}"),
             AppErr::Parse(pe) => write!(f, "Unable to parse: {pe}"),
+            AppErr::IoError(e) => write!(f, "An IO operation failed: {e}"),
         }
     }
 }

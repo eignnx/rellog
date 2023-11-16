@@ -10,6 +10,7 @@ use crate::{
 };
 
 use super::{
+    breakpoint::{Breakpoint, Event},
     err::Err,
     intrinsics::IntrinsicsMap,
     kb::KnowledgeBase,
@@ -25,6 +26,9 @@ pub struct Rt {
     pub intrs: IntrinsicsMap,
     pub recursion_depth: Cell<usize>,
     pub max_recursion_depth: Cell<usize>,
+    pub debug_mode: Cell<bool>,
+    pub query_stack: RefCell<Vec<RcTm>>,
+    pub debugger: RefCell<Option<Box<dyn Breakpoint>>>,
 }
 
 impl Rt {
@@ -34,7 +38,15 @@ impl Rt {
             intrs: IntrinsicsMap::initialize(),
             recursion_depth: 0.into(),
             max_recursion_depth: DEFAULT_MAX_RECURSION_DEPTH.into(),
+            debug_mode: false.into(),
+            query_stack: vec![].into(),
+            debugger: None.into(),
         }
+    }
+
+    pub fn with_debugger(self, debugger: impl Breakpoint + 'static) -> Self {
+        self.debugger.replace(Some(Box::new(debugger)));
+        self
     }
 
     pub fn solve_query<'rtb, 'td, 'it>(
@@ -47,6 +59,7 @@ impl Rt {
         'rtb: 'it,
         'td: 'it,
     {
+        self.query_stack.borrow_mut().clear();
         self.recursion_depth.set(0);
         self.solve_query_impl(query, u, td)
     }
@@ -61,6 +74,9 @@ impl Rt {
         'rtb: 'it,
         'td: 'it,
     {
+        self.query_stack.borrow_mut().push(u.reify_term(&query));
+        self.maybe_breakpoint(Event::Call);
+
         if self.recursion_depth.get() >= self.max_recursion_depth.get() {
             return Err::MaxRecursionDepthExceeded {
                 query: u.reify_term(&query),
@@ -212,8 +228,23 @@ impl Rt {
         &self,
     ) -> impl ExactSizeIterator<Item = Result<UnifierSet, Err>> + '_ {
         DeferredIter::new(|| {
+            self.maybe_breakpoint(Event::Exit);
             self.decr_recursion_depth();
         })
+    }
+
+    pub fn current_query(&self) -> RcTm {
+        self.query_stack
+            .borrow()
+            .last()
+            .expect("can't get here without init'ing qstack")
+            .clone()
+    }
+
+    fn maybe_breakpoint(&self, event: Event) {
+        if let Some(debugger) = self.debugger.borrow_mut().as_mut() {
+            debugger.breakpoint(self, event);
+        }
     }
 }
 
