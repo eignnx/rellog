@@ -60,12 +60,12 @@ impl Indent {
 impl fmt::Display for Indent {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         for _ in 0..self.offset {
-            f.write_char('·')?;
-            // f.write_char(' ')?;
+            // f.write_char('·')?;
+            f.write_char(' ')?;
         }
         for _ in 0..self.indent {
-            f.write_str("␣␣␣␣")?;
-            // f.write_str("    ")?;
+            // f.write_str("␣␣␣␣")?;
+            f.write_str("    ")?;
         }
         Ok(())
     }
@@ -157,12 +157,12 @@ impl<'tm> TmDisplayer<'tm> {
         for (sym, tm) in map {
             match (sym, tm.as_ref()) {
                 (s1, Tm::Sym(s2)) if s1 == s2 => {
-                    writeln!(f, "[{sym}]")?;
+                    write!(f, "[{sym}]")?;
                     // writeln!(f, "[{sym}")?;
                     // write!(f, "{}]", self.indent.dedented())?;
                 }
                 (s, Tm::Var(v)) if s.to_str().to_pascal_case() == v.to_str().as_ref() => {
-                    writeln!(f, "[{v}]")?;
+                    write!(f, "[{v}]")?;
                     // writeln!(f, "[{v}")?;
                     // write!(f, "{}]", self.indent.dedented())?;
                 }
