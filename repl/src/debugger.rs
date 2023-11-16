@@ -2,7 +2,7 @@ use core::fmt;
 use std::{collections::BTreeSet, ops::ControlFlow, str::FromStr, sync::Arc};
 
 use librellog::{
-    ast::{RcTm, Tm},
+    ast::{tm_displayer::TmDisplayer, RcTm, Tm},
     interner::IStr,
     rt::{breakpoint::Event, Rt, UnifierSet},
 };
@@ -39,8 +39,9 @@ impl librellog::rt::breakpoint::Breakpoint for Debugger {
 
         loop {
             let depth = rt.recursion_depth.get();
+            let query_disp = TmDisplayer::default().indented(query.as_ref());
             println!("[[breakpoint][event {event}][depth {depth}][query");
-            println!("  {}", Color::Yellow.paint(format!("{query}")));
+            println!("    {}", Color::Yellow.paint(format!("{query_disp}")));
             println!("]]");
 
             let src_buf = match self.line_editor.read_line().unwrap() {
