@@ -1,0 +1,38 @@
+[Rule][Output]
+    - [Rule][before ""][after Output]
+
+
+[Rule][Before][After]
+    - [must_be_txt Rule]
+    - [txt_prefix Before][txt_suffix Rule][txt_compound After]
+
+[Rule][Before][After]
+    - [must_be_rel Rule]
+    - [clause_head Rule][ClauseBody]
+    - [rule ClauseBody][Before][After]
+
+[Rule][Before][After]
+    - [block Rule][functor '-'][Members]
+    - [rules Members][Before][After]
+
+
+[rules {}][before S][after S]
+[rules {Rule ..Rules}][Before][After]
+    - [Rule][Before][after AfterRule]
+    - [Rules][before AfterRule][After]
+
+
+[story]
+    - "Once upon a time there was "
+    - [a][StartLetter]
+    - " "
+    - [Animal][StartLetter]
+    - " who was very hungry."
+
+
+[animal aardvark][start_letter vowel] - "aardvark"
+[animal bear][start_letter consonant] - "bear"
+
+
+[a][start_letter vowel] - "an"
+[a][start_letter consonant] - "a"

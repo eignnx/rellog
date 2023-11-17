@@ -10,9 +10,10 @@ use rpds::Vector;
 use unifier_set::DirectChildren;
 
 use crate::{
-    ast::{dup::TmDuplicator, RcTm, Rel, Sig, Tm},
+    ast::{dup::TmDuplicator, Clause, RcTm, Rel, Sig, Tm},
     data_structures::{Int, Var},
-    lex, parse,
+    lex::{self, tok::Tok},
+    parse,
     rt::Err,
     rt::{
         soln_stream::{self, SolnStream},
@@ -893,6 +894,48 @@ impl IntrinsicsMap {
             }
         });
 
+        def_intrinsic!(intrs, |_rt, u, [block][functor][members] as rel| {
+            match (block.as_ref(), functor.as_ref(), members.as_ref()) {
+                (Tm::Block(f, ms), _, _) => {
+                    let f = f.into();
+                    let ms = RcTm::list_from_iter(ms.iter().cloned());
+                    let Some(u) = u.unify(functor, &f).and_then(|u| u.unify(members, &ms)) else {
+                        return soln_stream::failure();
+                    };
+                    soln_stream::success(u)
+                }
+                (_, Tm::Sym(f), Tm::Cons(..) | Tm::Nil) => {
+                    let tok = match f.to_str().as_ref() {
+                        "-" => Tok::Dash,
+                        "|" => Tok::Pipe,
+                        _ => return soln_stream::error(Err::ArgumentTypeError {
+                            rel: rel.to_string(),
+                            key: "functor".to_string(),
+                            expected_ty: "either the symbol `'-'` or the symbol `'|'`".to_string(),
+                            recieved_tm: functor.to_string()
+                        }),
+                    };
+
+                    let Some((members, None)) = members.try_as_list() else {
+                        return soln_stream::error(Err::UnexpectedPartialList {
+                            rel: rel.to_string(),
+                            key: "members".to_string(),
+                            partial: members.try_as_list().unwrap().1.unwrap().into(),
+                        });
+                    };
+                    let b = Tm::Block(tok, members).into();
+                    soln_stream::unifying(u, block, &b)
+                }
+                (Tm::Var(..), Tm::Var(..), _) | (Tm::Var(..), _, Tm::Var(..)) => {
+                    soln_stream::error(Err::InstantiationError {
+                        rel: rel.to_string(),
+                        tm: block.clone(),
+                    })
+                }
+                _ => soln_stream::failure()
+            }
+        });
+
         def_intrinsic!(intrs, |_rt, u, [cwd] as _rel| {
             let dir: String = std::env::current_dir()
                 .unwrap()
@@ -989,8 +1032,15 @@ impl IntrinsicsMap {
             }
         });
 
-        // TODO: once prolog's `forall` is implemented, this can become just
-        // `[directive]`, i.e. a multi-deterministic relation.
+        def_intrinsic!(intrs, |state, u, [directive] as _rel| {
+            let directives_clone = state.rt.db.directives.clone();
+            let directive = directive.clone();
+            Box::new(directives_clone
+                .into_iter()
+                .flat_map(move |rel| u.unify(&Tm::Rel(rel).into(), &directive))
+                .map(Ok))
+        });
+
         def_intrinsic!(intrs, |state, u, [directives] as _rel| {
             let it = state
                 .rt
@@ -1001,6 +1051,26 @@ impl IntrinsicsMap {
                 .map(|rel| Tm::Rel(rel).into());
             let ds = RcTm::list_from_iter(it);
             soln_stream::unifying(u, directives, &ds)
+        });
+
+        def_intrinsic!(intrs, |state, u, [clause_head][clause_body] as _rel| {
+            let relations_clone = state.rt.db.relations.clone();
+            let clause_head = clause_head.clone();
+            let clause_body = clause_body.clone();
+            Box::new(relations_clone
+                .into_iter()
+                // TODO: use `_sig` to trim search space via signature indexing.
+                .flat_map(move |(_sig, clauses)| clauses)
+                .flat_map(move |Clause { head: h, body: b }| {
+                    u.unify(&clause_head, &RcTm::from(h)).and_then(|u| {
+                        u.unify(&clause_body, &if let Some(b) = b {
+                            b
+                        } else {
+                            tm!([true]).into()
+                        })
+                    })
+                })
+                .map(Ok))
         });
 
         ////////////////////// Define `[builtins]` //////////////////////

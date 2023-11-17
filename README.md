@@ -48,6 +48,8 @@ Note that conjunctions are expressed as indented `-`-preceded lists.
 * Prioritize automatic choicepoint elimination rather than efficiency. This makes irrelevant many common uses of "cut."
 * Avoid the trailing period problem that prolog suffers from.
 
+![An example of a definite clause grammar being used in rellog. See examples/dcgs.rellog for code.](./examples/story-lion-bear-dcg.png)
+
 ## Installation
 
 First download and build Rellog. You'll need a relatively recent (as of October 2023) Rust compiler. If you have Rust installed, you'll need to make sure you're using the nightly compiler.
