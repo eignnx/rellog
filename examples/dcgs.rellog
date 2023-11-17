@@ -1,31 +1,38 @@
 [Rule][Output]
-    - [Rule][before {}][after Output]
+    - [Rule][before ""][after Output]
+
 
 [Rule][Before][After]
     - [must_be_txt Rule]
-    - [prefix Before][suffix Rule][compound After]
-
-[Rule][Before][After]
-    - [Block Rule][functor '-'][Members]
-    - [rules Members][Before][After]
+    - [txt_prefix Before][txt_suffix Rule][txt_compound After]
 
 [Rule][Before][After]
     - [must_be_rel Rule]
-    - [clause Rule][Head][Body]
-    
+    - [clause_head Rule][ClauseBody]
+    - [rule ClauseBody][Before][After]
+
+[Rule][Before][After]
+    - [block Rule][functor '-'][Members]
+    - [rules Members][Before][After]
+
 
 [rules {}][before S][after S]
 [rules {Rule ..Rules}][Before][After]
-    - [Rule][Before][after Middle]
-    - [prefix S0][suffix Middle][compound AfterRule]
+    - [Rule][Before][after AfterRule]
     - [Rules][before AfterRule][After]
 
+
 [story]
-    - "Once upon a time there was a "
-    - [Animal]
+    - "Once upon a time there was "
+    - [a][StartLetter]
+    - " "
+    - [Animal][StartLetter]
     - " who was very hungry."
 
-[animal lion]
-    - "lion"
-[animal bear]
-    - "bear"
+
+[animal aardvark][start_letter vowel] - "aardvark"
+[animal bear][start_letter consonant] - "bear"
+
+
+[a][start_letter vowel] - "an"
+[a][start_letter consonant] - "a"
