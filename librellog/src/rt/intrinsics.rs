@@ -10,7 +10,7 @@ use rpds::Vector;
 use unifier_set::DirectChildren;
 
 use crate::{
-    ast::{dup::TmDuplicator, RcTm, Rel, Sig, Tm},
+    ast::{dup::TmDuplicator, Clause, RcTm, Rel, Sig, Tm},
     data_structures::{Int, Var},
     lex::{self, tok::Tok},
     parse,
@@ -1032,8 +1032,15 @@ impl IntrinsicsMap {
             }
         });
 
-        // TODO: once prolog's `forall` is implemented, this can become just
-        // `[directive]`, i.e. a multi-deterministic relation.
+        def_intrinsic!(intrs, |state, u, [directive] as _rel| {
+            let directives_clone = state.rt.db.directives.clone();
+            let directive = directive.clone();
+            Box::new(directives_clone
+                .into_iter()
+                .flat_map(move |rel| u.unify(&Tm::Rel(rel).into(), &directive))
+                .map(Ok))
+        });
+
         def_intrinsic!(intrs, |state, u, [directives] as _rel| {
             let it = state
                 .rt
@@ -1044,6 +1051,26 @@ impl IntrinsicsMap {
                 .map(|rel| Tm::Rel(rel).into());
             let ds = RcTm::list_from_iter(it);
             soln_stream::unifying(u, directives, &ds)
+        });
+
+        def_intrinsic!(intrs, |state, u, [clause_head][clause_body] as _rel| {
+            let relations_clone = state.rt.db.relations.clone();
+            let clause_head = clause_head.clone();
+            let clause_body = clause_body.clone();
+            Box::new(relations_clone
+                .into_iter()
+                // TODO: use `_sig` to trim search space via signature indexing.
+                .flat_map(move |(_sig, clauses)| clauses)
+                .flat_map(move |Clause { head: h, body: b }| {
+                    u.unify(&clause_head, &RcTm::from(h)).and_then(|u| {
+                        if let Some(b) = b {
+                            u.unify(&clause_body, &b)
+                        } else {
+                            u.unify(&clause_body, &tm!([true]).into())
+                        }
+                    })
+                })
+                .map(Ok))
         });
 
         ////////////////////// Define `[builtins]` //////////////////////
