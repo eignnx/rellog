@@ -1063,11 +1063,11 @@ impl IntrinsicsMap {
                 .flat_map(move |(_sig, clauses)| clauses)
                 .flat_map(move |Clause { head: h, body: b }| {
                     u.unify(&clause_head, &RcTm::from(h)).and_then(|u| {
-                        if let Some(b) = b {
-                            u.unify(&clause_body, &b)
+                        u.unify(&clause_body, &if let Some(b) = b {
+                            b
                         } else {
-                            u.unify(&clause_body, &tm!([true]).into())
-                        }
+                            tm!([true]).into()
+                        })
                     })
                 })
                 .map(Ok))
