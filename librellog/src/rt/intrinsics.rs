@@ -904,7 +904,7 @@ impl IntrinsicsMap {
                     };
                     soln_stream::success(u)
                 }
-                (_, Tm::Sym(f), ms) if matches!(ms, Tm::Cons(..) | Tm::Nil) => {
+                (_, Tm::Sym(f), Tm::Cons(..) | Tm::Nil) => {
                     let tok = match f.to_str().as_ref() {
                         "-" => Tok::Dash,
                         "|" => Tok::Pipe,
@@ -926,12 +926,13 @@ impl IntrinsicsMap {
                     let b = Tm::Block(tok, members).into();
                     soln_stream::unifying(u, block, &b)
                 }
-                _ => soln_stream::error(Err::GenericError {
-                    rel: rel.to_string(),
-                    msg: "The builtin [block][functor][members] accepts a \
-                          block, either the symbol `'-'` or the symbol `'|'`, \
-                          and a concrete list of members, respectively.".to_string()
-                }),
+                (Tm::Var(..), Tm::Var(..), _) | (Tm::Var(..), _, Tm::Var(..)) => {
+                    soln_stream::error(Err::InstantiationError {
+                        rel: rel.to_string(),
+                        tm: block.clone(),
+                    })
+                }
+                _ => soln_stream::failure()
             }
         });
 
