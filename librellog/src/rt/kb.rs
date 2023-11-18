@@ -1,3 +1,5 @@
+//! Defines a rellog Knowledge Base ('kb').
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use crate::ast::{self, Clause, Rel, Sig};

@@ -25,19 +25,19 @@ use crate::{
 
 use super::Rt;
 
-pub struct IntrState<'a> {
+pub struct StateForBuiltin<'a> {
     rt: &'a Rt,
     td: &'a RefCell<TmDuplicator>,
 }
 
-type IntrinsicFn = Box<dyn Fn(&mut IntrState<'_>, UnifierSet, Rel) -> Box<dyn SolnStream>>;
+type BuiltinMethod = Box<dyn Fn(&mut StateForBuiltin<'_>, UnifierSet, Rel) -> Box<dyn SolnStream>>;
 
-pub struct Intrinsic {
+pub struct Builtin {
     signature: Sig,
-    func: IntrinsicFn,
+    method: BuiltinMethod,
 }
 
-impl Intrinsic {
+impl Builtin {
     pub fn apply(
         &self,
         rt: &Rt,
@@ -49,9 +49,9 @@ impl Intrinsic {
             return soln_stream::failure();
         }
 
-        let mut state = IntrState { rt, td };
+        let mut state = StateForBuiltin { rt, td };
 
-        (self.func)(&mut state, u, rel)
+        (self.method)(&mut state, u, rel)
     }
 }
 
@@ -96,11 +96,11 @@ macro_rules! def_intrinsic {
     };
 }
 
-pub struct IntrinsicsMap(BTreeMap<Sig, Intrinsic>);
+pub struct BuiltinsMap(BTreeMap<Sig, Builtin>);
 
-impl Debug for IntrinsicsMap {
+impl Debug for BuiltinsMap {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        writeln!(f, "IntrinsicsMap(")?;
+        writeln!(f, "BuiltinsMap(")?;
         for sig in self.0.keys() {
             writeln!(f, "\t{sig},")?;
         }
@@ -109,27 +109,27 @@ impl Debug for IntrinsicsMap {
     }
 }
 
-impl IntrinsicsMap {
+impl BuiltinsMap {
     fn new() -> Self {
         Self(BTreeMap::new())
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = (&Sig, &Intrinsic)> {
+    pub fn iter(&self) -> impl Iterator<Item = (&Sig, &Builtin)> {
         self.0.iter()
     }
 
     fn def(
         &mut self,
         sig: &[&str],
-        func: impl Fn(&mut IntrState<'_>, UnifierSet, Rel) -> Box<dyn SolnStream> + 'static,
+        func: impl Fn(&mut StateForBuiltin<'_>, UnifierSet, Rel) -> Box<dyn SolnStream> + 'static,
     ) {
         let sig: Sig = sig.iter().map(|s| s.into()).collect::<Vector<_>>().into();
 
         self.0.insert(
             sig.clone(),
-            Intrinsic {
+            Builtin {
                 signature: sig,
-                func: Box::new(func),
+                method: Box::new(func),
             },
         );
     }
@@ -1097,7 +1097,7 @@ impl IntrinsicsMap {
         intrs
     }
 
-    pub(crate) fn index_match(&self, rel: &Rel) -> Option<&Intrinsic> {
+    pub(crate) fn index_match(&self, rel: &Rel) -> Option<&Builtin> {
         self.0.get(&rel.clone().into())
     }
 }

@@ -11,8 +11,8 @@ use crate::{
 
 use super::{
     breakpoint::{Breakpoint, Event},
+    builtins::BuiltinsMap,
     err::Err,
-    intrinsics::IntrinsicsMap,
     kb::KnowledgeBase,
     soln_stream::{self, SolnStream},
     UnifierSet,
@@ -23,7 +23,7 @@ pub static DEFAULT_MAX_RECURSION_DEPTH: usize = 256;
 /// The rellog runtime engine. (`rt` stands for "run time")
 pub struct Rt {
     pub db: KnowledgeBase,
-    pub intrs: IntrinsicsMap,
+    pub builtins: BuiltinsMap,
     pub recursion_depth: Cell<usize>,
     pub max_recursion_depth: Cell<usize>,
     pub debug_mode: Cell<bool>,
@@ -35,7 +35,7 @@ impl Rt {
     pub fn new(db: impl Into<KnowledgeBase>) -> Self {
         Self {
             db: db.into(),
-            intrs: IntrinsicsMap::initialize(),
+            builtins: BuiltinsMap::initialize(),
             recursion_depth: 0.into(),
             max_recursion_depth: DEFAULT_MAX_RECURSION_DEPTH.into(),
             debug_mode: false.into(),
@@ -145,7 +145,7 @@ impl Rt {
             Some(clauses) => clauses,
             None => {
                 // If it can't be found in the loaded module, check the intrinsics.
-                return match self.intrs.index_match(rel) {
+                return match self.builtins.index_match(rel) {
                     Some(intr) => intr.apply(self, td, u, rel.clone()),
                     None => Err::NoSuchRelation(rel.clone().into()).into(),
                 };

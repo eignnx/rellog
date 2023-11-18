@@ -1,8 +1,8 @@
 //! Defines the rellog runtime.
 
 pub mod breakpoint;
+pub mod builtins;
 mod err;
-pub mod intrinsics;
 pub mod kb;
 mod rt;
 pub mod soln_stream;
