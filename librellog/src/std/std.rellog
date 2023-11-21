@@ -247,6 +247,12 @@
 
 [sig [true]][help "Always succeeds."]
 [sig [false]][help "Always fails."]
+[sig [not]][help
+    """
+    Succeeds if the goal passed to it fails, fails if the goal succeeds at least 
+    once. Note: This is safe because the knowledgebase is immutable.
+    """
+]
 
 [sig [io_writeln][stream]][help
     "Writes a text string to `Stream`, and then writes a newline character."

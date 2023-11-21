@@ -751,6 +751,15 @@ impl BuiltinsMap {
             soln_stream::failure()
         });
 
+        def_builtin!(intrs, |state, u, [goal as "not"] as _rel| {
+            let mut solns = state.rt.solve_query_impl(goal.clone(), u.clone(), state.td);
+            match solns.next() {
+                Some(Err(e)) => soln_stream::error(e),
+                Some(Ok(_)) => soln_stream::failure(),
+                None => soln_stream::success(u),
+            }
+        });
+
         #[derive(Clone, Copy)]
         #[allow(clippy::enum_variant_names)]
         enum StdStream {
