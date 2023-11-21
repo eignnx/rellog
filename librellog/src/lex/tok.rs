@@ -43,6 +43,9 @@ pub enum Tok {
     /// The equal sign `=`.
     Equal,
 
+    /// The double colon symbol `::`.
+    PathSep,
+
     Sym(Sym),
     Var(Var),
     Int(Int),
@@ -65,6 +68,7 @@ impl fmt::Display for Tok {
             Tok::Semicolon => write!(f, ";"),
             Tok::Spread => write!(f, ".."),
             Tok::Equal => write!(f, "="),
+            Tok::PathSep => write!(f, "::"),
             Tok::Sym(s) => write!(f, "{s}"),
             Tok::Var(v) => write!(f, "{v}"),
             Tok::Int(i) => write!(f, "{i}"),

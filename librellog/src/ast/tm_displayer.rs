@@ -9,6 +9,8 @@ use crate::{
     lex::tok::Tok,
 };
 
+use super::BinOpSymbol;
+
 #[derive(Clone, Default)]
 pub struct TmDisplayer<'tm> {
     tm: Option<&'tm Tm>,
@@ -312,6 +314,16 @@ impl<'tm> TmDisplayer<'tm> {
             write!(f, "[{} {tail}]\"", Tok::Spread)
         }
     }
+
+    fn fmt_bin_op(
+        &self,
+        f: &mut fmt::Formatter<'_>,
+        op: &BinOpSymbol,
+        x: &RcTm,
+        y: &RcTm,
+    ) -> fmt::Result {
+        write!(f, "{} {} {}", x, op, y)
+    }
 }
 
 impl<'tm> fmt::Display for TmDisplayer<'tm> {
@@ -328,6 +340,7 @@ impl<'tm> fmt::Display for TmDisplayer<'tm> {
             Tm::Txt(char_list, tail) => Self::fmt_txt(f, char_list, tail),
             Tm::Block(functor, members) => self.fmt_block(f, functor, members),
             Tm::Rel(map) => self.fmt_rel(map, f),
+            Tm::BinOp(op, x, y) => self.fmt_bin_op(f, op, x, y),
             Tm::Cons(x, xs) => self.fmt_list(x.clone(), xs.clone(), f),
             Tm::Nil => write!(f, "{{}}"),
         }

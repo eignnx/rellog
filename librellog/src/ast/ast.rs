@@ -35,6 +35,7 @@ pub enum Tm {
     Txt(CharList, RcTm),
     Block(Tok, Vector<RcTm>),
     Rel(Rel),
+    BinOp(BinOpSymbol, RcTm, RcTm),
     Cons(RcTm, RcTm),
     Nil,
 }
@@ -55,6 +56,7 @@ impl Dup for Tm {
                     .collect();
                 Tm::Rel(rel)
             }
+            Tm::BinOp(op, x, y) => Tm::BinOp(*op, x.dup(duper), y.dup(duper)),
             Tm::Txt(cl, tl) => Tm::Txt(cl.clone(), tl.dup(duper)),
             Tm::Sym(_) | Tm::Int(_) | Tm::Nil => self.clone(),
         }
@@ -309,6 +311,7 @@ impl DirectChildren<Var> for RcTm {
             Tm::Txt(_, tail) => Box::new(iter::once(tail)),
             Tm::Block(_, members) => Box::new(members.iter()),
             Tm::Rel(rel) => Box::new(rel.values()),
+            Tm::BinOp(_, x, y) => Box::new([x, y].into_iter()),
             Tm::Cons(head, tail) => Box::new(iter::once(head).chain(iter::once(tail))),
         }
     }
@@ -321,8 +324,52 @@ impl DirectChildren<Var> for RcTm {
                 Tm::Block(functor.clone(), members.iter().map(f).collect()).into()
             }
             Tm::Rel(rel) => Tm::Rel(rel.iter().map(|(k, v)| (*k, f(v))).collect()).into(),
+            Tm::BinOp(op, x, y) => Tm::BinOp(*op, f(x), f(y)).into(),
             Tm::Cons(head, tail) => Tm::Cons(f(head), f(tail)).into(),
         }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum BinOpSymbol {
+    PathSep,
+    Equal,
+    Semicolon,
+}
+
+impl BinOpSymbol {
+    pub fn deference_lvl(&self) -> usize {
+        DEFERENCE_TABLE
+            .iter()
+            .enumerate()
+            .find(|(_, op)| **op == *self)
+            .map(|(idx, _)| idx)
+            .expect("All cases handled")
+    }
+
+    pub fn to_tok(&self) -> Tok {
+        match self {
+            BinOpSymbol::PathSep => Tok::PathSep,
+            BinOpSymbol::Equal => Tok::Equal,
+            BinOpSymbol::Semicolon => Tok::Semicolon,
+        }
+    }
+}
+
+/// Operator deference is the inverse of operator precedence.
+pub const DEFERENCE_TABLE: &[BinOpSymbol] = &[
+    BinOpSymbol::PathSep, // Lowest deference (highest precedence).
+    BinOpSymbol::Equal,
+    BinOpSymbol::Semicolon, // Highest deference (lowest precedence).
+];
+
+impl fmt::Display for BinOpSymbol {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            BinOpSymbol::Equal => "=",
+            BinOpSymbol::PathSep => "::",
+            BinOpSymbol::Semicolon => ";",
+        })
     }
 }
 
@@ -367,19 +414,20 @@ impl Sig {
     }
 }
 
-impl From<Vector<Sym>> for Sig {
-    fn from(v: Vector<Sym>) -> Self {
-        let mut v: Vec<_> = v.into_iter().cloned().collect();
+impl FromIterator<Sym> for Sig {
+    fn from_iter<I: IntoIterator<Item = Sym>>(iter: I) -> Self {
+        let mut v: Vec<_> = iter.into_iter().collect();
         v.sort();
         Self(v.into_iter().collect())
     }
 }
 
-impl From<Rel> for Sig {
-    fn from(rel: Rel) -> Self {
-        let mut v: Vec<_> = rel.keys().cloned().collect();
-        v.sort();
-        Self(v.into_iter().collect())
+impl<I> From<I> for Sig
+where
+    I: IntoIterator<Item = Sym>,
+{
+    fn from(it: I) -> Self {
+        it.into_iter().collect()
     }
 }
 

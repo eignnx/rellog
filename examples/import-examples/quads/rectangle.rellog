@@ -1,0 +1,7 @@
+[[export
+    - [rect_width][rect_height][rect_area]
+]]
+
+
+[RectWidth][RectHeight][RectArea]
+    - [formula {RectWidth mul RectHeight}][result RectArea]

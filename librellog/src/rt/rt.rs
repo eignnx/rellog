@@ -4,7 +4,7 @@ use rpds::Vector;
 
 use crate::{
     ast::dup::TmDuplicator,
-    ast::{RcTm, Tm},
+    ast::{BinOpSymbol, RcTm, Tm},
     lex::tok::Tok,
     utils::{cloning_iter::CloningIterator, deferred_iter::DeferredIter},
 };
@@ -89,18 +89,30 @@ impl Rt {
 
         match query.as_ref() {
             Tm::Rel(_) => self.solve_rel(query.clone(), u, td),
-            Tm::Block(Tok::Pipe, members) => Box::new(
-                self.solve_or_block(members.clone(), u, td)
-                    .chain(self.deferred_decr_recursion_depth()),
-            ),
-            Tm::Block(Tok::Dash, members) => Box::new(
-                self.solve_and_block(members.clone(), u, td)
-                    .chain(self.deferred_decr_recursion_depth()),
-            ),
-            Tm::Block(_, _) => {
-                self.decr_recursion_depth();
-                Err::AttemptToQueryNonCallable(query.clone()).into()
-            }
+            Tm::Block(functor, members) => match functor {
+                Tok::Pipe => Box::new(
+                    self.solve_or_block(members.clone(), u, td)
+                        .chain(self.deferred_decr_recursion_depth()),
+                ),
+                Tok::Dash => Box::new(
+                    self.solve_and_block(members.clone(), u, td)
+                        .chain(self.deferred_decr_recursion_depth()),
+                ),
+                _ => {
+                    self.decr_recursion_depth();
+                    Err::AttemptToQueryNonCallable(query.clone()).into()
+                }
+            },
+            Tm::BinOp(op, x, y) => match op {
+                BinOpSymbol::Equal => Box::new(
+                    soln_stream::unifying(u, x, y).chain(self.deferred_decr_recursion_depth()),
+                ),
+                BinOpSymbol::Semicolon => self.solve_and_binop(x.clone(), y.clone(), u, td),
+                BinOpSymbol::PathSep => {
+                    self.decr_recursion_depth();
+                    Err::AttemptToQueryNonCallable(query.clone()).into()
+                }
+            },
             Tm::Var(v) => {
                 let reified = u.reify_term(&query);
                 if query == reified {
@@ -122,6 +134,27 @@ impl Rt {
                 Err::AttemptToQueryNonCallable(query.clone()).into()
             }
         }
+    }
+
+    fn solve_and_binop<'rtb, 'td, 'it>(
+        &'rtb self,
+        x: RcTm,
+        y: RcTm,
+        u: UnifierSet,
+        td: &'td RefCell<TmDuplicator>,
+    ) -> Box<dyn SolnStream + 'it>
+    where
+        'rtb: 'it,
+        'td: 'it,
+    {
+        Box::new(
+            self.solve_query_impl(x, u, td)
+                .flat_map(move |u_res| match u_res {
+                    Ok(u) => self.solve_query_impl(y.clone(), u, td),
+                    Err(e) => e.into(),
+                })
+                .chain(self.deferred_decr_recursion_depth()),
+        )
     }
 
     fn solve_rel<'rtb, 'td, 'it>(
@@ -147,7 +180,7 @@ impl Rt {
                 // If it can't be found in the loaded module, check the intrinsics.
                 return match self.builtins.index_match(rel) {
                     Some(intr) => intr.apply(self, td, u, rel.clone()),
-                    None => Err::NoSuchRelation(rel.clone().into()).into(),
+                    None => Err::NoSuchRelation(rel.keys().cloned().into()).into(),
                 };
             }
         };

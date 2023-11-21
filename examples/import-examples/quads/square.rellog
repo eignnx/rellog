@@ -1,0 +1,13 @@
+[[export
+    - [square_width][square_area]
+]]
+
+
+[SquareWidth][SquareArea]
+    - [factors {SquareWidth SquareWidth}][product SquareArea]
+
+
+[factors {}][product 1]
+[factors {X ..Xs}][Product]
+    [factors Xs][product XsProduct]
+    [formula {X mul XsProduct}][result Product]

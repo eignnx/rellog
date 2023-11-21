@@ -1,0 +1,25 @@
+[[import {
+    circle::[circle_radius][circle_area]
+    quads::{
+        self
+        rectangle::[rect_width][rect_height][rect_area]
+        square::[square_width][square_area]
+    }
+}][submodules {
+    circle
+    quads
+}][export {
+    [shape][area]
+    circle
+    quads
+}]]
+
+
+[shape {square Width}][Area]
+    - quads::square::[SquareWidth][square_area Area]
+
+[shape {rect RectWidth RectHeight}][Area]
+    - quads::[RectWidth][RectHeight][rect_area Area]
+
+[shape {circle CircleRadius}][Area]
+    - [CircleRadius][circle_area Area]

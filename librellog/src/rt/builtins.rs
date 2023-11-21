@@ -45,7 +45,7 @@ impl Builtin {
         u: UnifierSet,
         rel: Rel,
     ) -> Box<dyn SolnStream> {
-        if self.signature != Sig::from(rel.clone()) {
+        if self.signature != rel.keys().cloned().collect() {
             return soln_stream::failure();
         }
 
@@ -123,7 +123,7 @@ impl BuiltinsMap {
         sig: &[&str],
         func: impl Fn(&mut StateForBuiltin<'_>, UnifierSet, Rel) -> Box<dyn SolnStream> + 'static,
     ) {
-        let sig: Sig = sig.iter().map(|s| s.into()).collect::<Vector<_>>().into();
+        let sig: Sig = sig.iter().map(|s| s.into()).collect();
 
         self.0.insert(
             sig.clone(),
@@ -1098,6 +1098,6 @@ impl BuiltinsMap {
     }
 
     pub(crate) fn index_match(&self, rel: &Rel) -> Option<&Builtin> {
-        self.0.get(&rel.clone().into())
+        self.0.get(&rel.keys().cloned().collect())
     }
 }

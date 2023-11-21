@@ -1,6 +1,9 @@
 use std::fmt;
 
-use crate::ast::{RcTm, Sig};
+use crate::{
+    ast::{RcTm, Sig},
+    lex, parse,
+};
 
 #[derive(Debug, Clone)]
 pub enum Err {
@@ -32,6 +35,8 @@ pub enum Err {
         depth: usize,
         query: RcTm,
     },
+    ParseError(String),
+    LexError(String),
 }
 
 impl fmt::Display for Err {
@@ -74,6 +79,8 @@ impl fmt::Display for Err {
                     "Max recursion depth ({depth}) exceeded for query `{query}`.",
                 )
             }
+            Err::ParseError(msg) => write!(f, "{msg}"),
+            Err::LexError(msg) => write!(f, "{msg}"),
         }
     }
 }
@@ -81,5 +88,17 @@ impl fmt::Display for Err {
 impl From<std::io::Error> for Err {
     fn from(err: std::io::Error) -> Self {
         Err::IoError(err.to_string())
+    }
+}
+
+impl<'a> From<parse::Error<'a>> for Err {
+    fn from(e: parse::Error) -> Self {
+        Err::ParseError(e.to_string())
+    }
+}
+
+impl From<lex::LexError> for Err {
+    fn from(e: lex::LexError) -> Self {
+        Err::LexError(e.to_string())
     }
 }

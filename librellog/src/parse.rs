@@ -17,9 +17,8 @@ use nom_i9n::{I9nError, I9nErrorCtx, I9nErrorSituation, I9nInput, TokenizedInput
 use rpds::Vector;
 
 use crate::{
-    ast::{Clause, Item, Module, RcTm, Rel, Tm},
+    ast::{BinOpSymbol, Clause, Item, Module, RcTm, Rel, Tm},
     data_structures::{Int, Map, Sym, Var},
-    interner::IStr,
     lex::{
         tok::{
             At,
@@ -62,7 +61,7 @@ impl<'ts> Display for Error<'ts> {
         let (i, last) = last;
         writeln!(
             f,
-            "\t...{last} Last token: {}.",
+            "\t...{last}\n\t\t(Last token: {}.)",
             i.first().map_or_else(
                 || "end of input".into(),
                 |tok| format!("token `{}` at [{}:{}]", tok.value, tok.line, tok.col)
@@ -153,9 +152,9 @@ impl<'ts> From<I9nError<BaseInput<'ts>>> for Error<'ts> {
                     let situation = I9nErrorSituationDisplay(situation);
                     let ctx = I9nErrorCtxDisplay(ctx);
                     let input_preview = input
-                        .get(0)
+                        .first()
                         .map(|tok| tok.value.to_string())
-                        .unwrap_or_else(|| "end of file".into());
+                        .unwrap_or_else(|| "end of input".into());
                     format!("Indentation error: {situation} {ctx} at token `{input_preview}`.")
                 }),
             )],
@@ -175,7 +174,11 @@ impl Display for I9nErrorSituationDisplay {
             nom_i9n::I9nRelation::Lt => "indented less than",
         };
 
-        write!(f, "Current line was {relation} expected")?;
+        write!(
+            f,
+            "Current line was {relation} expected (expected={}, actual={})",
+            self.0.expected, self.0.actual
+        )?;
 
         Ok(())
     }
@@ -382,9 +385,11 @@ fn eq_nesting(ts: Toks) -> Res<Tm> {
     ))
     .parse(ts)?;
 
-    let list = RcTm::list_from_iter(iter::once(first).chain(rest).map(Into::into));
-    let eq_rel = Tm::Rel([(IStr::from("eq"), list)].into_iter().collect());
-    Ok((ts, eq_rel))
+    let output = rest.into_iter().fold(first, |so_far, next| {
+        Tm::BinOp(BinOpSymbol::Equal, so_far.into(), next.into())
+    });
+
+    Ok((ts, output))
 }
 
 fn non_operator_tm(ts: Toks) -> Res<Tm> {
@@ -439,7 +444,7 @@ pub fn module(ts: Toks) -> Res<Module> {
                     Item::Directive(rel) => m.directives.push(rel),
                     Item::RelDef(head, body) => {
                         m.relations
-                            .entry(head.clone().into())
+                            .entry(head.keys().cloned().collect())
                             .or_default()
                             .push(Clause { head, body });
                     }
