@@ -75,7 +75,7 @@ macro_rules! ident_of_binding {
     };
 }
 
-macro_rules! def_intrinsic {
+macro_rules! def_builtin {
     ($intrs:expr, |$state:ident, $u:ident, $([$ident:ident $(as $name:literal)?])+ as $rel:ident| $body:expr) => {
         let sig = [$(name_of_binding!($ident $(as $name)?),)+];
         $intrs.def(&sig, move |state, u, rel| {
@@ -137,7 +137,7 @@ impl BuiltinsMap {
     pub(crate) fn initialize() -> Self {
         let mut intrs = Self::new();
 
-        def_intrinsic!(intrs, |_rt, u, [terms as "eq"] as _rel| {
+        def_builtin!(intrs, |_rt, u, [terms as "eq"] as _rel| {
             let Some((list, None)) = terms.try_as_list() else {
                 return soln_stream::error(Err::ArgumentTypeError {
                     rel: "[eq]".into(),
@@ -163,7 +163,7 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [rel][attrs] as rel_called| {
+        def_builtin!(intrs, |_rt, u, [rel][attrs] as rel_called| {
             match (rel.as_ref(), attrs.as_ref()) {
                 (Tm::Var(_), Tm::Cons(_, _)) => {
                     let var = rel;
@@ -223,7 +223,7 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [attr][key][value] as rel| {
+        def_builtin!(intrs, |_rt, u, [attr][key][value] as rel| {
             match (attr.as_ref(), key.as_ref(), value.as_ref()) {
 
                 // [[mode [attr in][key inout][value inout]]]
@@ -263,7 +263,7 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [gt][lt] as rel| {
+        def_builtin!(intrs, |_rt, u, [gt][lt] as rel| {
             match (gt.as_ref(), lt.as_ref()) {
                 (Tm::Int(gt), Tm::Int(lt)) => {
                     if gt > lt {
@@ -279,7 +279,7 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [gte][lte] as rel| {
+        def_builtin!(intrs, |_rt, u, [gte][lte] as rel| {
             match (gte.as_ref(), lte.as_ref()) {
                 (Tm::Int(gte), Tm::Int(lte)) => {
                     if gte >= lte {
@@ -295,14 +295,14 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_var"] as _rel| {
+        def_builtin!(intrs, |_rt, u, [tm as "must_be_var"] as _rel| {
             match u.reify_term(tm).as_ref() {
                 Tm::Var(_) => soln_stream::success(u),
                 _ => soln_stream::failure(),
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_num"] as rel| {
+        def_builtin!(intrs, |_rt, u, [tm as "must_be_num"] as rel| {
             match u.reify_term(tm).as_ref() {
                 Tm::Int(..) => soln_stream::success(u),
                 Tm::Var(..) => soln_stream::error(Err::InstantiationError{
@@ -313,7 +313,7 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_sym"] as rel| {
+        def_builtin!(intrs, |_rt, u, [tm as "must_be_sym"] as rel| {
             match u.reify_term(tm).as_ref() {
                 Tm::Sym(..) => soln_stream::success(u),
                 Tm::Var(..) => soln_stream::error(Err::InstantiationError{
@@ -324,7 +324,7 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_txt"] as rel| {
+        def_builtin!(intrs, |_rt, u, [tm as "must_be_txt"] as rel| {
             match u.reify_term(tm).as_ref() {
                 Tm::Txt(..) => soln_stream::success(u),
                 Tm::Var(..) => soln_stream::error(Err::InstantiationError{
@@ -335,7 +335,7 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [tm as "must_be_rel"] as rel_called| {
+        def_builtin!(intrs, |_rt, u, [tm as "must_be_rel"] as rel_called| {
             match u.reify_term(tm).as_ref() {
                 Tm::Rel(..) => soln_stream::success(u),
                 Tm::Var(..) => soln_stream::error(Err::InstantiationError{
@@ -346,7 +346,7 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [rel][key][value] as rel_called| {
+        def_builtin!(intrs, |_rt, u, [rel][key][value] as rel_called| {
             let rel = match rel.as_ref() {
                 Tm::Rel(rel) => rel,
                 Tm::Var(_) => return Err::InstantiationError{
@@ -378,18 +378,18 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_state, u, [term][variables] as _rel| {
+        def_builtin!(intrs, |_state, u, [term][variables] as _rel| {
             let vars: BTreeSet<Var> = term.variables().cloned().collect();
             let vars = RcTm::list_from_iter(vars.into_iter().map(RcTm::from));
             soln_stream::unifying(u, &vars, variables)
         });
 
-        def_intrinsic!(intrs, |state, u, [original][duplicate] as _rel| {
+        def_builtin!(intrs, |state, u, [original][duplicate] as _rel| {
             let new = state.td.borrow_mut().duplicate(original);
             soln_stream::unifying(u, &new, duplicate)
         });
 
-        def_intrinsic!(intrs, |state, u, [original][duplicate][renaming][renamed] as rel| {
+        def_builtin!(intrs, |state, u, [original][duplicate][renaming][renamed] as rel| {
             let Some((renaming_set, None)) = renaming.try_as_set_from_list() else {
                 return soln_stream::error(Err::ArgumentTypeError {
                     rel: rel.to_string(),
@@ -441,7 +441,7 @@ impl BuiltinsMap {
             soln_stream::unifying(u, &new, duplicate)
         });
 
-        def_intrinsic!(intrs, |_rt, u, [pascal_case][snake_case] as rel| {
+        def_builtin!(intrs, |_rt, u, [pascal_case][snake_case] as rel| {
             match (pascal_case.as_ref(), snake_case.as_ref()) {
                 (Tm::Sym(pc), _) => {
                     let lower = format!("{}", heck::AsSnakeCase(&pc.to_str()[..]));
@@ -461,7 +461,7 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [txt_prefix][txt_suffix][txt_compound] as rel| {
+        def_builtin!(intrs, |_rt, u, [txt_prefix][txt_suffix][txt_compound] as rel| {
             use Tm::{Txt, Var};
             match (txt_prefix.as_ref(), txt_suffix.as_ref(), txt_suffix.as_ref()) {
                 (Txt(ref prefix_head, ref prefix_tail), Txt(suffix_head, suffix_tail), _) => {
@@ -510,7 +510,7 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [sum][x][y] as rel| {
+        def_builtin!(intrs, |_rt, u, [sum][x][y] as rel| {
             match (sum.as_ref(), x.as_ref(), y.as_ref()) {
                 (_, Tm::Int(x), Tm::Int(y)) => {
                     let res = Tm::Int(x + y).into();
@@ -549,7 +549,7 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [product][x][y] as rel| {
+        def_builtin!(intrs, |_rt, u, [product][x][y] as rel| {
             match (product.as_ref(), x.as_ref(), y.as_ref()) {
                 (_, Tm::Int(x), Tm::Int(y)) => {
                     let res = Tm::Int(x * y).into();
@@ -600,7 +600,7 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [difference][minuend][subtrahend] as rel| {
+        def_builtin!(intrs, |_rt, u, [difference][minuend][subtrahend] as rel| {
             match (difference.as_ref(), minuend.as_ref(), subtrahend.as_ref()) {
                 (a, b, c) if ![a, b, c].into_iter().all(|tm| matches!(*tm, Tm::Int(_) | Tm::Var(_))) => {
                     Err::GenericError {
@@ -630,7 +630,7 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [quotient][remainder][numerator][denominator] as rel| {
+        def_builtin!(intrs, |_rt, u, [quotient][remainder][numerator][denominator] as rel| {
             match (quotient.as_ref(), remainder.as_ref(), numerator.as_ref(), denominator.as_ref()) {
                 (a, b, c, d) if ![a, b, c, d].into_iter().all(|tm| matches!(*tm, Tm::Int(_) | Tm::Var(_))) => {
                     Err::GenericError {
@@ -715,7 +715,7 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [pred][succ] as rel| {
+        def_builtin!(intrs, |_rt, u, [pred][succ] as rel| {
             match (pred.as_ref(), succ.as_ref()) {
                 (Tm::Var(_), Tm::Var(_)) => Err::InstantiationError {
                     rel: rel.to_string(),
@@ -743,11 +743,11 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [_yes as "true"] as _rel| {
+        def_builtin!(intrs, |_rt, u, [_yes as "true"] as _rel| {
             soln_stream::success(u)
         });
 
-        def_intrinsic!(intrs, |_rt, _u, [_no as "false"] as _rel| {
+        def_builtin!(intrs, |_rt, _u, [_no as "false"] as _rel| {
             soln_stream::failure()
         });
 
@@ -823,7 +823,7 @@ impl BuiltinsMap {
             soln_stream::success(u)
         }
 
-        def_intrinsic!(intrs, |_rt, u, [text as "io_write"][stream as "stream"] as rel| {
+        def_builtin!(intrs, |_rt, u, [text as "io_write"][stream as "stream"] as rel| {
             let Ok(stream) = StdStream::try_from(stream) else {
                 return Err::ArgumentTypeError {
                     rel: rel.to_string(),
@@ -835,7 +835,7 @@ impl BuiltinsMap {
             io_write_impl(u, text, stream)
         });
 
-        def_intrinsic!(intrs, |_rt, u, [text as "io_writeln"][stream as "stream"] as rel| {
+        def_builtin!(intrs, |_rt, u, [text as "io_writeln"][stream as "stream"] as rel| {
             let Ok(stream) = StdStream::try_from(stream) else {
                 return Err::ArgumentTypeError {
                     rel: rel.to_string(),
@@ -853,7 +853,7 @@ impl BuiltinsMap {
             soln_stream
         });
 
-        def_intrinsic!(intrs, |_rt, u, [term][text] as rel| {
+        def_builtin!(intrs, |_rt, u, [term][text] as rel| {
             match (term.as_ref(), text.as_ref()) {
                 (Tm::Var(..), _) => {
                     let term_var = term;
@@ -894,7 +894,7 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [block][functor][members] as rel| {
+        def_builtin!(intrs, |_rt, u, [block][functor][members] as rel| {
             match (block.as_ref(), functor.as_ref(), members.as_ref()) {
                 (Tm::Block(f, ms), _, _) => {
                     let f = f.into();
@@ -936,7 +936,7 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |_rt, u, [cwd] as _rel| {
+        def_builtin!(intrs, |_rt, u, [cwd] as _rel| {
             let dir: String = std::env::current_dir()
                 .unwrap()
                 .as_os_str()
@@ -945,7 +945,7 @@ impl BuiltinsMap {
             soln_stream::unifying(u, cwd, &Tm::Txt(dir.into(), Tm::Nil.into()).into())
         });
 
-        def_intrinsic!(intrs, |_rt, u, [cd] as rel| {
+        def_builtin!(intrs, |_rt, u, [cd] as rel| {
             if !matches!(cd.as_ref(), Tm::Txt(_, _)) {
                 return Err::ArgumentTypeError {
                     rel: rel.to_string(),
@@ -980,7 +980,7 @@ impl BuiltinsMap {
             soln_stream::success(u)
         });
 
-        def_intrinsic!(intrs, |_rt, u, [output as "ls"] as _rel| {
+        def_builtin!(intrs, |_rt, u, [output as "ls"] as _rel| {
             let read_dir = match std::fs::read_dir(".") {
                 Ok(rd) => rd,
                 Err(e) => return soln_stream::error(e.into())
@@ -998,7 +998,7 @@ impl BuiltinsMap {
             soln_stream::unifying(u, output, &list)
         });
 
-        def_intrinsic!(intrs, |state, u, [recursion_limit] as rel| {
+        def_builtin!(intrs, |state, u, [recursion_limit] as rel| {
             match recursion_limit.as_ref() {
                 Tm::Int(i) => {
                     if i <= &Zero::zero() {
@@ -1032,7 +1032,7 @@ impl BuiltinsMap {
             }
         });
 
-        def_intrinsic!(intrs, |state, u, [directive] as _rel| {
+        def_builtin!(intrs, |state, u, [directive] as _rel| {
             let directives_clone = state.rt.db.directives.clone();
             let directive = directive.clone();
             Box::new(directives_clone
@@ -1041,7 +1041,7 @@ impl BuiltinsMap {
                 .map(Ok))
         });
 
-        def_intrinsic!(intrs, |state, u, [directives] as _rel| {
+        def_builtin!(intrs, |state, u, [directives] as _rel| {
             let it = state
                 .rt
                 .db
@@ -1053,7 +1053,7 @@ impl BuiltinsMap {
             soln_stream::unifying(u, directives, &ds)
         });
 
-        def_intrinsic!(intrs, |state, u, [clause_head][clause_body] as _rel| {
+        def_builtin!(intrs, |state, u, [clause_head][clause_body] as _rel| {
             let relations_clone = state.rt.db.relations.clone();
             let clause_head = clause_head.clone();
             let clause_body = clause_body.clone();
@@ -1089,7 +1089,7 @@ impl BuiltinsMap {
 
         // TODO: #3 once prolog's `forall` is implemented, this can become just
         // `[builtin]`, i.e. a multi-deterministic relation.
-        def_intrinsic!(intrs, |_rt, u, [builtins] as _rel| {
+        def_builtin!(intrs, |_rt, u, [builtins] as _rel| {
             let builtin_rel_sigs = builtin_rel_sigs.clone();
             soln_stream::unifying(u, builtins, &builtin_rel_sigs)
         });
