@@ -339,3 +339,10 @@
 [[todo
     "[[mode [num out][den in][quo out][rem in]]] not supported."
 ]]
+
+[sig [file_path][clauses][directives]][help
+    """
+    Relates a rellog source file given by `FilePath` to that files contained 
+    `Clauses` and `Directives`.
+    """
+]

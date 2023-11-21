@@ -14,7 +14,7 @@ use crate::{
     data_structures::{Int, Var},
     lex::{self, tok::Tok},
     parse,
-    rt::Err,
+    rt::{kb::KnowledgeBase, Err},
     rt::{
         soln_stream::{self, SolnStream},
         UnifierSet,
@@ -1071,6 +1071,50 @@ impl BuiltinsMap {
                     })
                 })
                 .map(Ok))
+        });
+
+        def_builtin!(intrs, |_state, u, [file_path][clauses][directives] as rel| {
+            match (file_path.as_ref(), clauses.as_ref(), directives.as_ref()) {
+                (Tm::Txt(..), _, _) => {
+                    let mut path_buf = String::new();
+                    if file_path.try_collect_txt_to_string(&mut path_buf).is_err() {
+                        return soln_stream::error(Err::UnexpectedPartialList {
+                            rel: rel.to_string(),
+                            key: "file_path".into(),
+                            partial: file_path.clone(),
+                        });
+                    }
+
+                    let mut kb = KnowledgeBase::default();
+                    if let Err(e) = kb.include(path_buf) {
+                        return soln_stream::error(e);
+                    }
+
+                    let KnowledgeBase { directives: ds, relations: rs } = kb;
+
+                    let ds = RcTm::list_from_iter(ds.into_iter().map(|rel| Tm::Rel(rel).into()));
+                    let cs = RcTm::list_from_iter(rs.into_iter().flat_map(|(_sig, clauses)| {
+                        clauses.into_iter().map(|clause| {
+                            let Clause { head, body } = clause;
+                            match body {
+                                Some(body) => tm!([head head.into()][body body]),
+                                None => tm!([fact head.into()]),
+                            }.into()
+                        })
+                    }));
+
+                    let Some(u) = u.unify(directives, &ds) else {
+                        return soln_stream::failure();
+                    };
+
+                    let Some(u) = u.unify(clauses, &cs) else {
+                        return soln_stream::failure();
+                    };
+
+                    soln_stream::success(u)
+                }
+                _ => todo!()
+            }
         });
 
         ////////////////////// Define `[builtins]` //////////////////////
