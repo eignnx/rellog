@@ -79,6 +79,7 @@ $ cargo run
     - [Text Strings](#text-strings)
     - [Variables](#variables)
     - [Relations](#relations)
+    - [Operators](#operators)
     - [Lists](#lists)
     - [Blocks](#blocks)
 - [The REPL](#the-repl)
@@ -370,6 +371,17 @@ An example value of this type would be:
 ```yaml
 [name casey][age 29][bank_balance_cents -4400]
 ```
+
+#### Operators
+
+There are only a few operators in rellog (and parsing them is kinda buggy at the moment).
+
+| Operator | Name | Meaning |
+| -------- | ---- | ------- |
+| `A = B` | Unification. | Succeeds if `A` and `B` are unifiable, and in the process unifies them. |
+| `A ~ B` | Unifiability. | Succeeds if `A` and `B` are unifiable, fails if they aren't. |
+| `A; B` | Conjunction. | Succeeds if `A` succeeds and if `B` subsequently succeeds. |
+| `A::B` | Path separator. | Does nothing right now, will be used for module system. |
 
 #### Lists
 
