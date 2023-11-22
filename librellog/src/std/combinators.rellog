@@ -9,7 +9,7 @@
 [c8r {iota X}][ret {X s k}]
 
 
-[sig [program][val]][help
+[sig [Program][Val]][doc
     """
     Input a program like `[program {iota i 1 2}][Val]`, then backtrack to see
     the reduction steps.

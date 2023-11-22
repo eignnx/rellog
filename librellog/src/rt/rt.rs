@@ -107,6 +107,14 @@ impl Rt {
                 BinOpSymbol::Equal => Box::new(
                     soln_stream::unifying(u, x, y).chain(self.deferred_decr_recursion_depth()),
                 ),
+                BinOpSymbol::Tilde => Box::new(
+                    match u.unify(x, y) {
+                        // Throw out the new unifier set, we're only testing for unifiability.
+                        Some(_u) => soln_stream::success(u),
+                        None => soln_stream::failure(),
+                    }
+                    .chain(self.deferred_decr_recursion_depth()),
+                ),
                 BinOpSymbol::Semicolon => self.solve_and_binop(x.clone(), y.clone(), u, td),
                 BinOpSymbol::PathSep => {
                     self.decr_recursion_depth();

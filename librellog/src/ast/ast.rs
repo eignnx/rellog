@@ -334,6 +334,7 @@ impl DirectChildren<Var> for RcTm {
 pub enum BinOpSymbol {
     PathSep,
     Equal,
+    Tilde,
     Semicolon,
 }
 
@@ -351,6 +352,7 @@ impl BinOpSymbol {
         match self {
             BinOpSymbol::PathSep => Tok::PathSep,
             BinOpSymbol::Equal => Tok::Equal,
+            BinOpSymbol::Tilde => Tok::Tilde,
             BinOpSymbol::Semicolon => Tok::Semicolon,
         }
     }
@@ -360,6 +362,7 @@ impl BinOpSymbol {
 pub const DEFERENCE_TABLE: &[BinOpSymbol] = &[
     BinOpSymbol::PathSep, // Lowest deference (highest precedence).
     BinOpSymbol::Equal,
+    BinOpSymbol::Tilde,
     BinOpSymbol::Semicolon, // Highest deference (lowest precedence).
 ];
 
@@ -367,6 +370,7 @@ impl fmt::Display for BinOpSymbol {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self {
             BinOpSymbol::Equal => "=",
+            BinOpSymbol::Tilde => "~",
             BinOpSymbol::PathSep => "::",
             BinOpSymbol::Semicolon => ";",
         })

@@ -392,6 +392,20 @@ fn eq_nesting(ts: Toks) -> Res<Tm> {
     Ok((ts, output))
 }
 
+fn tilde_nesting(ts: Toks) -> Res<Tm> {
+    let (ts, (first, rest)) = tuple((
+        non_operator_tm,
+        many1(preceded(tok(Tilde), non_operator_tm)),
+    ))
+    .parse(ts)?;
+
+    let output = rest.into_iter().fold(first, |so_far, next| {
+        Tm::BinOp(BinOpSymbol::Tilde, so_far.into(), next.into())
+    });
+
+    Ok((ts, output))
+}
+
 fn non_operator_tm(ts: Toks) -> Res<Tm> {
     alt((
         parenthesized_tm,
@@ -412,7 +426,7 @@ fn parenthesized_tm(ts: Toks) -> Res<Tm> {
 }
 
 fn operator_tm(ts: Toks) -> Res<Tm> {
-    alt((and_list, eq_nesting)).parse(ts)
+    alt((and_list, eq_nesting, tilde_nesting)).parse(ts)
 }
 
 pub fn tm(ts: Toks) -> Res<Tm> {
