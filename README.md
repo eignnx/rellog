@@ -101,7 +101,7 @@ An example of a relation might be a student-teacher relationship. In Rellog, the
 We refer to this relation by its ***signature*** which is written:
 
 ```yaml
-[student][teacher]
+[Student][Teacher]
 ```
 
 A signature is a set of symbols which are the names of the relation's ***keys***.
@@ -126,9 +126,9 @@ Here's a bigger example involving multiple relations.
 ```
 
 This is a set of facts about three different relations:
-1. The `[course][instructor]` relation,
-1. the `[course][name]` relation, and
-1. the `[student][course]` relation.
+1. The `[Course][Instructor]` relation,
+1. the `[Course][Name]` relation, and
+1. the `[Student][Course]` relation.
 
 An interesting question to ask might be "who are all the students of Dr. Na?"
 
@@ -145,7 +145,7 @@ We can pose this question as a Rellog query in the REPL:
     - Student = aditya
 ```
 
-We could even define the `[student][teacher]` relation in Rellog by writing a fact with a collection of conditions:
+We could even define the `[Student][Teacher]` relation in Rellog by writing a fact with a collection of conditions:
 
 ```clojure
 [Student][Teacher]
@@ -171,12 +171,12 @@ Now, to ask who Gideon's teachers are we could query:
 
 ### Getting Help
 
-There are many relations predefined for you to use in your Rellog code. Use the `[sig][help]` relation to query them:
+There are many relations predefined for you to use in your Rellog code. Use the `[Sig][Doc]` relation to query them:
 
 ```yaml
--- [Sig][Help]
+-- [Sig][Doc]
 
-    - Sig = [prefix][suffix][compound]
+    - Sig = [Prefix][Suffix][Compound]
     - Help =
        """
        Relates a list `Compound` to some partitioning 
@@ -185,14 +185,14 @@ There are many relations predefined for you to use in your Rellog code. Use the 
        """
 ```
 
-The `[sig][help]` relation is good to use to document your own relations too.
+The `[Sig][Help]` relation is good to use to document your own relations too.
 
-There's also the `[help]` relation. It performs a side-effect when queried (so it's not a pure relation). It prints out the `Help` text associated with the signature passed in:
+There's also the `[Help]` relation. It performs a side-effect when queried (so it's not a pure relation). It prints out the `Help` text associated with the signature passed in:
 
 ```
--- [help [pred][succ]]
+-- [help [Pred][Succ]]
 
-Relation: [pred][succ]<br/>
+Relation: [Pred][Succ]
 --------------
 Relates two adjacent integers: a predecessor and a successor.
 ```
@@ -308,34 +308,34 @@ Double linebreaks create a new paragraph.
 #### Relations
 
 - Sets of ***key-value pairs***. We call a key-value pair an ***attribute***.
-- The set of keys defines the name of a relation e.i. the set `{k1, k2, k3}` corresponds to a relation whose ***signature*** is `[k1][k2][k3]`.
+- The set of keys defines the name of a relation e.i. the set `{k1, k2, k3}` corresponds to a relation whose ***signature*** is `[K1][K2][K3]`.
 - The following 2 relations are the same because order does not matter.
-    - `[list][member]`
-    - `[member][list]`
+    - `[List][Member]`
+    - `[Member][List]`
 - ***Note:*** you cannot put any whitespace between the `]` and the `[` within relation value, i.e. this is two separate relations, not one:
   
     ```yaml
-    [list]   [member]
+    [List]   [Member]
     ```
 ##### Examples
 ```yaml
 [list L][member M]
 
 # The following 2 are the same:
-[human Human]
-[Human]
+[human human]
+[human]
 
 
 [numerator 4][denominator 3][Quotient][Remainder]
 
 # The following 2 are the same:
-[prefix][suffix][compound]
-[prefix prefix][suffix suffix][compound compound]
+[Prefix][Suffix][Compound]
+[prefix Prefix][suffix Suffix][compound Compound]
 
-# Relations of symbols that match the keys are referred to as *relation signatures*.
+# Relation values containing variables whose names match the keys are referred to as *relation signatures*.
 
-# Use the `[sig][help]` relation to get documentation on a relation.
-[sig [list][member]][Help]
+# Use the `[Sig][Doc]` relation to get documentation on a relation.
+[sig [List][Length]][Doc]
 ```
 
 ##### Uses
@@ -364,7 +364,7 @@ class Person:
 Person(name='casey', age=29, bank_balance_cents=-4400)
 ```
 
-In Rellog, this kind of person is representable by values with signature `[name][age][bank_balance_cents]`.
+In Rellog, this kind of person is representable by values with signature `[Name][Age][BankBalanceCents]`.
 
 An example value of this type would be:
 ```yaml
@@ -447,4 +447,5 @@ There are several commands that directly interact with the REPL. Most of them be
 | `:r`, `:reload` | Reload the currently loaded source files. |
 | `:l <PATH>`, `:load <PATH>` | Load a source file located at `<path>`. Use in conjunction with `[cd]` to change the current working directory, and `[cwd]` to see the current working directory. |
 | `:u <PATH>`, `:unload <PATH>` | Sometimes you want to stop paying attention to a file (maybe it was deleted and is no longer relevant). You can tell the REPL to forget about the file with `:unload`. |
+| `:d`, `:debug` | Enters debugging mode. Once in, use `help` to learn how to use the debugger. |
 | `:q`, `:quit`, `:e`, `:exit`, `:wq` | Quit the REPL. Can also be done with `CTRL-C` or `CTRL-D`. |

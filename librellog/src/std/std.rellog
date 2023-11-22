@@ -1,4 +1,4 @@
-[sig [prefix][suffix][compound]][help
+[sig [Prefix][Suffix][Compound]][doc
     """
     Relates a list `Compound` to some partitioning of itself into a `Prefix` 
     and a `Suffix`. Also works for text strings.
@@ -15,15 +15,15 @@
     """
 ]]
 
-[sig [forwards][backwards]][help "Relates a list to its reversal."]
-[forwards {}][backwards {}]
-[forwards {A ..As}][Backwards]
-    - [forwards As][backwards AsBackwards]
-    - [prefix AsBackwards][suffix {A}][compound Backwards]
+[sig [Forward][Backward]][doc "Relates a list to its reversal."]
+[forward {}][backward {}]
+[forward {A ..As}][Backward]
+    - [forward As][backward AsBackward]
+    - [prefix AsBackward][suffix {A}][compound Backward]
 
 [[todo
     """
-    `[[mode [forwards out][backwards in]]]` loops forever.
+    `[[mode [forward out][backward in]]]` loops forever.
     Does it need to be an intrinsic?
     """
 ]]
@@ -32,7 +32,7 @@
 [list {Other ..Rest}][Member]
     - [list Rest][Member]
 
-[sig [list][members]][help "Relates a list to a (sub?)list of its members."]
+[sig [List][Members]][doc "Relates a list to a (sub?)list of its members."]
 [List][members {}]
 [List][members {Member ..Rest}]
     - [List][members Rest]
@@ -54,40 +54,40 @@
 [must_be [num N]]
     - [must_be_num N]
 
-[sig [list][last]][help "Relates a list to its last element."]
+[sig [List][Last]][doc "Relates a list to its last element."]
 [list {Last}][Last]
 [list {X ..Xs}][Last]
     - [list Xs][Last]
 
-[[todo "mode [list out][length in] is broken"]]
-[sig [list][length]][help "Relates a list to it's length."]
-[list {}][length 0]
-[list {X ..Xs}][Length]
-    - [list Xs][length XsLength]
-    - [pred XsLength][succ Length]
+[[todo "mode [list out][len in] is broken"]]
+[sig [List][Len]][doc "Relates a list to it's length."]
+[list {}][len 0]
+[list {X ..Xs}][Len]
+    - [list Xs][len XsLen]
+    - [pred XsLen][succ Len]
 
 
-[sig [io {println}]][help "Prints a newline character to stdout."]
+[sig [io {println}]][doc "Prints a newline character to stdout."]
 [io {println}]
     - [io_writeln ""][stream stdout]
 
-[sig [io {println Text}]][help "Prints `Text` to stdout, followed by a newline character."]
+[sig [io {println Text}]][doc "Prints `Text` to stdout, followed by a newline character."]
 [io {println Text}]
     - [io_writeln Text][stream stdout]
 
-[sig [io {print Text}]][help "Prints `Text` to stdout."]
+[sig [io {print Text}]][doc "Prints `Text` to stdout."]
 [io {print Text}]
     - [io_write Text][stream stdout]
 
 
 [help Signature]
-    - [sig Signature][help HelpTxt]
+    - [sig Signature][doc DocTxt]
     - [term Signature][text SigTxt]
     - [io {println}]
     - [io {print "Relation: "}]
     - [io {println SigTxt}]
     - [io {println "--------------"}]
-    - [io {println HelpTxt}]
+    - [io {println DocTxt}]
     - [io {println}]
 
 [fn {factorial 0}][ret 1]
@@ -98,7 +98,7 @@
     - [fn {factorial PredN}][ret Fact]
     - [product Ret][x N][y Fact]
 
-[sig [formula][result]][help
+[sig [Formula][Result]][doc
     """
     Computes an arithmetic expression given by `Formula` and stores the result 
     in `Result`.
@@ -148,25 +148,25 @@
 
 [[comment "Documentation for builtins"]]
 
-[sig [rel][attrs]][help
+[sig [Rel][Attrs]][doc
     """
     Relates a relation to a list of its attributes. An attribute is a 
     `[key Value]` pair.
     """
 ]
 
-[sig [attr][key][value]][help
+[sig [Attr][Key][Value]][doc
     "Relates an attribute (a `[key Value]` pair) to its key and value."
 ]
 
-[sig [rel][key][value]][help
+[sig [Rel][Key][Value]][doc
     """
     Extracts a value from a relation given the key name. Faster than searching 
     through a list of the relation's attributes.
     """
 ]
 
-[sig [eq]][help
+[sig [Eq]][doc
     """
     Unifies together the elements of the provided list.
     
@@ -178,17 +178,17 @@
     """
 ]
 
-[sig [term][variables]][help
+[sig [Term][Variables]][doc
     "Relates a term to the list of variables contained in that term."
 ]
 
-[sig [original][duplicate]][help
+[sig [Original][Duplicate]][doc
     """
     Creates a duplicate of `Original` and unifies it with `Duplicate`.
     """
 ]
 
-[sig [original][duplicate][renaming][renamed]][help
+[sig [Original][Duplicate][Renaming][Renamed]][doc
     """
     Creates a duplicate of `Original` and unifies it with `Duplicate`.
 
@@ -205,78 +205,78 @@
     """
 ]
 
-[sig [snake_case][pascal_case]][help
+[sig [SnakeCase][PascalCase]][doc
     "Convert symbols between snake_case and PascalCase."
 ]
 
-[sig [gt][lt]][help
+[sig [Gt][Lt]][doc
     "True if the number `Gt` is greater than the number `Lt`."
 ]
 
-[sig [gte][lte]][help
+[sig [Gte][Lte]][doc
     "True if the number `Gte` is greater than or equal to the number `Lte`."
 ]
 
-[sig [must_be_var]][help
+[sig [MustBeVar]][doc
     "Succeeds if its argument is an unbound variable."
 ]
 
-[sig [must_be_num]][help
+[sig [MustBeNum]][doc
     "Succeeds if its argument is an instantiated number."
 ]
 
-[sig [must_be_sym]][help
+[sig [MustBeSym]][doc
     "Succeeds if its argument is an instantiated symbol."
 ]
 
-[sig [must_be_txt]][help
+[sig [MustBeTxt]][doc
     "Succeeds if its argument is an instantiated text string."
 ]
 
-[sig [must_be_rel]][help
+[sig [MustBeRel]][doc
     "Succeeds if its argument is an instantiated relation structure."
 ]
 
-[sig [txt_prefix][txt_suffix][txt_compound]][help
+[sig [TxtPrefix][TxtSuffix][TxtCompound]][doc
     "Pushes a suffix onto a text string."
 ]
 
-[sig [pred][succ]][help
+[sig [Pred][Succ]][doc
     "Relates two adjacent integers: a predecessor and a successor."
 ]
 
-[sig [true]][help "Always succeeds."]
-[sig [false]][help "Always fails."]
-[sig [not]][help
+[sig [True]][doc "Always succeeds."]
+[sig [False]][doc "Always fails."]
+[sig [Not]][doc
     """
     Succeeds if the goal passed to it fails, fails if the goal succeeds at least 
     once. Note: This is safe because the knowledgebase is immutable.
     """
 ]
 
-[sig [io_writeln][stream]][help
+[sig [IoWriteln][Stream]][doc
     "Writes a text string to `Stream`, and then writes a newline character."
 ]
 
-[sig [io_write][stream]][help
+[sig [IoWrite][Stream]][doc
     "Writes a text string to `Stream`."
 ]
 
-[sig [term][text]][help
+[sig [Term][Text]][doc
     "Relates a term to its text string representation."
 ]
 
-[sig [builtins]][help "Lists all builtin relations."]
+[sig [Builtins]][doc "Lists all builtin relations."]
 
-[sig [cwd]][help "Gives the current working directory."]
+[sig [Cwd]][doc "Gives the current working directory."]
 
-[sig [cd]][help
+[sig [Cd]][doc
     """
     Changes the current working directory to the path provided as an argument.
     """
 ]
 
-[sig [ls]][help
+[sig [Ls]][doc
     """
     Unifies its argument with a list of file/directory names from the current 
     working directory.
@@ -286,20 +286,20 @@
 [Min][Sub][Dif]
     - [minuend Min][subtrahend Sub][difference Dif]
 
-[sig [minuend][subtrahend][difference]][help
+[sig [Minuend][Subtrahend][Difference]][doc
     """
     Expresses the relationship: `Minuend - Subtrahend = Difference`.
     
     To perform addition, use mode `[subtrahend][difference][Minuend]`.
 
-    Alias: [min][sub][dif]
+    Alias: [Min][Sub][Dif]
     """
 ]
 
 [Num][Den][Quo][Rem]
     - [numerator Num][denominator Den][quotient Quo][remainder Rem]
 
-[sig [numerator][denominator][quotient][remainder]][help
+[sig [Numerator][Denominator][Quotient][Remainder]][doc
     """
     Expresses the relationship: `Numerator/Denominator = Quotient (with a 
     remainder of Remainder)`. More precisely, the relationship is `Numerator = 
@@ -308,7 +308,7 @@
     Can be used to express divisibility (when Remainder is set to 0), as well as
     multiplication (when Remainder is 0).
 
-    Alias: [num][den][quo][rem]
+    Alias: [Num][Den][Quo][Rem]
 
 
     Common Modes:
@@ -346,7 +346,7 @@
     "[[mode [num out][den in][quo out][rem in]]] not supported."
 ]]
 
-[sig [file_path][clauses][directives]][help
+[sig [FilePath][Clauses][Directives]][doc
     """
     Relates a rellog source file given by `FilePath` to that files contained 
     `Clauses` and `Directives`.
