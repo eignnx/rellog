@@ -773,24 +773,36 @@ impl BuiltinsMap {
         });
 
         // https://www.swi-prolog.org/pldoc/doc_for?object=catch/3
-        // catch(:Goal, +ExceptionTerm, :RecoveryGoal)
-        def_builtin!(intrs, |state, u, [goal][error] as _rel| {
+        def_builtin!(intrs, |state, u, [goal][truth] as _rel| {
             let solns = state.rt.solve_query_impl(goal.clone(), u.clone(), state.td);
+
             let has_errored = Cell::new(false);
-            let error = error.clone();
-            Box::new(solns.map_while(move |res| {
-                let error = error.clone();
+
+            let truth_cpy = truth.clone();
+            let u_cpy = u.clone();
+            let mut solns = solns.map_while(move |res| {
+                let truth = truth_cpy.clone();
+                let u = u_cpy.clone();
+
                 if has_errored.get() {
                     return None;
                 }
+
                 match res {
-                    Ok(u) => Some(Ok(u)),
+                    Ok(u) => u.unify(&truth, &RcTm::sym_true()).map(Ok),
                     Err(e) => {
                         has_errored.set(true);
-                        u.unify(&error, &Tm::Sym(format!("{e}").into()).into()).map(Ok)
+                        let error = tm!([error Tm::Sym(format!("{e}").into()).into()]).into();
+                        u.unify(&truth, &error).map(Ok)
                     },
                 }
-            }))
+            }).peekable();
+
+            if solns.peek().is_none() {
+                return soln_stream::unifying(u, truth, &RcTm::sym_false());
+            }
+
+            Box::new(solns)
         });
 
         #[derive(Clone, Copy)]

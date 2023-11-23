@@ -147,6 +147,14 @@ impl RcTm {
     pub fn sym(s: impl AsRef<str>) -> Self {
         Tm::Sym(IStr::from(s.as_ref())).into()
     }
+
+    pub fn sym_true() -> Self {
+        Tm::Sym("true".into()).into()
+    }
+
+    pub fn sym_false() -> Self {
+        Tm::Sym("false".into()).into()
+    }
 }
 
 #[macro_export]
