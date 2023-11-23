@@ -184,7 +184,7 @@ macro_rules! tm {
 
     ( $([$attr:ident $expr:expr])+ ) => {
         {
-            let mut rel = Rel::new();
+            let mut rel = $crate::ast::Rel::new();
 
             $(
                 rel.insert_mut(stringify!($attr).into(), $expr);

@@ -792,7 +792,7 @@ impl BuiltinsMap {
                     Ok(u) => u.unify(&truth, &RcTm::sym_true()).map(Ok),
                     Err(e) => {
                         has_errored.set(true);
-                        let error = tm!([error Tm::Sym(format!("{e}").into()).into()]).into();
+                        let error = tm!([error Tm::from(e).into()]).into();
                         u.unify(&truth, &error).map(Ok)
                     },
                 }
