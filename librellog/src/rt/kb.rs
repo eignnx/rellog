@@ -1,13 +1,9 @@
 //! Defines a rellog Knowledge Base ('kb').
 
-use std::{
-    collections::{BTreeMap, BTreeSet},
-    io::Read,
-    path::Path,
-};
+use std::{collections::BTreeMap, io::Read, path::Path};
 
 use crate::{
-    ast::{self, Clause, Rel, Sig},
+    ast::{self, Clause, RcTm, Rel, Sig},
     lex, parse,
 };
 
@@ -38,7 +34,7 @@ impl KnowledgeBase {
     }
 
     pub fn import(&mut self, other: impl Into<KnowledgeBase>) {
-        // TODO: detect name clashes
+        // TODO: detect name clashes from other modules.
         let mut other = other.into();
         self.directives.append(&mut other.directives);
         self.relations.append(&mut other.relations);
@@ -50,17 +46,33 @@ impl KnowledgeBase {
     pub fn index_match<'m>(
         &'m self,
         query_head: &Rel,
+        u: &UnifierSet,
     ) -> Option<impl ExactSizeIterator<Item = &'m Clause> + 'm> {
         let sig = query_head.keys().cloned().collect();
-        let sig_based_index = self.relations.get(&sig).map(|clauses| clauses.iter())?;
+        let sig_based_index = self.relations.get(&sig)?;
+        println!(
+            "\nSIG_BASED_INDEX: {} ~ {}",
+            RcTm::from(query_head.clone()),
+            RcTm::list_from_iter(
+                sig_based_index
+                    .iter()
+                    .cloned()
+                    .map(|clause| RcTm::from(clause.head))
+            )
+        );
         let arg_indexed = sig_based_index
+            .iter()
             .filter(|clause| {
-                let u = UnifierSet::new();
                 let clause_head = clause.head.clone().into();
                 let query_head = query_head.clone().into();
                 u.unify(&clause_head, &query_head).is_some()
             })
-            .collect::<BTreeSet<_>>();
+            .collect::<Vec<_>>();
+
+        println!(
+            "ARG_INDEXED: {}",
+            RcTm::list_from_iter(arg_indexed.iter().map(|clause| clause.head.clone().into()))
+        );
 
         Some(arg_indexed.into_iter())
     }

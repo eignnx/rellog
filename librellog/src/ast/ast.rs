@@ -8,6 +8,7 @@ use std::{
 };
 
 use char_list::CharList;
+use heck::ToPascalCase;
 use nom_locate::LocatedSpan;
 use rpds::{vector, Vector};
 use unifier_set::{ClassifyTerm, DirectChildren, TermKind};
@@ -15,7 +16,7 @@ use unifier_set::{ClassifyTerm, DirectChildren, TermKind};
 use crate::{
     ast::dup::{Dup, TmDuplicator},
     ast::tm_displayer::TmDisplayer,
-    data_structures::{Int, Map, Sym, Var},
+    data_structures::{Generation, Int, Map, Sym, Var},
     interner::IStr,
     lex::{
         self,
@@ -144,6 +145,16 @@ impl RcTm {
         }
     }
 
+    pub fn source_vars_to_repl_vars(&self) -> Self {
+        self.map_direct_children(|child| match child.as_ref() {
+            Tm::Var(v) if matches!(v.gen(), Generation::Source) => {
+                Tm::Var(Var::from_repl(v.istr())).into()
+            }
+            Tm::Var(_) => child.clone(), // Prevent infinite recursion.
+            _ => child.source_vars_to_repl_vars(),
+        })
+    }
+
     pub fn sym(s: impl AsRef<str>) -> Self {
         Tm::Sym(IStr::from(s.as_ref())).into()
     }
@@ -164,7 +175,7 @@ macro_rules! tm {
             let ident = stringify!($ident);
             match ident.chars().next().unwrap() {
                 ch if ch.is_lowercase() => Tm::Sym(ident.into()),
-                ch if ch.is_uppercase() => Tm::Var(ident.into()),
+                ch if ch.is_uppercase() => Tm::Var(Var::from_source(ident)),
                 _ => todo!(),
             }
         }
@@ -449,7 +460,10 @@ impl From<&Sig> for Tm {
             .0
             .iter()
             .copied()
-            .map(|sym| (sym, RcTm::from(Tm::Sym(sym))))
+            .map(|sym| {
+                let pascal = sym.to_str().to_pascal_case();
+                (sym, RcTm::from(Tm::Var(Var::from_source(pascal))))
+            })
             .collect();
         Tm::Rel(rel)
     }
@@ -458,7 +472,7 @@ impl From<&Sig> for Tm {
 impl fmt::Display for Sig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for key in &self.0 {
-            write!(f, "[{key}]")?;
+            write!(f, "[{}]", key.to_str().to_pascal_case())?;
         }
         Ok(())
     }

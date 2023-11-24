@@ -182,7 +182,7 @@ impl Rt {
         };
 
         // Perform "argument indexing", get all potientially-matching clauses.
-        let clauses = match self.db.index_match(rel) {
+        let clauses = match self.db.index_match(rel, &u) {
             Some(clauses) => clauses,
             None => {
                 // If it can't be found in the loaded module, check the intrinsics.

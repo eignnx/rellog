@@ -44,6 +44,32 @@
           - [gt @Numbers][lt @Bounds]
           - [member @Numbers][list {3 6 9}]
       ][Filtered]
+
+    {
+        [list {1 2 3}][var IterationVar$3]
+        [list X][var IterationVar$5]
+    }
+
+    {
+        [pred 1][succ X0]
+        [pred 2][succ X1]
+        [pred 3][succ X2]
+    }
+
+    {
+        {
+            [ele 1][var IterationVar$3]
+            [ele X0][var IterationVar$5]
+        }
+        {
+            [ele 2][var IterationVar$3]
+            [ele X1][var IterationVar$5]
+        }
+        {
+            [ele 3][var IterationVar$3]
+            [ele X2][var IterationVar$5]
+        }
+    }
     """
 ]]
 
@@ -68,8 +94,27 @@
     - [rel Goal][Attrs]
     - [splatted Attrs][Unsplatted][ListsSplatted]
     - [attrs Unsplatted][rel GoalNew]
-    - [dbg [goal GoalNew]]
+    - [dbg [GoalNew]]
     - [dbg [ListsSplatted]]
+    - [ListsSplatted][goal GoalNew]
+
+
+[Goal][lists_splatted {}]
+
+[Goal][lists_splatted {[list {}][Var]}]
+[Goal][lists_splatted {[list {X ..Xs}][Var]}]
+    - [original Goal][duplicate GoalDup][renaming {Var}][renamed {VarDup}]
+    - VarDup = X
+    - GoalDup
+    - [lists_splatted {[list Xs][Var]}][Goal]
+
+[Goal][lists_splatted {[list {}][var A] [list {}][var B]}]
+[Goal][lists_splatted {[list {X ..Xs}][var A] [list {Y ..Ys}][var B]}]
+    - [dbg {X Y}]
+    - [original {A B Goal}][duplicate {X Y GoalDup}]
+    - GoalDup
+    - [Goal][lists_splatted {[list Xs][var A] [list Ys][var B]}]
+
 
 
 [splatted {}][unsplatted {}][lists_splatted {}]
