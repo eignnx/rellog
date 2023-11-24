@@ -352,3 +352,17 @@
     `Clauses` and `Directives`.
     """
 ]
+
+[undocumented_sig S]
+    - [clause_head S][clause_body B]
+    - [not [Sig][Doc] ~ S]
+    - [not [Sig][Doc]; (Sig ~ S)]
+
+[sig [Goal][Truth]][doc
+    """
+    Runs `Goal`. If successful `Truth` = `true`, if it fails `Truth` = `false`,
+    and if it errors `Truth` = `[Error]` where `Error` is the error generated.
+
+    When `Goal` errors, all subsequent solutions will be cut.
+    """
+]

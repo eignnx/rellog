@@ -10,6 +10,7 @@ pub enum AppErr<'ts> {
     FileRead(String, std::io::Error),
     Lex(lex::LexError),
     Parse(parse::Error<'ts>),
+    #[allow(unused)]
     IoError(Box<dyn std::error::Error>),
 }
 

@@ -1,8 +1,8 @@
 use std::fmt;
 
 use crate::{
-    ast::{RcTm, Sig},
-    lex, parse,
+    ast::{RcTm, Sig, Tm},
+    lex, parse, tm,
 };
 
 #[derive(Debug, Clone)]
@@ -81,6 +81,58 @@ impl fmt::Display for Err {
             }
             Err::ParseError(msg) => write!(f, "{msg}"),
             Err::LexError(msg) => write!(f, "{msg}"),
+        }
+    }
+}
+
+impl From<Err> for Tm {
+    fn from(err: Err) -> Self {
+        match err {
+            Err::AttemptToQueryNonCallable(tm) => tm!([attempt_to_call_non_callable tm]),
+            Err::InstantiationError { rel, tm } => {
+                tm!([instantiation_error tm!([rel RcTm::sym(rel)][tm tm]).into()])
+            }
+            Err::NoSuchRelation(sig) => tm!([no_such_relation sig.into()]),
+            Err::ArgumentTypeError {
+                rel,
+                key,
+                expected_ty,
+                recieved_tm,
+            } => {
+                tm!([argument_type_error tm!(
+                    [rel
+                        RcTm::sym(rel)
+                    ][key
+                        RcTm::sym(key)
+                    ][expected_ty
+                        RcTm::sym(expected_ty)
+                    ][recieved_tm
+                        RcTm::sym(recieved_tm)
+                    ]
+                ).into()])
+            }
+            Err::GenericError { rel, msg } => tm!([generic_error
+                tm!([rel RcTm::sym(rel)][msg RcTm::sym(msg)]).into()
+            ]),
+            Err::UnexpectedPartialList { rel, key, partial } => tm!([unexpected_partial_list tm!(
+                [rel
+                    RcTm::sym(rel)
+                ][key
+                    RcTm::sym(key)
+                ][partial
+                    partial
+                ]
+            ).into()]),
+            Err::IoError(msg) => tm!([io_error RcTm::sym(msg)]),
+            Err::MaxRecursionDepthExceeded { depth, query } => {
+                tm!([max_recursion_depth_exceeded tm!(
+                    [depth
+                        Tm::Int(depth.into()).into()
+                    ][query query]
+                ).into()])
+            }
+            Err::ParseError(e) => tm!([parse_error RcTm::sym(e)]),
+            Err::LexError(e) => tm!([lex_error RcTm::sym(e)]),
         }
     }
 }

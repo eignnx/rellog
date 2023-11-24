@@ -1,5 +1,5 @@
 use std::{
-    cell::RefCell,
+    cell::{Cell, RefCell},
     collections::{BTreeMap, BTreeSet},
     fmt::{Debug, Display},
     io::{stderr, stdout, Write},
@@ -30,7 +30,14 @@ pub struct StateForBuiltin<'a> {
     td: &'a RefCell<TmDuplicator>,
 }
 
-type BuiltinMethod = Box<dyn Fn(&mut StateForBuiltin<'_>, UnifierSet, Rel) -> Box<dyn SolnStream>>;
+type BuiltinMethod = Box<
+    dyn for<'state> Fn(
+            &mut StateForBuiltin<'state>,
+            UnifierSet,
+            Rel,
+        ) -> Box<dyn SolnStream + 'state>
+        + 'static,
+>;
 
 pub struct Builtin {
     signature: Sig,
@@ -38,13 +45,13 @@ pub struct Builtin {
 }
 
 impl Builtin {
-    pub fn apply(
+    pub fn apply<'arg>(
         &self,
-        rt: &Rt,
-        td: &RefCell<TmDuplicator>,
+        rt: &'arg Rt,
+        td: &'arg RefCell<TmDuplicator>,
         u: UnifierSet,
         rel: Rel,
-    ) -> Box<dyn SolnStream> {
+    ) -> Box<dyn SolnStream + 'arg> {
         if self.signature != rel.keys().cloned().collect() {
             return soln_stream::failure();
         }
@@ -121,7 +128,12 @@ impl BuiltinsMap {
     fn def(
         &mut self,
         sig: &[&str],
-        func: impl Fn(&mut StateForBuiltin<'_>, UnifierSet, Rel) -> Box<dyn SolnStream> + 'static,
+        func: impl for<'state> Fn(
+                &mut StateForBuiltin<'state>,
+                UnifierSet,
+                Rel,
+            ) -> Box<dyn SolnStream + 'state>
+            + 'static,
     ) {
         let sig: Sig = sig.iter().map(|s| s.into()).collect();
 
@@ -758,6 +770,39 @@ impl BuiltinsMap {
                 Some(Ok(_)) => soln_stream::failure(),
                 None => soln_stream::success(u),
             }
+        });
+
+        // https://www.swi-prolog.org/pldoc/doc_for?object=catch/3
+        def_builtin!(intrs, |state, u, [goal][truth] as _rel| {
+            let solns = state.rt.solve_query_impl(goal.clone(), u.clone(), state.td);
+
+            let has_errored = Cell::new(false);
+
+            let truth_cpy = truth.clone();
+            let u_cpy = u.clone();
+            let mut solns = solns.map_while(move |res| {
+                let truth = truth_cpy.clone();
+                let u = u_cpy.clone();
+
+                if has_errored.get() {
+                    return None;
+                }
+
+                match res {
+                    Ok(u) => u.unify(&truth, &RcTm::sym_true()).map(Ok),
+                    Err(e) => {
+                        has_errored.set(true);
+                        let error = tm!([error Tm::from(e).into()]).into();
+                        u.unify(&truth, &error).map(Ok)
+                    },
+                }
+            }).peekable();
+
+            if solns.peek().is_none() {
+                return soln_stream::unifying(u, truth, &RcTm::sym_false());
+            }
+
+            Box::new(solns)
         });
 
         #[derive(Clone, Copy)]
