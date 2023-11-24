@@ -352,3 +352,8 @@
     `Clauses` and `Directives`.
     """
 ]
+
+[undocumented_sig S]
+    - [clause_head S][clause_body B]
+    - [not [Sig][Doc] ~ S]
+    - [not [Sig][Doc]; (Sig ~ S)]
