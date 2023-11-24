@@ -94,8 +94,6 @@
     - [rel Goal][Attrs]
     - [splatted Attrs][Unsplatted][ListsSplatted]
     - [attrs Unsplatted][rel GoalNew]
-    - [dbg [GoalNew]]
-    - [dbg [ListsSplatted]]
     - [ListsSplatted][goal GoalNew]
 
 
@@ -110,7 +108,6 @@
 
 [Goal][lists_splatted {[list {}][var A] [list {}][var B]}]
 [Goal][lists_splatted {[list {X ..Xs}][var A] [list {Y ..Ys}][var B]}]
-    - [dbg {X Y}]
     - [original {A B Goal}][duplicate {X Y GoalDup}]
     - GoalDup
     - [Goal][lists_splatted {[list Xs][var A] [list Ys][var B]}]
@@ -119,7 +116,7 @@
 
 [splatted {}][unsplatted {}][lists_splatted {}]
 
-[splatted {Attr0..Attrs0}][unsplatted {Attr..Attrs}][lists_splatted {[var IterationVar][List]..Xs}]
+[splatted {Attr0..Attrs0}][unsplatted {Attr..Attrs}][lists_splatted {[var IterationVar][List] ..Xs}]
     - [attr Attr0][Key][value [splat List]]
     - [Attr][Key][value IterationVar]
     - [splatted Attrs0][unsplatted Attrs][lists_splatted Xs]

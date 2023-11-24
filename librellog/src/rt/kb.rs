@@ -47,19 +47,24 @@ impl KnowledgeBase {
         &'m self,
         query_head: &Rel,
         u: &UnifierSet,
+        debug: bool,
     ) -> Option<impl ExactSizeIterator<Item = &'m Clause> + 'm> {
         let sig = query_head.keys().cloned().collect();
         let sig_based_index = self.relations.get(&sig)?;
-        println!(
-            "\nSIG_BASED_INDEX: {} ~ {}",
-            RcTm::from(query_head.clone()),
-            RcTm::list_from_iter(
-                sig_based_index
-                    .iter()
-                    .cloned()
-                    .map(|clause| RcTm::from(clause.head))
-            )
-        );
+
+        if debug {
+            println!(
+                "\nSIG_BASED_INDEX: {} ~ {}",
+                RcTm::from(query_head.clone()),
+                RcTm::list_from_iter(
+                    sig_based_index
+                        .iter()
+                        .cloned()
+                        .map(|clause| RcTm::from(clause.head))
+                )
+            );
+        }
+
         let arg_indexed = sig_based_index
             .iter()
             .filter(|clause| {
@@ -69,10 +74,12 @@ impl KnowledgeBase {
             })
             .collect::<Vec<_>>();
 
-        println!(
-            "ARG_INDEXED: {}",
-            RcTm::list_from_iter(arg_indexed.iter().map(|clause| clause.head.clone().into()))
-        );
+        if debug {
+            println!(
+                "ARG_INDEXED: {}",
+                RcTm::list_from_iter(arg_indexed.iter().map(|clause| clause.head.clone().into()))
+            );
+        }
 
         Some(arg_indexed.into_iter())
     }
