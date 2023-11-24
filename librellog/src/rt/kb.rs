@@ -40,8 +40,7 @@ impl KnowledgeBase {
         self.relations.append(&mut other.relations);
     }
 
-    /// Returns an `ExactSizeIterator` of all the clauses that could match the given Rel.
-    /// Eventually this ought to perform smart argument-indexing.
+    /// Returns an `ExactSizeIterator` of all the clauses whose heads match the given query.
     /// If the relation does not exist, `None` is returned.
     pub fn index_match<'m>(
         &'m self,
