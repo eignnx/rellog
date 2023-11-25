@@ -182,7 +182,7 @@ impl Rt {
         };
 
         // Perform "argument indexing", get all potientially-matching clauses.
-        let clauses = match self.db.index_match(rel) {
+        let clauses = match self.db.index_match(rel, &u, self.debug_mode.get()) {
             Some(clauses) => clauses,
             None => {
                 // If it can't be found in the loaded module, check the intrinsics.
@@ -291,7 +291,7 @@ impl Rt {
 
 #[test]
 fn test_runtime() {
-    use crate::{lex, parse};
+    use crate::{data_structures::Var, lex, parse};
     crate::init_interner();
 
     let src = "
@@ -316,6 +316,6 @@ fn test_runtime() {
         .collect::<Vec<_>>();
 
     assert2::let_assert!([Ok(u)] = &solns[..]);
-    let answer_var = Tm::Var("Compound".into()).into();
+    let answer_var = Tm::Var(Var::from_repl("Compound")).into();
     assert2::check!(&u.reify_term(&answer_var).to_string() == "{1 2 3 4 5 6}");
 }

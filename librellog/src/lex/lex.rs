@@ -1,7 +1,7 @@
 use std::{fmt::Display, path::PathBuf, str::FromStr};
 
 use crate::{
-    data_structures::Int,
+    data_structures::{Int, Var},
     interner::IStr,
     lex::tok::{At, MakeAt, Tok},
     utils::my_nom::{Res, Span},
@@ -105,7 +105,7 @@ fn var_or_sym(i: Span) -> Res<Tok> {
     .map(|span| span.fragment().into())
     .map(|sym: IStr| {
         if matches_variable(sym.to_str().as_ref()) {
-            Tok::Var(sym.into())
+            Tok::Var(Var::from_source(sym))
         } else if sym.to_str().starts_with(char::is_lowercase) {
             Tok::Sym(sym)
         } else {
@@ -221,8 +221,13 @@ pub fn tokenize_into<'i, 'buf>(
 mod block_tests {
     use super::tokenize;
     use super::Tok::*;
+    use crate::data_structures::Var;
     use crate::lex::tok::At;
     use pretty_assertions::assert_eq;
+
+    fn src_var(s: &str) -> Var {
+        Var::from_source(s)
+    }
 
     #[test]
     fn tokenize_basic_relation_def() {
@@ -244,7 +249,7 @@ mod block_tests {
 
         let expected = vec![
             OBrack,
-            Var("A".into()),
+            Var(src_var("A")),
             CBrack,
             Dash,
             OBrack,
@@ -276,9 +281,9 @@ mod block_tests {
         let expected = vec![
             OBrack,
             Sym("asdf".into()),
-            Var("Qwerty".into()),
+            Var(src_var("Qwerty")),
             COBrack,
-            Var("Poiu".into()),
+            Var(src_var("Poiu")),
             CBrack,
         ];
 

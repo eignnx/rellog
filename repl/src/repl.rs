@@ -337,7 +337,7 @@ fn parse_term(src: &str) -> Option<RcTm> {
             return None;
         }
     };
-    Some(query)
+    Some(query.source_vars_to_repl_vars())
 }
 
 fn load_module_from_file(tok_buf: &mut Vec<At<Tok>>, fname: String) -> AppRes<ast::Module> {

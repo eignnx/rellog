@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fmt, num::NonZeroUsize};
+use std::{collections::HashMap, fmt};
 
 use crate::data_structures::Var;
 
@@ -11,7 +11,7 @@ pub trait Dup {
 #[derive(Default)]
 pub struct TmDuplicator {
     substs: HashMap<Var, Var>,
-    gen: Option<NonZeroUsize>,
+    gen: u16,
     should_rename_var: Option<Box<dyn Fn(Var) -> bool>>,
 }
 
@@ -26,11 +26,12 @@ impl TmDuplicator {
     }
 
     fn incr_gen(&mut self) {
-        if let Some(gen) = self.gen {
-            self.gen = Some(NonZeroUsize::new(gen.get() + 1).unwrap());
-        } else {
-            self.gen = Some(NonZeroUsize::new(1).unwrap());
-        }
+        self.gen += 1
+    }
+
+    pub fn do_in_new_gen<'a>(&'a mut self, action: impl FnOnce(&'a mut Self)) {
+        self.incr_gen();
+        action(self)
     }
 
     fn reset(&mut self) {
@@ -41,8 +42,7 @@ impl TmDuplicator {
         match self.substs.get(old) {
             Some(new) => new.clone(),
             None if self.should_rename_var(old) => {
-                let gen = self.gen.expect("Don't generate Vars with None generation.");
-                let new = old.with_gen(gen);
+                let new = old.with_gen(self.gen);
                 self.substs.insert(old.clone(), new.clone());
                 new
             }
