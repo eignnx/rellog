@@ -1,0 +1,75 @@
+
+[Nat][Base][Digits]
+    - [Nat][Base][RevDigits]
+    - [forwards RevDigits][backwards Digits]
+
+[nat 0][Base][revdigits {}]
+[Nat][Base][revdigits {Rem ..Ds}]
+    - [num Nat][den Base][Quo][Rem]
+    - [nat Quo][Base][revdigits Ds]
+
+[[todo
+    "[[mode [num out][den in][quo out][rem in]]] not supported."
+]]
+
+[fn {factorial 0}][ret 1]
+[fn {factorial 1}][ret 1]
+[fn {factorial N}][Ret]
+    - [gt N][lt 1]
+    - [formula {N mul {factorial {N sub 1}}}][result Ret]
+
+[fn {sq X}][Ret]
+    - [product Ret][X][y X]
+
+[sig [Formula][Result]][doc
+    """
+    Computes an arithmetic expression given by `Formula` and stores the result 
+    in `Result`.
+
+
+    Available operations are:
+
+        - `{X add Y}` for addition
+
+        - `{X sub Y}` for subtraction
+
+        - `{X mul Y}` for multiplication
+
+        - `{X div Y}` for integer division
+
+        - `{X mod Y}` for euclidean modulus
+
+        - `{neg X}` for negation
+
+    Also any function defined with the `[Fn][Ret]` relation can be called.
+    """
+]
+[formula N][result N]
+    - [must_be_num N]
+[formula {A0 mul B0}][result C]
+    - [formula A0][result A]
+    - [formula B0][result B]
+    - [den A][quo B][rem 0][num C]
+[formula {A0 div B0}][result C]
+    - [formula A0][result A]
+    - [formula B0][result B]
+    - [num A][den B][quo C][rem Ignore]
+[formula {A0 mod B0}][result C]
+    - [formula A0][result A]
+    - [formula B0][result B]
+    - [num A][den B][quo Ignore][rem C]
+[formula {A0 add B0}][result C]
+    - [formula A0][result A]
+    - [formula B0][result B]
+    - [subtrahend A][difference B][minuend C]
+[formula {A0 sub B0}][result C]
+    - [formula A0][result A]
+    - [formula B0][result B]
+    - [minuend A][subtrahend B][difference C]
+[formula {neg A0}][result B]
+    - [formula A0][result A]
+    - [minuend 0][subtrahend A][difference B]
+[formula {F ..Args0}][result Ret]
+    - [must_be_sym F]
+    - [elementwise [formula [splat Args0]][result [splat Args]]]
+    - [fn {F ..Args}][Ret]

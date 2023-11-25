@@ -80,6 +80,19 @@
     - [io_write Text][stream stdout]
 
 
+[sig [io {writeln Text}]][doc "Writes `Text` to `Stream`, followed by a newline character."]
+[io {writeln Stream Text}]
+    - [io_writeln Text][Stream]
+
+[sig [io {writeln}]][doc "Writes a newline character to `Stream`."]
+[io {writeln Stream}]
+    - [io_writeln ""][Stream]
+
+[sig [io {write Text}]][doc "Writes `Text` to `Stream`."]
+[io {write Stream Text}]
+    - [io_write Text][Stream]
+
+
 [help Signature]
     - [sig Signature][doc DocTxt]
     - [term Signature][text SigTxt]
@@ -89,61 +102,6 @@
     - [io {println "--------------"}]
     - [io {println DocTxt}]
     - [io {println}]
-
-[fn {factorial 0}][ret 1]
-[fn {factorial 1}][ret 1]
-[fn {factorial N}][Ret]
-    - [gt N][lt 1]
-    - [succ N][pred PredN]
-    - [fn {factorial PredN}][ret Fact]
-    - [product Ret][x N][y Fact]
-
-[sig [Formula][Result]][doc
-    """
-    Computes an arithmetic expression given by `Formula` and stores the result 
-    in `Result`.
-
-
-    Available operations are:
-
-        - `{X add Y}` for addition
-
-        - `{X sub Y}` for subtraction
-
-        - `{X mul Y}` for multiplication
-
-        - `{X div Y}` for integer division
-
-        - `{X mod Y}` for euclidean modulus
-
-        - `{neg X}` for negation
-    """
-]
-[formula N][result N]
-    - [must_be_num N]
-[formula {A0 mul B0}][result C]
-    - [formula A0][result A]
-    - [formula B0][result B]
-    - [den A][quo B][rem 0][num C]
-[formula {A0 div B0}][result C]
-    - [formula A0][result A]
-    - [formula B0][result B]
-    - [num A][den B][quo C][rem Ignore]
-[formula {A0 mod B0}][result C]
-    - [formula A0][result A]
-    - [formula B0][result B]
-    - [num A][den B][quo Ignore][rem C]
-[formula {A0 add B0}][result C]
-    - [formula A0][result A]
-    - [formula B0][result B]
-    - [subtrahend A][difference B][minuend C]
-[formula {A0 sub B0}][result C]
-    - [formula A0][result A]
-    - [formula B0][result B]
-    - [minuend A][subtrahend A][difference C]
-[formula {neg A0}][result B]
-    - [formula A0][result A]
-    - [minuend 0][subtrahend A][difference B]
 
 
 [[comment "Documentation for builtins"]]
@@ -170,10 +128,6 @@
     """
     Unifies together the elements of the provided list.
     
-    Syntax sugar allows these to be equivalent expressions:
-
-    -- A = B = C
-
     -- [eq {A B C}]
     """
 ]
@@ -332,19 +286,6 @@
     [num][den 1][Quo][rem] <=> quo = num - rem
     """
 ]
-
-[Nat][Base][Digits]
-    - [Nat][Base][RevDigits]
-    - [forwards RevDigits][backwards Digits]
-
-[nat 0][Base][revdigits {}]
-[Nat][Base][revdigits {Rem ..Ds}]
-    - [num Nat][den Base][Quo][Rem]
-    - [nat Quo][Base][revdigits Ds]
-
-[[todo
-    "[[mode [num out][den in][quo out][rem in]]] not supported."
-]]
 
 [sig [FilePath][Clauses][Directives]][doc
     """

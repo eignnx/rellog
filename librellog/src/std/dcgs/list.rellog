@@ -1,10 +1,16 @@
+[[exporting {
+    [Rule][Output]
+    [Rule][Before][After]
+}]]
+
+
 [Rule][Output]
-    - [Rule][before ""][after Output]
+    - [Rule][before {}][after Output]
 
 
 [Rule][Before][After]
     - [must_be_txt Rule]
-    - [txt_prefix Before][txt_suffix Rule][txt_compound After]
+    - [prefix Before][suffix Rule][compound After]
 
 [Rule][Before][After]
     - [must_be_rel Rule]
@@ -20,19 +26,3 @@
 [rules {Rule ..Rules}][Before][After]
     - [Rule][Before][after AfterRule]
     - [Rules][before AfterRule][After]
-
-
-[story]
-    - "Once upon a time there was "
-    - [a][StartLetter]
-    - " "
-    - [Animal][StartLetter]
-    - " who was very hungry."
-
-
-[animal aardvark][start_letter vowel] - "aardvark"
-[animal bear][start_letter consonant] - "bear"
-
-
-[a][start_letter vowel] - "an"
-[a][start_letter consonant] - "a"

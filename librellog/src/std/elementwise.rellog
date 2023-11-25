@@ -34,9 +34,12 @@
     - ^[base ^{1 2 3}][exponent 2][power ^Out]
     - ![base !{1 2 3}][exponent 2][power !Out]
     - ([base ({1 2 3})][exponent 2][power (Out)])
+    - [elementwise [base [splat {1 2 3}]][exponent [scalar 2]][power [splat Out]]]
+    - [elementwise [base ['*' {1 2 3}]][exponent ['_' 2]][power ['*' Out]]]
 
     - [each [base @{1 2 3}][exponent 2][power @Out]]
     - [each [base @{1 2 3}][exponent 2][@Power]]
+
     - [elementwise
           [base @{1 2 3}][exponent 2][@Power]
       ]
@@ -44,7 +47,11 @@
           - [gt @Numbers][lt @Bounds]
           - [member @Numbers][list {3 6 9}]
       ][Filtered]
+    """
+]]
 
+[[scratch_paper
+    """
     {
         [list {1 2 3}][var IterationVar$3]
         [list X][var IterationVar$5]
@@ -73,13 +80,6 @@
     """
 ]]
 
-[call Goal]
-    - Goal
-
-[list1 {}][list2 {}][zipped {}]
-[list1 {A..As}][list2 {B..Bs}][zipped {{A B}..AsBs}]
-    - [list1 As][list2 Bs][zipped AsBs]
-
 
 [[example
     """
@@ -88,6 +88,11 @@
            ][exponent [scalar 3]
            ][power [splat Out]]
        ]
+    """
+]]
+[[example
+    """
+    -- [elementwise [pred [splat {1 2 3}]]][succ [splat X]]]
     """
 ]]
 [elementwise Goal]
@@ -113,27 +118,34 @@
     - [Goal][lists_splatted {[list Xs][var A] [list Ys][var B]}]
 
 
-
+[sig [Splatted][Unsplatted][ListsSplatted]][doc
+    [params
+        [splatted
+            """
+            A list of attributes which may have keys of either `[splat X]` or
+            `[scalar]`.
+            """
+        ][unsplatted
+            """
+            The `Splatted` list with all `splat`s and `scalar`s unwrapped and
+            removed.
+            """
+        ][lists_splatted
+            """
+            A list summarizing which the splatted lists and giving fresh
+            iteration variables for each one.
+            """
+        ]
+    ]
+]
 [splatted {}][unsplatted {}][lists_splatted {}]
 
-[splatted {Attr0..Attrs0}][unsplatted {Attr..Attrs}][lists_splatted {[var IterationVar][List] ..Xs}]
+[splatted {Attr0 ..Attrs0}][unsplatted {Attr ..Attrs}][lists_splatted {[var IterationVar][List] ..Xs}]
     - [attr Attr0][Key][value [splat List]]
     - [Attr][Key][value IterationVar]
     - [splatted Attrs0][unsplatted Attrs][lists_splatted Xs]
 
-[splatted {Attr0..Attrs0}][unsplatted {Attr..Attrs}][ListsSplatted]
+[splatted {Attr0 ..Attrs0}][unsplatted {Attr ..Attrs}][ListsSplatted]
     - [attr Attr0][Key][value [Scalar]]
     - [Attr][Key][value Scalar]
     - [splatted Attrs0][unsplatted Attrs][ListsSplatted]
-
-
-[dbg Term]
-    - [Term][Text]
-    - [io {println Text}]
-
-[old_list {}][new_list {}][subst [Old][New]]
-[old_list {Old..OldRem}][new_list {New..NewRem}][subst [Old][New]]
-    - [old_list OldRem][new_list NewRem][subst [Old][New]]
-[old_list {Unrelated..OldRem}][new_list {Unrelated..NewRem}][subst [Old][New]]
-    - [old_list OldRem][new_list NewRem][subst [Old][New]]
-
