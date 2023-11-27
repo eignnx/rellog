@@ -12,6 +12,7 @@ use unifier_set::DirectChildren;
 use crate::{
     ast::{dup::TmDuplicator, Clause, RcTm, Rel, Sig, Tm},
     data_structures::{Int, Var},
+    interner::IStr,
     lex::{self, tok::Tok},
     parse,
     rt::{kb::KnowledgeBase, Err},
@@ -1125,6 +1126,55 @@ impl BuiltinsMap {
                     })
                 })
                 .map(Ok))
+        });
+
+        def_builtin!(intrs, |_state, u, [tm_in][reified_tm_out] as _rel| {
+
+            fn reify(tm: &RcTm) -> RcTm {
+                match tm.as_ref() {
+                    Tm::Nil  => tm.clone(),
+                    Tm::Cons(head, tail) => Tm::Cons(reify(head), reify(tail)).into(),
+                    Tm::Var(v) => tm!([var
+                        tm!([name
+                            Tm::Sym(v.istr()).into()
+                        ][gen
+                            v.gen().into()
+                        ]).into()
+                    ]).into(),
+                    Tm::Int(..) => tm!([int tm.clone()]).into(),
+                    Tm::Sym(..) => tm!([sym tm.clone()]).into(),
+                    Tm::Txt(..) => tm!([txt tm.clone()]).into(),
+                    Tm::BinOp(f, lhs, rhs) => tm!([binop
+                        tm!([functor
+                                (*f).into()
+                            ][lhs
+                                reify(lhs)
+                            ][rhs
+                                reify(rhs)
+                            ]).into()
+                        ]).into(),
+                    Tm::Block(f, members) => tm!([binop
+                        tm!([functor
+                                Tm::Sym(IStr::from(f.to_string())).into()
+                            ][members
+                                RcTm::list_from_iter(members.iter().map(reify))
+                            ]).into()
+                        ]).into(),
+                    Tm::Rel(rel) => tm!([rel
+                        tm!([attrs
+                                RcTm::list_from_iter(rel.iter().map(|(k, v)| {
+                                    tm!([key
+                                        Tm::Sym(*k).into()
+                                    ][value
+                                        reify(v)
+                                    ]).into()
+                                }))
+                            ]).into()
+                        ]).into(),
+                }
+            }
+
+            soln_stream::unifying(u, reified_tm_out, &reify(tm_in))
         });
 
         def_builtin!(intrs, |_state, u, [file_path][clauses][directives] as rel| {
