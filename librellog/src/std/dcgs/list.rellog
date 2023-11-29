@@ -1,7 +1,4 @@
-[[exporting {
-    [Rule][Output]
-    [Rule][Before][After]
-}]]
+[[exporting { [Rule][Output] [Rule][Before][After] }]]
 
 
 [Rule][Output]
