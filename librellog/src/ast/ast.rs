@@ -318,6 +318,7 @@ impl ClassifyTerm<Var> for RcTm {
             (Tm::Rel(r1), Tm::Rel(r2)) => r1.keys().eq(r2.keys()),
             (Tm::Cons(_, _), Tm::Cons(_, _)) => true,
             (Tm::Nil, Tm::Nil) => true,
+            (Tm::BinOp(op1, _, _), Tm::BinOp(op2, _, _)) => op1 == op2,
             _ => false,
         }
     }
