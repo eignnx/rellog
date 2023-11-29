@@ -5,17 +5,21 @@
     - [Rule][before {}][after Output]
 
 
-[Rule][Before][After]
-    - [must_be_txt Rule]
-    - [prefix Before][suffix Rule][compound After]
+[rule {}][before S][after S]
 
-[Rule][Before][After]
-    - [must_be_rel Rule]
-    - [clause_head Rule][ClauseBody]
+[rule {X ..Xs}][Before][After]
+    - [prefix Before][suffix {X ..Xs}][compound After]
+
+[rule logic=Rule][before S][after S]
+    - Rule
+
+[rule Rel][Before][After]
+    - [must_be_rel Rel]
+    - [clause_head Rel][ClauseBody]
     - [rule ClauseBody][Before][After]
 
-[Rule][Before][After]
-    - [block Rule][functor '-'][Members]
+[rule Block][Before][After]
+    - [Block][functor '-'][Members]
     - [rules Members][Before][After]
 
 

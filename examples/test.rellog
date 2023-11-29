@@ -22,3 +22,13 @@
 [story "There once was a man from Nantucket..."]
 
 [[operator "::"][precedence 32]]
+
+
+[my_dcg AlsoDigits]
+    - {a b c}
+    - logic=[maybe_digits Next][cond AlsoDigits]
+    - Next
+    - {x y z}
+
+[maybe_digits {1 2 3}][cond true]
+[maybe_digits {}][cond false]
