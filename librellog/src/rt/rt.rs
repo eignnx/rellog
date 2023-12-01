@@ -270,6 +270,7 @@ impl Rt {
     ) -> impl ExactSizeIterator<Item = Result<UnifierSet, Err>> + '_ {
         DeferredIter::new(|| {
             self.maybe_breakpoint(Event::Exit);
+            let _ = self.query_stack.borrow_mut().pop();
             self.decr_recursion_depth();
         })
     }

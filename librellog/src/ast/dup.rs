@@ -57,13 +57,13 @@ impl TmDuplicator {
             .unwrap_or(true)
     }
 
-    pub fn duplicate_conditionally<D: Dup>(
+    pub fn dup_conditionally<D: Dup>(
         &mut self,
         x: &D,
         cond: Box<impl Fn(Var) -> bool + 'static>,
     ) -> D {
         let old_cond = self.should_rename_var.replace(cond);
-        let new = self.duplicate(x);
+        let new = x.dup(self);
         self.should_rename_var = old_cond;
         new
     }

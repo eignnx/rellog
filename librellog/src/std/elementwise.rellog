@@ -118,26 +118,17 @@
     - [Goal][lists_splatted {[list Xs][var A] [list Ys][var B]}]
 
 
-[sig [Splatted][Unsplatted][ListsSplatted]][doc
-    [params
-        [splatted
-            """
-            A list of attributes which may have keys of either `[splat X]` or
-            `[scalar]`.
-            """
-        ][unsplatted
-            """
-            The `Splatted` list with all `splat`s and `scalar`s unwrapped and
-            removed.
-            """
-        ][lists_splatted
-            """
-            A list summarizing which the splatted lists and giving fresh
-            iteration variables for each one.
-            """
-        ]
-    ]
-]
+[todo "format this nicely once the parser can handle it"]
+[sig [Splatted][Unsplatted][ListsSplatted]][doc [params [splatted """
+                                                                  A list of attributes which may have keys of either `[splat X]` or
+                                                                  `[scalar]`.
+                                                                  """ ][unsplatted """
+                                                                                   The `Splatted` list with all `splat`s and `scalar`s unwrapped and
+                                                                                   removed.
+                                                                                   """ ][lists_splatted """
+                                                                                                        A list summarizing which the splatted lists and giving fresh
+                                                                                                        iteration variables for each one.
+                                                                                                        """ ] ] ]
 [splatted {}][unsplatted {}][lists_splatted {}]
 
 [splatted {Attr0 ..Attrs0}][unsplatted {Attr ..Attrs}][lists_splatted {[var IterationVar][List] ..Xs}]

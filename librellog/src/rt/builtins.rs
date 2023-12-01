@@ -10,7 +10,10 @@ use rpds::Vector;
 use unifier_set::DirectChildren;
 
 use crate::{
-    ast::{dup::TmDuplicator, Clause, RcTm, Rel, Sig, Tm},
+    ast::{
+        dup::{Dup, TmDuplicator},
+        Clause, RcTm, Rel, Sig, Tm,
+    },
     data_structures::{Int, Var},
     interner::IStr,
     lex::{self, tok::Tok},
@@ -398,7 +401,7 @@ impl BuiltinsMap {
         });
 
         def_builtin!(intrs, |state, u, [original][duplicate] as _rel| {
-            let new = state.td.borrow_mut().duplicate(original);
+            let new = original.dup(&mut state.td.borrow_mut());
             soln_stream::unifying(u, &new, duplicate)
         });
 
@@ -413,7 +416,7 @@ impl BuiltinsMap {
             };
 
             let new = state.td.borrow_mut()
-                .duplicate_conditionally(original, Box::new(move |var| {
+                .dup_conditionally(original, Box::new(move |var| {
                     renaming_set.contains(&RcTm::from(var))
                 }));
 

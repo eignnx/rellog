@@ -24,11 +24,11 @@
 [[operator "::"][precedence 32]]
 
 
-[my_dcg B]
+[my_dcg AlsoDigits]
     - {a b c}
-    - logic=[maybe_list L][cond B]
-    - L
+    - logic=[maybe_digits Next][cond AlsoDigits]
+    - Next
     - {x y z}
 
-[maybe_list {1 2 3}][cond true]
-[maybe_list {}][cond false]
+[maybe_digits {1 2 3}][cond true]
+[maybe_digits {}][cond false]
