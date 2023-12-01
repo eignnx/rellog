@@ -1156,7 +1156,7 @@ impl BuiltinsMap {
                                 reify(rhs)
                             ]).into()
                         ]).into(),
-                    Tm::Block(f, members) => tm!([binop
+                    Tm::Block(f, members) => tm!([block
                         tm!([functor
                                 Tm::Sym(IStr::from(f.to_string())).into()
                             ][members
