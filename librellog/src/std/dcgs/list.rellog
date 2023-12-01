@@ -16,11 +16,11 @@
 [impl][rule (logic=Rule) ~ _][before S][after S]
     - Rule
 
-[impl][rule Rel ~ [rel _]][Before][After]
-    - [clause_head Rel][ClauseBody]
+[impl][rule Rule ~ [Rel]][Before][After]
+    - [clause_head Rule][ClauseBody]
     - [rule ClauseBody][Before][After]
 
-[impl][rule Block ~ [block _]][Before][After]
+[impl][rule Block ~ [block [functor '-'][members _]]][Before][After]
     - [Block][functor '-'][Members]
     - [rules Members][Before][After]
 

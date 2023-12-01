@@ -1111,18 +1111,30 @@ impl BuiltinsMap {
             soln_stream::unifying(u, directives, &ds)
         });
 
-        def_builtin!(intrs, |state, u, [clause_head][clause_body] as _rel| {
-            let relations_clone = state.rt.db.relations.clone();
+        def_builtin!(intrs, |state, u, [clause_head][clause_body] as rel| {
+            let Some(clause_head_rel) = clause_head.try_as_rel() else {
+                return soln_stream::error(Err::ArgumentTypeError {
+                    rel: rel.to_string(),
+                    key: "clause_head".to_string(),
+                    expected_ty: "relation".to_string(),
+                    recieved_tm: clause_head.to_string(),
+                });
+            };
+
+            let Some(clauses) = state.rt.db.index_match(clause_head_rel, &u, state.rt.debug_mode.get()) else {
+                return soln_stream::failure();
+            };
+
             let clause_head = clause_head.clone();
             let clause_body = clause_body.clone();
-            Box::new(relations_clone
+
+            Box::new(clauses
                 .into_iter()
-                // TODO: use `_sig` to trim search space via signature indexing.
-                .flat_map(move |(_sig, clauses)| clauses)
                 .flat_map(move |Clause { head: h, body: b }| {
-                    u.unify(&clause_head, &RcTm::from(h)).and_then(|u| {
+                    let head = Tm::Rel(h.clone()).into();
+                    u.unify(&clause_head, &head).and_then(|u| {
                         u.unify(&clause_body, &if let Some(b) = b {
-                            b
+                            b.clone()
                         } else {
                             tm!([true]).into()
                         })
