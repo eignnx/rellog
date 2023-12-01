@@ -22,3 +22,13 @@
 [story "There once was a man from Nantucket..."]
 
 [[operator "::"][precedence 32]]
+
+
+[my_dcg B]
+    - {a b c}
+    - logic=[maybe_list L][cond B]
+    - L
+    - {x y z}
+
+[maybe_list {1 2 3}][cond true]
+[maybe_list {}][cond false]
