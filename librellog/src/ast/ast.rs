@@ -253,9 +253,9 @@ impl Deref for RcTm {
     }
 }
 
-impl From<Tm> for RcTm {
-    fn from(tm: Tm) -> Self {
-        RcTm(Rc::new(tm))
+impl<T: Into<Tm>> From<T> for RcTm {
+    fn from(value: T) -> Self {
+        RcTm(Rc::new(value.into()))
     }
 }
 
@@ -385,6 +385,12 @@ pub const DEFERENCE_TABLE: &[BinOpSymbol] = &[
     BinOpSymbol::Tilde,
     BinOpSymbol::Semicolon, // Highest deference (lowest precedence).
 ];
+
+impl From<BinOpSymbol> for Tm {
+    fn from(value: BinOpSymbol) -> Self {
+        Tm::Sym(IStr::from(value.to_string()))
+    }
+}
 
 impl fmt::Display for BinOpSymbol {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

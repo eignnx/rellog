@@ -4,21 +4,23 @@
 [Rule][Output]
     - [Rule][before {}][after Output]
 
+[Rule][Before][After]
+    - [tm_in Rule][reified_tm_out ReifiedRule]
+    - [impl][rule Rule ~ ReifiedRule][Before][After]
 
-[rule {}][before S][after S]
+[impl][rule {} ~ _][before S][after S]
 
-[rule {X ..Xs}][Before][After]
+[impl][rule {X ..Xs} ~ _][Before][After]
     - [prefix Before][suffix {X ..Xs}][compound After]
 
-[rule logic=Rule][before S][after S]
+[impl][rule (logic=Rule) ~ _][before S][after S]
     - Rule
 
-[rule Rel][Before][After]
-    - [must_be_rel Rel]
-    - [clause_head Rel][ClauseBody]
+[impl][rule Rule ~ [Rel]][Before][After]
+    - [clause_head Rule][ClauseBody]
     - [rule ClauseBody][Before][After]
 
-[rule Block][Before][After]
+[impl][rule Block ~ [block [functor '-'][members _]]][Before][After]
     - [Block][functor '-'][Members]
     - [rules Members][Before][After]
 

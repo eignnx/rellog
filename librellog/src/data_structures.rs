@@ -4,8 +4,12 @@ use num::BigInt;
 use rpds::RedBlackTreeMap;
 
 use crate::{
-    ast::dup::{Dup, TmDuplicator},
+    ast::{
+        dup::{Dup, TmDuplicator},
+        Tm,
+    },
     interner::IStr,
+    tm,
 };
 
 pub type Sym = IStr;
@@ -37,6 +41,16 @@ impl Generation {
             Self::Internal(old) => {
                 panic!("Attempting to set a generation to an older one! (old={old}, new={new})")
             }
+        }
+    }
+}
+
+impl From<Generation> for Tm {
+    fn from(value: Generation) -> Self {
+        match value {
+            Generation::Repl => Tm::Sym("repl".into()),
+            Generation::Source => Tm::Sym("source".into()),
+            Generation::Internal(g) => tm!([internal Tm::Int(g.into()).into()]),
         }
     }
 }
