@@ -214,7 +214,6 @@ impl Display for I9nErrorCtxDisplay {
 
 fn tok<'ts>(tgt: Tok) -> impl Parser<Toks<'ts>, At<Tok>, Error<'ts>> {
     let p = move |ts: Toks<'ts>| -> Res<'ts, At<Tok>> {
-        println!("<parse:tok TRY=\"{tgt:?}\"");
         match ts.split_first() {
             Some((t, rest)) if t.as_ref() == &tgt => Ok((rest, t.clone())),
             Some((t, _)) => {
@@ -226,8 +225,6 @@ fn tok<'ts>(tgt: Tok) -> impl Parser<Toks<'ts>, At<Tok>, Error<'ts>> {
             }
             None => Err(eof_error(ts)),
         }
-        .inspect(|_| println!("SUCCESS />"))
-        .inspect_err(|_| println!("FAIL />"))
     };
     nom_i9n::tok(p)
 }
@@ -282,26 +279,17 @@ fn txt(ts: Toks) -> Res<CharList> {
 }
 
 fn attr(ts: Toks) -> Res<(Sym, RcTm)> {
-    println!("<attr TRY>");
     alt((
         // [name Value]
         tuple((
             sym,
             alt((
-                |ts| {
-                    println!("<attr:non_block_tm TRY in a new block />");
-                    delimited(
-                        nom_i9n::begin_block,
-                        nom_i9n::on_new_line(non_block_tm),
-                        nom_i9n::end_block,
-                    )
-                    .parse(ts)
-                },
-                |ts| {
-                    println!("<attr:non_block_tm FAIL in a new block />");
-                    println!("<attr:tm TRY />");
-                    tm.parse(ts)
-                },
+                delimited(
+                    nom_i9n::begin_block,
+                    nom_i9n::on_new_line(non_block_tm),
+                    nom_i9n::end_block,
+                ),
+                tm,
             )),
         )),
         // [AttrVarSameName]
@@ -315,8 +303,6 @@ fn attr(ts: Toks) -> Res<(Sym, RcTm)> {
     ))
     .map(|(sym, tm)| (sym, tm.into()))
     .parse(ts)
-    .inspect(|(_ts, x)| println!("SUCCESS, {x:?}\n</attr>"))
-    .inspect_err(|_| println!("FAIL\n</attr>"))
 }
 
 fn rel(ts: Toks) -> Res<Rel> {

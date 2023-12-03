@@ -7,8 +7,6 @@
 //! Throughout the crate, the word **indentation** has been abbreviated **i9n**
 //! (in the word *indentation*, there are nine letters between the *i* and the *n*).
 
-#![feature(result_option_inspect)]
-
 pub use crate::{errors::*, i9n_input::*, traits::*};
 use nom::{error::ParseError, multi::many1, sequence::preceded, IResult, InputLength, Parser};
 use std::{cmp::Ordering, fmt::Debug, marker::PhantomData};
@@ -57,14 +55,11 @@ where
     Tf: NextTokLoc<I> + Clone,
     E: From<I9nError<I>>,
 {
-    println!("<begin_block TRY {}", loc(&i));
     if i.current_loc().col > i.current_i9n() {
         let i = i.push_i9n(i.current_loc().col);
-        println!("SUCCEED {} />", loc(&i));
         return Ok((i, ()));
     }
 
-    println!("FAIL NotGt AtNewGroup {} />", loc(&i));
     let e = i.make_error(I9nRelation::NotGt, I9nErrorCtx::AtNewGroup);
     Err(nom::Err::Error(e.into()))
 }
@@ -80,40 +75,18 @@ where
     E: From<I9nError<I>>,
 {
     let col = i.current_loc().col;
-    println!("<end_block ");
 
     if col < i.current_i9n() {
         let i = i.pop_i9n();
         if col > i.current_i9n() {
             let e = i.make_error(I9nRelation::Gt, I9nErrorCtx::AtGroupEnd);
-            println!("FAIL Gt AtGroupEnd {} />", loc(&i));
             return Err(nom::Err::Error(e.into()));
         }
-        println!("SUCCEED {} />", loc(&i));
         return Ok((i, ()));
     }
 
-    println!("FAIL NotGt AtGroupEnd {} />", loc(&i));
     let e = i.make_error(I9nRelation::NotGt, I9nErrorCtx::AtGroupEnd);
     Err(nom::Err::Error(e.into()))
-}
-
-fn loc<I, Tf>(i: &I9nInput<I, Tf>) -> String
-where
-    I: Clone,
-    Tf: NextTokLoc<I> + Clone,
-{
-    format!(
-        "loc:i9n=\"{:?}\" loc:loc=\"{}:{}\"{}",
-        i.stack.into_iter().collect::<Vec<_>>(),
-        i.current_loc().line,
-        i.current_loc().col,
-        if i.at_start_of_line() {
-            " at_start_of_line"
-        } else {
-            ""
-        }
-    )
 }
 
 /// Succeeds if the input column **equals** the current indentation level.
@@ -123,15 +96,12 @@ where
     Tf: NextTokLoc<I> + Clone,
     E: From<I9nError<I>>,
 {
-    println!("<begin_line ");
     if i.current_loc().col == i.current_i9n() && i.at_start_of_line() {
-        println!("SUCCEED {} />", loc(&i));
         // Note: we don't advance the input. This means `begin_line` can be
         // parsed repeatedly at the same location.
         return Ok((i, ()));
     }
 
-    println!("FAIL {} />", loc(&i));
     let e = i.make_error(I9nRelation::NotEq, I9nErrorCtx::AtNewLine);
     Err(nom::Err::Error(e.into()))
 }
@@ -147,7 +117,6 @@ where
     E: From<I9nError<I>>,
 {
     move |i: I9nInput<I, Tf>| {
-        println!("<tok TRY {}>", loc(&i));
         match i.current_loc().col.cmp(&i.current_i9n()) {
             Ordering::Equal if !i.at_start_of_line() => {
                 // This would happen if you're still on the same line as before
@@ -157,26 +126,13 @@ where
                 //        - my_block_middle
                 //        - my_block_end
                 // ```
-                println!("FAIL (Eq WithinLineButAfterStart) {}\n</tok>", loc(&i));
                 let e = i.make_error(I9nRelation::Eq, I9nErrorCtx::WithinLineButAfterStart);
                 Err(nom::Err::Error(e.into()))
             }
 
-            Ordering::Equal => {
-                let (i, o) = p.parse(i).inspect_err(|_| println!("</tok>"))?;
-                // i.at_start_of_line = false;
-                println!("SUCCEED Ordering::Equal {}\n</tok>", loc(&i));
-                Ok((i, o))
-            }
-
-            Ordering::Greater => {
-                let (i, x) = p.parse(i).inspect_err(|_| println!("</tok>"))?;
-                println!("SUCCEED Ordering::Greater {}\n</tok>", loc(&i));
-                Ok((i, x))
-            }
+            Ordering::Equal | Ordering::Greater => p.parse(i),
 
             Ordering::Less => {
-                println!("FAIL (Lt WithinLine) {}\n</tok>", loc(&i));
                 let e = i.make_error(I9nRelation::Lt, I9nErrorCtx::WithinLine);
                 Err(nom::Err::Error(e.into()))
             }

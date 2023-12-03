@@ -51,13 +51,7 @@ where
 {
     pub fn at_start_of_line(&self) -> bool {
         Tf::next_tok_loc(&self.input)
-            .map(|loc| {
-                println!(
-                    ">>>> I9nInput::at_start_of_line(): line={}, prev_line={}",
-                    loc.line, self.prev_line
-                );
-                loc.line > self.prev_line
-            })
+            .map(|loc| loc.line > self.prev_line)
             .unwrap_or(true)
     }
 
