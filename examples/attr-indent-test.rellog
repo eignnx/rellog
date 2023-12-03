@@ -12,6 +12,13 @@
 
 [blarg] body2_of_blarg
 
+[blarg]
+    - body3
+    -
+        | of
+        | blarg
+    - the_end
+
 [doc
     - indented
     - block
@@ -20,5 +27,15 @@
 [doc "inline"]
 
 [doc
-    "indented?"
+    """
+    This is the tale of Mr. Morton.
+
+    Mr. Morton is who?
+
+    He is the subject of our tale
+
+    and what the predicate says
+
+    Mr. Morton must do.
+    """
 ]

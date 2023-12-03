@@ -1,4 +1,7 @@
-use crate::{ast::RcTm, data_structures::Var};
+use crate::{
+    ast::{tm_displayer::TmDisplayer, RcTm},
+    data_structures::Var,
+};
 use std::fmt;
 use unifier_set::{ClassifyTerm, TermKind, UnifierSet};
 
@@ -11,26 +14,31 @@ impl fmt::Display for DisplayUnifierSet {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let u = &self.u;
         let mut nothing_written = true;
-        for (root_term, vars) in u.reified_forest().into_iter() {
+        for (root_tm, vars) in u.reified_forest().into_iter() {
             // Skip this row if none of the variables are original (from the top-level).
             if !vars.is_empty() && vars.iter().any(Var::is_original) {
-                if nothing_written && self.display_or_bar {
-                    write!(f, "   - ")?;
+                let msg = if nothing_written && self.display_or_bar {
+                    "  - "
                 } else {
-                    write!(f, "    - ")?;
-                }
+                    "   - "
+                };
+                f.write_str(msg)?;
+
                 nothing_written = false;
                 for (i, var) in vars.into_iter().filter(Var::is_original).enumerate() {
                     if var.is_original() {
-                        if i == 0 {
-                            write!(f, "{var}")?;
+                        let msg = if i == 0 {
+                            format!("{var}")
                         } else {
-                            write!(f, " = {var}")?;
-                        }
+                            format!(" = {var}")
+                        };
+                        f.write_str(&msg)?;
                     }
                 }
-                match root_term.classify_term() {
-                    TermKind::NonVar => writeln!(f, " = {root_term}")?,
+                match root_tm.classify_term() {
+                    TermKind::NonVar => {
+                        writeln!(f, " = {}", TmDisplayer::default().indented(&root_tm))?
+                    }
                     TermKind::Var(v) if v.is_original() => writeln!(f, " = {v}")?,
                     _ => {}
                 }

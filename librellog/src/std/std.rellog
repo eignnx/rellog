@@ -322,11 +322,19 @@
 
 [Key][attr_in [key K][value OldValue]][attr_out [key K][value NewValue]]
     [if K = Key][then
-        [tm_in OldValue][reified_tm_out NewValue0]; (NewValue = (OldValue ~ NewValue0))
+        - [tm_in OldValue][reified_tm_out NewValue0]
+        (NewValue = (OldValue ~ NewValue0))
     ][else
         NewValue = OldValue
     ]
 
+[sig [If][Then][Else]][doc
+    """
+    Runs the goal passed as the value to the `If` key, if the goal fails this
+    relation fails, if the goal succeeds (once or more) this relation succeeds
+    (once or more).
+    """
+]
 [if Cond][Then][Else]
     - [goal Cond][Truth]
     - [rel [true Then][false Else]][key Truth][value Callable]

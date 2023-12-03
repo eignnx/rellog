@@ -104,17 +104,17 @@ impl<'tm> TmDisplayer<'tm> {
 
     fn fmt_sym(&self, f: &mut Formatter<'_>, sym: &IStr) -> fmt::Result {
         let sym = sym.to_str();
-        if !sym.is_empty()
-            && !sym.contains(|c: char| !c.is_alphanumeric())
-            && sym
+        if sym.is_empty()
+            || sym.contains(|c: char| !c.is_alphanumeric() && c != '_')
+            || sym
                 .chars()
                 .next()
-                .map(|c| c.is_alphabetic() && c.is_ascii_lowercase())
+                .map(|c| !c.is_alphabetic() && !c.is_ascii_lowercase())
                 .expect("empty str case handled above")
         {
-            write!(f, "{sym}")
-        } else {
             write!(f, "'{sym}'")
+        } else {
+            write!(f, "{sym}")
         }
     }
 
@@ -295,24 +295,51 @@ impl<'tm> TmDisplayer<'tm> {
         }
     }
 
-    fn fmt_txt(f: &mut Formatter<'_>, char_list: &char_list::CharList, tail: &RcTm) -> fmt::Result {
+    fn fmt_txt(
+        &self,
+        f: &mut Formatter<'_>,
+        char_list: &char_list::CharList,
+        tail: &RcTm,
+    ) -> fmt::Result {
         let mut char_list = char_list;
         let mut tail = tail;
+        let mut content = String::from(char_list.as_str());
 
-        write!(f, "\"{char_list}")?;
         while let Tm::Txt(cl, tl) = tail.as_ref() {
             char_list = cl;
             tail = tl;
-            write!(f, "{char_list}")?;
+            content.push_str(char_list.as_str());
         }
 
-        if let Tm::Nil = tail.as_ref() {
-            write!(f, "\"")
-        } else {
+        let lines: Vec<_> = content.lines().collect();
+
+        match lines.len() {
+            0 | 1 => f.write_str("\"")?,
+            _ => write!(f, "\n{}\"\"\"", self.indent)?,
+        }
+
+        for line in &lines {
+            if lines.len() > 1 {
+                write!(f, "\n{}", self.indent)?;
+            }
+            write!(f, "{line}")?;
+        }
+
+        if !matches!(tail.as_ref(), Tm::Nil) {
             // If it's not text, and the tail wasn't Nil, break
             // and display the tail (either Var or malformed).
-            write!(f, "[{} {tail}]\"", Tok::Spread)
+            write!(f, "[{} {tail}]", Tok::Spread)?;
         }
+
+        match lines.len() {
+            0 | 1 => f.write_str("\"")?,
+            _ => {
+                write!(f, "\n{}", self.indent)?;
+                f.write_str("\"\"\"")?;
+            }
+        }
+
+        Ok(())
     }
 
     fn fmt_bin_op(
@@ -337,7 +364,7 @@ impl<'tm> fmt::Display for TmDisplayer<'tm> {
             Tm::Sym(s) => self.fmt_sym(f, s),
             Tm::Var(v) => write!(f, "{v}"),
             Tm::Int(i) => write!(f, "{i}"),
-            Tm::Txt(char_list, tail) => Self::fmt_txt(f, char_list, tail),
+            Tm::Txt(char_list, tail) => self.fmt_txt(f, char_list, tail),
             Tm::Block(functor, members) => self.fmt_block(f, functor, members),
             Tm::Rel(map) => self.fmt_rel(map, f),
             Tm::BinOp(op, x, y) => self.fmt_bin_op(f, op, x, y),
