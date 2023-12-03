@@ -1,7 +1,6 @@
 use std::{
     cell::RefCell,
     fmt::{self, Display, Formatter},
-    iter,
     path::PathBuf,
 };
 
@@ -390,43 +389,48 @@ fn list(ts: Toks) -> Res<Tm> {
     Ok((ts, xs))
 }
 
-fn and_list(ts: Toks) -> Res<Tm> {
-    let (ts, (first, rest)) = tuple((
-        non_operator_tm,
-        many1(preceded(tok(Semicolon), non_operator_tm)),
-    ))
-    .parse(ts)?;
+#[allow(unused)]
+fn left_associative_binop(
+    bin_op_token: Tok,
+    bin_op_symbol: BinOpSymbol,
+) -> impl Fn(Toks) -> Res<Tm> {
+    move |ts| {
+        let (ts, (first, rest)) = tuple((
+            non_operator_tm,
+            many1(preceded(tok(bin_op_token.clone()), non_operator_tm)),
+        ))
+        .parse(ts)?;
 
-    let terms = iter::once(first).chain(rest).map(RcTm::from).collect();
-    Ok((ts, Tm::Block(Dash, terms)))
+        let output = rest.into_iter().fold(first, |so_far, next| {
+            Tm::BinOp(bin_op_symbol, so_far.into(), next.into())
+        });
+
+        Ok((ts, output))
+    }
 }
 
-fn eq_nesting(ts: Toks) -> Res<Tm> {
-    let (ts, (first, rest)) = tuple((
-        non_operator_tm,
-        many1(preceded(tok(Equal), non_operator_tm)),
-    ))
-    .parse(ts)?;
+fn right_associative_binop(
+    bin_op_token: Tok,
+    bin_op_symbol: BinOpSymbol,
+) -> impl Fn(Toks) -> Res<Tm> {
+    move |ts| {
+        let (ts, (first, mut rest)) = tuple((
+            non_operator_tm,
+            many1(preceded(tok(bin_op_token.clone()), non_operator_tm)),
+        ))
+        .parse(ts)?;
 
-    let output = rest.into_iter().fold(first, |so_far, next| {
-        Tm::BinOp(BinOpSymbol::Equal, so_far.into(), next.into())
-    });
+        let mut terms = vec![first];
+        terms.append(&mut rest);
 
-    Ok((ts, output))
-}
+        let output = terms
+            .into_iter()
+            .rev()
+            .reduce(|so_far, next| Tm::BinOp(bin_op_symbol, so_far.into(), next.into()))
+            .expect("At least 2 items since its a binop");
 
-fn tilde_nesting(ts: Toks) -> Res<Tm> {
-    let (ts, (first, rest)) = tuple((
-        non_operator_tm,
-        many1(preceded(tok(Tilde), non_operator_tm)),
-    ))
-    .parse(ts)?;
-
-    let output = rest.into_iter().fold(first, |so_far, next| {
-        Tm::BinOp(BinOpSymbol::Tilde, so_far.into(), next.into())
-    });
-
-    Ok((ts, output))
+        Ok((ts, output))
+    }
 }
 
 fn non_operator_tm(ts: Toks) -> Res<Tm> {
@@ -479,7 +483,16 @@ fn parenthesized_tm(ts: Toks) -> Res<Tm> {
 }
 
 fn operator_tm(ts: Toks) -> Res<Tm> {
-    context("operator term", alt((and_list, eq_nesting, tilde_nesting))).parse(ts)
+    context(
+        "operator term",
+        alt((
+            right_associative_binop(Tok::Semicolon, BinOpSymbol::Semicolon),
+            right_associative_binop(Tok::Equal, BinOpSymbol::Equal),
+            right_associative_binop(Tok::Tilde, BinOpSymbol::Tilde),
+            right_associative_binop(Tok::PathSep, BinOpSymbol::PathSep),
+        )),
+    )
+    .parse(ts)
 }
 
 pub fn tm(ts: Toks) -> Res<Tm> {
