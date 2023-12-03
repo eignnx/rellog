@@ -1,8 +1,7 @@
 use std::{fmt::Display, path::PathBuf, str::FromStr};
 
 use crate::{
-    data_structures::{Int, Var},
-    interner::IStr,
+    data_structures::{Int, Sym, Var},
     lex::tok::{At, MakeAt, Tok},
     utils::my_nom::{Res, Span},
 };
@@ -10,11 +9,11 @@ use char_list::CharList;
 use nom::{
     branch::alt,
     bytes::complete::{tag, take_until, take_while, take_while1},
-    character::complete::{anychar, multispace0},
-    combinator::{all_consuming, fail, recognize, verify},
+    character::complete::{multispace0, satisfy},
+    combinator::{all_consuming, fail, opt, recognize},
     error::{context, VerboseError},
     multi::many0,
-    sequence::{delimited, terminated, tuple},
+    sequence::{delimited, preceded, terminated, tuple},
     Finish, Parser,
 };
 use nom_i9n::{I9nInput, TokenizedInput};
@@ -84,44 +83,43 @@ fn text_literal<'i>(i: Span<'i>) -> Res<'i, CharList> {
     .parse(i)
 }
 
-pub fn matches_variable(src: &str) -> bool {
-    src.starts_with(|c: char| c.is_uppercase() || c == '_')
-        && src.chars().skip(1).all(|c| c.is_alphanumeric())
-}
-
-fn var_or_sym(i: Span) -> Res<Tok> {
+pub fn sym(i: Span) -> Res<Sym> {
     let quoted_sym = delimited(
         tag("'"),
         recognize(take_while(|c: char| c != '\'')),
         tag("'"),
-    )
-    .map(|span: Span| span.fragment().into())
-    .map(|sym: IStr| Tok::Sym(sym));
+    );
 
-    let unquoted_sym_or_var = recognize(tuple((
-        verify(anychar::<Span, _>, |&c| c.is_alphabetic() || c == '_'),
-        take_while(|c: char| c.is_alphanumeric() || c == '_'),
-    )))
-    .map(|span| span.fragment().into())
-    .map(|sym: IStr| {
-        if matches_variable(sym.to_str().as_ref()) {
-            Tok::Var(Var::from_source(sym))
-        } else if sym.to_str().starts_with(char::is_lowercase) {
-            Tok::Sym(sym)
-        } else {
-            unreachable!()
-        }
-    });
+    let unquoted_sym = recognize(tuple((
+        satisfy(|c| c.is_alphabetic() && c.is_lowercase()),
+        take_while(|c: char| (c.is_alphabetic() && c.is_lowercase()) || c.is_numeric() || c == '_'),
+    )));
 
-    alt((quoted_sym, unquoted_sym_or_var)).parse(i)
+    alt((quoted_sym, unquoted_sym))
+        .map(|span: Span| -> Sym { span.fragment().into() })
+        .parse(i)
+}
+
+pub fn var(i: Span) -> Res<Var> {
+    let name_parser = recognize(
+        satisfy(|c| c.is_uppercase() || c == '_').and(many0(satisfy(|c| c.is_alphanumeric()))),
+    );
+
+    let nat_sym = take_while1(char::is_numeric).map(|i: Span| Sym::from(i));
+
+    let suffix_parser = preceded(tag("."), alt((sym, nat_sym)));
+
+    name_parser
+        .and(opt(suffix_parser))
+        .map(|(name, suffix)| Var::from_source(name, suffix))
+        .parse(i)
 }
 
 fn int(i: Span) -> Res<Int> {
-    take_while1(char::is_numeric)
+    recognize(opt(tag("-")).and(take_while1(char::is_numeric)))
         .map(|i: Span| {
-            let s: &str = i.as_ref();
-            Int::from_str(s)
-                .expect("take_while(char::is_numeric) feeds into Int::from_str without error")
+            Int::from_str(i.as_ref())
+                .expect("take_while1(char::is_numeric) feeds into Int::from_str without error")
         })
         .parse(i)
 }
@@ -131,7 +129,8 @@ fn one_token(i: Span) -> Res<At<Tok>> {
     alt((
         int.map(Tok::Int),
         text_literal.map(Tok::Txt),
-        var_or_sym,
+        sym.map(Tok::Sym),
+        var.map(Tok::Var),
         tag("][").map(|_| Tok::COBrack),
         tag("[").map(|_| Tok::OBrack),
         tag("]").map(|_| Tok::CBrack),
@@ -226,7 +225,7 @@ mod block_tests {
     use pretty_assertions::assert_eq;
 
     fn src_var(s: &str) -> Var {
-        Var::from_source(s)
+        Var::from_source(s, None)
     }
 
     #[test]

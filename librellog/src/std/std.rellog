@@ -315,15 +315,25 @@
     """
 ]]
 
-[goal Goal0][MetaParam][new_goal Goal]
-    - [rel Goal0][attrs Attrs0]
-    - [elementwise [key [scalar MetaParam]][attr_in [splat Attrs0]][attr_out [splat Attrs]]]
+[Goal.0][MetaParam][new_goal Goal]
+    - [rel Goal.0][attrs Attrs.0]
+    - [elementwise [key
+        [scalar MetaParam]
+    ][attr_in
+        [splat Attrs.0]
+    ][attr_out
+        [splat Attrs]
+    ][value
+        [splat Value]
+    ][new_value
+        [splat NewValue]
+    ]]
     - [rel Goal][Attrs]
 
-[Key][attr_in [key K][value OldValue]][attr_out [key K][value NewValue]]
+[Key][attr_in [key K][value OldValue]][attr_out [key K][new_value NewValue]]
     [if K = Key][then
         - [tm_in OldValue][reified_tm_out NewValue0]
-        (NewValue = (OldValue ~ NewValue0))
+        - (NewValue = (OldValue ~ NewValue0))
     ][else
         NewValue = OldValue
     ]

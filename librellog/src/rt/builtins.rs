@@ -1156,9 +1156,11 @@ impl BuiltinsMap {
                     Tm::Cons(head, tail) => Tm::Cons(reify(head), reify(tail)).into(),
                     Tm::Var(v) => tm!([var
                         tm!([name
-                            Tm::Sym(v.istr()).into()
+                            Tm::Sym(v.name).into()
+                        ][suffix
+                            v.suffix.map(|s| Tm::Sym(s).into()).unwrap_or(Tm::Nil.into())
                         ][gen
-                            v.gen().into()
+                            v.gen.into()
                         ]).into()
                     ]).into(),
                     Tm::Int(..) => tm!([int tm.clone()]).into(),

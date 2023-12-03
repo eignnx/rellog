@@ -18,8 +18,9 @@ pub type Map<K, V> = RedBlackTreeMap<K, V>;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Var {
-    istr: IStr,
-    gen: Generation,
+    pub name: IStr,
+    pub suffix: Option<IStr>,
+    pub gen: Generation,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -56,41 +57,35 @@ impl From<Generation> for Tm {
 }
 
 impl Var {
-    pub fn from_repl(s: impl Into<IStr>) -> Self {
+    pub fn from_repl(name: impl Into<IStr>, suffix: Option<IStr>) -> Self {
         Self {
-            istr: s.into(),
+            name: name.into(),
+            suffix: suffix.map(Into::into),
             gen: Generation::Repl,
         }
     }
 
-    pub fn from_source(s: impl Into<IStr>) -> Self {
+    pub fn from_source(name: impl Into<IStr>, suffix: Option<IStr>) -> Self {
         Self {
-            istr: s.into(),
+            name: name.into(),
+            suffix: suffix.map(Into::into),
             gen: Generation::Source,
         }
     }
 
     pub fn with_gen(&self, gen: u16) -> Self {
         Self {
-            istr: self.istr,
             gen: Generation::Internal(gen),
+            ..self.clone()
         }
-    }
-
-    pub fn gen(&self) -> Generation {
-        self.gen
-    }
-
-    pub fn gen_mut(&mut self) -> &mut Generation {
-        &mut self.gen
-    }
-
-    pub fn istr(&self) -> IStr {
-        self.istr
     }
 
     pub fn is_original(&self) -> bool {
         matches!(self.gen, Generation::Repl) // Either rename the method or think about Generation::Source.
+    }
+
+    pub fn should_display_at_top_level(&self) -> bool {
+        self.is_original() && !self.name.to_str().starts_with('_')
     }
 }
 
@@ -104,16 +99,20 @@ impl Deref for Var {
     type Target = IStr;
 
     fn deref(&self) -> &Self::Target {
-        &self.istr
+        &self.name
     }
 }
 
 impl fmt::Display for Var {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.name)?;
+        if let Some(suffix) = self.suffix {
+            write!(f, ".{suffix}")?;
+        }
         match self.gen {
-            Generation::Repl => write!(f, "{}", self.istr),
-            Generation::Source => write!(f, "{}$", self.istr),
-            Generation::Internal(gen) => write!(f, "{}${}", self.istr, gen),
+            Generation::Repl => Ok(()),
+            Generation::Source => write!(f, "$"),
+            Generation::Internal(gen) => write!(f, "${gen}"),
         }
     }
 }

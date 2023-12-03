@@ -147,8 +147,8 @@ impl RcTm {
 
     pub fn source_vars_to_repl_vars(&self) -> Self {
         self.map_direct_children(|child| match child.as_ref() {
-            Tm::Var(v) if matches!(v.gen(), Generation::Source) => {
-                Tm::Var(Var::from_repl(v.istr())).into()
+            Tm::Var(v) if matches!(v.gen, Generation::Source) => {
+                Tm::Var(Var::from_repl(v.name, v.suffix)).into()
             }
             Tm::Var(_) => child.clone(), // Prevent infinite recursion.
             _ => child.source_vars_to_repl_vars(),
@@ -175,7 +175,7 @@ macro_rules! tm {
             let ident = stringify!($ident);
             match ident.chars().next().unwrap() {
                 ch if ch.is_lowercase() => Tm::Sym(ident.into()),
-                ch if ch.is_uppercase() => Tm::Var(Var::from_source(ident)),
+                ch if ch.is_uppercase() => Tm::Var(Var::from_source(ident, None)),
                 _ => todo!(),
             }
         }
@@ -469,7 +469,7 @@ impl From<&Sig> for Tm {
             .copied()
             .map(|sym| {
                 let pascal = sym.to_str().to_pascal_case();
-                (sym, RcTm::from(Tm::Var(Var::from_source(pascal))))
+                (sym, RcTm::from(Tm::Var(Var::from_source(pascal, None))))
             })
             .collect();
         Tm::Rel(rel)

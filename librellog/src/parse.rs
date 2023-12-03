@@ -292,10 +292,10 @@ fn attr(ts: Toks) -> Res<(Sym, RcTm)> {
                 tm,
             )),
         )),
-        // [AttrVarSameName]
+        // [AttrVarSameName] or [AttrVarSameName.3] or [AttrVarSameName.New]
         var.map(|v| {
             // `lower` created on separate line so INTERNER isn't shared AND mutated.
-            let lower = format!("{}", heck::AsSnakeCase(&v.to_str()[..]));
+            let lower = format!("{}", heck::AsSnakeCase(&v.name.to_str()[..]));
             (lower.into(), Tm::Var(v))
         }),
         // [attr_sym_same_name]
@@ -568,15 +568,24 @@ mod tests {
                     "goal".into(),
                     Tm::Rel(
                         vec![
-                            ("list".into(), Tm::Var("List".into()).into()),
-                            ("pred".into(), Tm::Var("Pred".into()).into()),
+                            (
+                                "list".into(),
+                                Tm::Var(Var::from_source("List", None)).into(),
+                            ),
+                            (
+                                "pred".into(),
+                                Tm::Var(Var::from_source("Pred", None)).into(),
+                            ),
                         ]
                         .into_iter()
                         .collect(),
                     )
                     .into(),
                 ),
-                ("initial".into(), Tm::Var("Sublist".into()).into()),
+                (
+                    "initial".into(),
+                    Tm::Var(Var::from_source("Sublist", None)).into(),
+                ),
                 ("final".into(), Tm::Sym("empty_list".into()).into()),
             ]
             .into_iter()
@@ -597,9 +606,12 @@ mod tests {
         let actual = parse_to_tm(src);
 
         let blah: RcTm = Tm::Rel(
-            vec![("blah".into(), Tm::Var("Blah".into()).into())]
-                .into_iter()
-                .collect(),
+            vec![(
+                "blah".into(),
+                Tm::Var(Var::from_source("Blah", None)).into(),
+            )]
+            .into_iter()
+            .collect(),
         )
         .into();
 
@@ -621,9 +633,12 @@ mod tests {
         let actual = parse_to_tm(src);
 
         let blah: RcTm = Tm::Rel(
-            vec![("blah".into(), Tm::Var("Blah".into()).into())]
-                .into_iter()
-                .collect(),
+            vec![(
+                "blah".into(),
+                Tm::Var(Var::from_source("Blah", None)).into(),
+            )]
+            .into_iter()
+            .collect(),
         )
         .into();
 
