@@ -1,7 +1,7 @@
 use core::fmt;
 
 use char_list::CharList;
-use nom_i9n::StartCol;
+use nom_i9n::TokLoc;
 
 use crate::{
     data_structures::{Int, Sym, Var},
@@ -128,8 +128,11 @@ impl<T> MakeAt for T {
     }
 }
 
-impl<T> StartCol for At<T> {
-    fn start_col(&self) -> usize {
-        self.col
+impl<T> TokLoc for At<T> {
+    fn tok_loc(&self) -> nom_i9n::Loc {
+        nom_i9n::Loc {
+            line: self.line as usize,
+            col: self.col,
+        }
     }
 }

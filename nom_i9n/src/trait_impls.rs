@@ -10,7 +10,7 @@ use nom::{
 };
 use rpds::Stack;
 
-use crate::I9nInput;
+use crate::{I9nInput, NextTokLoc};
 
 impl<I, Tf> Deref for I9nInput<I, Tf> {
     type Target = I;
@@ -122,14 +122,17 @@ where
     }
 }
 
-impl<'a, I, Tf, R> Slice<R> for I9nInput<I, Tf>
+impl<I, Tf, R> Slice<R> for I9nInput<I, Tf>
 where
     I: Slice<R> + Slice<RangeTo<usize>> + Clone,
-    Tf: Clone,
+    Tf: NextTokLoc<I> + Clone,
 {
     fn slice(&self, range: R) -> Self {
         Self {
             input: self.input().slice(range),
+            prev_line: Tf::next_tok_loc(self.input())
+                .map(|loc| loc.line)
+                .unwrap_or(usize::MAX),
             ..I9nInput::clone(self)
         }
     }
@@ -193,11 +196,17 @@ where
     }
 }
 
-impl<I, Tf> From<I> for I9nInput<I, Tf> {
+impl<I, Tf> From<I> for I9nInput<I, Tf>
+where
+    Tf: NextTokLoc<I>,
+{
     fn from(input: I) -> Self {
         Self {
             input,
-            at_start_of_line: true,
+            // Assume we only conver from `I` to `I9nInput` at start of input.
+            // In that case, there is no previous line, so we should set it to
+            // 0, normally an invalid line number.
+            prev_line: 0,
             stack: Stack::new(),
             _token_finder: PhantomData,
         }

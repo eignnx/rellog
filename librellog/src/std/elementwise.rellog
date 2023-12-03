@@ -132,11 +132,11 @@
 [splatted {}][unsplatted {}][lists_splatted {}]
 
 [splatted {Attr0 ..Attrs0}][unsplatted {Attr ..Attrs}][lists_splatted {[var IterationVar][List] ..Xs}]
-    - [attr Attr0][Key][value [splat List]]
-    - [Attr][Key][value IterationVar]
+    - Attr0 = [Key][value [splat List]]
+    - Attr = [Key][value IterationVar]
     - [splatted Attrs0][unsplatted Attrs][lists_splatted Xs]
 
 [splatted {Attr0 ..Attrs0}][unsplatted {Attr ..Attrs}][ListsSplatted]
-    - [attr Attr0][Key][value [Scalar]]
-    - [Attr][Key][value Scalar]
+    - Attr0 = [Key][value [Scalar]]
+    - Attr = [Key][value Scalar]
     - [splatted Attrs0][unsplatted Attrs][ListsSplatted]

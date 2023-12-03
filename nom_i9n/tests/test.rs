@@ -23,7 +23,7 @@ use nom::{
     sequence::{preceded, tuple},
     IResult, Parser, Slice,
 };
-use nom_i9n::{begin_block, begin_line, end_block, tok, I9nError, I9nInput, NextTokCol};
+use nom_i9n::{begin_block, begin_line, end_block, tok, I9nError, I9nInput, Loc, NextTokLoc};
 use nom_locate::LocatedSpan;
 
 struct Bad(String);
@@ -37,11 +37,13 @@ impl fmt::Debug for Bad {
 #[derive(Debug, Clone)]
 struct SkipWsTf;
 
-impl<'i> NextTokCol<LocatedSpan<&'i str>> for SkipWsTf {
-    fn next_tok_col(i: &LocatedSpan<&'i str>) -> Option<usize> {
+impl<'i> NextTokLoc<LocatedSpan<&'i str>> for SkipWsTf {
+    fn next_tok_loc(i: &LocatedSpan<&'i str>) -> Option<Loc> {
         // Skip beyond any whitespace, then get the column.
         let (i, _) = multispace0::<LocatedSpan<&'i str>, ()>(*i).ok()?;
-        Some(i.get_column())
+        let line = i.location_line() as usize;
+        let col = i.get_column();
+        Some(Loc { line, col })
     }
 }
 

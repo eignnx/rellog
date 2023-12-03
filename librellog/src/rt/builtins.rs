@@ -187,18 +187,21 @@ impl BuiltinsMap {
                         (vec, None) => vec,
                         (_vec, Some(_tail_var)) => return soln_stream::error(Err::InstantiationError {
                             rel: rel_called.to_string(),
-                            tm:attrs.clone()
+                            tm: attrs.clone()
                         })
                     };
 
                     let rel: Result<Rel, Err> = attrs.into_iter()
                         .map(|attr| match attr.as_ref() {
-                            Tm::Rel(r) if r.size() == 1 => {
-                                Ok(r
-                                    .iter()
-                                    .map(|(k, v)| (*k, v.clone()))
-                                    .next()
-                                    .expect("There's exactly one key-value pair in here"))
+                            Tm::Rel(r) if r.contains_key(&"key".into()) && r.contains_key(&"value".into()) => {
+                                let key = r[&"key".into()].try_as_sym().ok_or_else(|| Err::ArgumentTypeError {
+                                    rel: rel_called.to_string(),
+                                    key: "attrs".into(),
+                                    expected_ty: "[Key][Value]".into(),
+                                    recieved_tm: attr.to_string(),
+                                })?;
+                                let value = r[&"value".into()].clone();
+                                Ok((key, value))
                             }
                             Tm::Var(_) => Err(Err::InstantiationError {
                                 rel: rel_called.to_string(),
@@ -222,8 +225,10 @@ impl BuiltinsMap {
                     soln_stream::unifying(u, var, &rel)
                 }
 
-                (Tm::Rel(rel), Tm::Var(_)) => {
-                    let list = RcTm::list_from_iter(rel.iter().map(|(k, v)| Tm::Rel(Rel::new().insert(*k, v.clone())).into()));
+                (Tm::Rel(rel), _) => {
+                    let list = RcTm::list_from_iter(rel.iter().map(|(k, v)| {
+                        tm!([key Tm::Sym(*k).into()][value v.clone()]).into()
+                    }));
                     soln_stream::unifying(u, attrs, &list)
                 }
 
@@ -234,7 +239,7 @@ impl BuiltinsMap {
 
                 (_, _) => Err::GenericError {
                     rel: rel_called.to_string(),
-                    msg: "[rel][attrs] takes a relation and a list of attributes".into()
+                    msg: "[rel][attrs] takes a relation and a list of `[Key][Value]` attributes".into()
                 }.into(),
             }
         });

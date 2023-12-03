@@ -1,12 +1,22 @@
 use nom::AsBytes;
 use nom_locate::LocatedSpan;
 
-pub trait NextTokCol<I> {
-    fn next_tok_col(input: &I) -> Option<usize>;
+#[derive(Debug, Clone, Copy, Hash, PartialEq, Eq)]
+pub struct Loc {
+    pub line: usize,
+    pub col: usize,
 }
 
-pub trait StartCol {
-    fn start_col(&self) -> usize;
+pub trait NextTokLoc<I> {
+    /// Returns a line-column pair for the next token in the input. The column
+    /// value ought to be the column of the *start* of the token.
+    fn next_tok_loc(input: &I) -> Option<Loc>;
+}
+
+pub trait TokLoc {
+    /// Returns a line-column pair for the token. The column value ought to be
+    /// the column of the *start* of the token.
+    fn tok_loc(&self) -> Loc;
 }
 
 /// A trait for collections that can reference their first element.
@@ -21,6 +31,7 @@ impl<T> First for &[T] {
     type Item = T;
 
     fn first(&self) -> Option<&Self::Item> {
+        #[allow(clippy::get_first)]
         self.get(0)
     }
 }

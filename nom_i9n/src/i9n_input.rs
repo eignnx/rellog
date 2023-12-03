@@ -4,13 +4,13 @@ use nom::Slice;
 
 use crate::{
     errors::{I9nError, I9nErrorCtx, I9nErrorSituation, I9nRelation},
-    First, NextTokCol, TokenizedInput,
+    First, Loc, NextTokLoc, TokenizedInput,
 };
 
 #[derive(Clone)]
 pub struct I9nInput<Input, TokenFinder> {
     pub(crate) input: Input,
-    pub(crate) at_start_of_line: bool,
+    pub(crate) prev_line: usize,
     pub(crate) stack: rpds::Stack<usize>,
     pub(crate) _token_finder: PhantomData<TokenFinder>,
 }
@@ -22,7 +22,7 @@ where
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("I9nInput")
             .field("input", &self.input)
-            .field("at_start_of_line", &self.at_start_of_line)
+            .field("prev_line", &self.prev_line)
             .field("stack", &self.stack)
             .finish()
     }
@@ -31,6 +31,7 @@ where
 impl<I, Tf> fmt::Display for I9nInput<I, Tf>
 where
     I: fmt::Display,
+    Tf: NextTokLoc<I>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "{}", self.input())
@@ -42,11 +43,29 @@ impl<I, Tf> I9nInput<I, Tf> {
     pub fn input(&self) -> &I {
         &self.input
     }
+}
+
+impl<I, Tf> I9nInput<I, Tf>
+where
+    Tf: NextTokLoc<I>,
+{
+    pub fn at_start_of_line(&self) -> bool {
+        Tf::next_tok_loc(&self.input)
+            .map(|loc| {
+                println!(
+                    ">>>> I9nInput::at_start_of_line(): line={}, prev_line={}",
+                    loc.line, self.prev_line
+                );
+                loc.line > self.prev_line
+            })
+            .unwrap_or(true)
+    }
 
     pub fn current_i9n(&self) -> usize {
         self.stack.peek().copied().unwrap_or(1)
     }
 }
+
 impl<I, T> I9nInput<I, TokenizedInput<I, T>>
 where
     Self: Slice<RangeFrom<usize>>,
@@ -66,11 +85,16 @@ where
 impl<I, Tf> I9nInput<I, Tf>
 where
     I: Clone,
-    Tf: NextTokCol<I> + Clone,
+    Tf: NextTokLoc<I> + Clone,
 {
-    pub fn current_col(&self) -> usize {
+    /// Returns the line-column pair of the next token in the input.
+    pub fn current_loc(&self) -> Loc {
+        const EOF_LINE: usize = usize::MAX;
         const EOF_COLUMN: usize = 0; // Note: beginning of line is usually at column 1.
-        Tf::next_tok_col(&self.input).unwrap_or(EOF_COLUMN)
+        Tf::next_tok_loc(&self.input).unwrap_or(Loc {
+            line: EOF_LINE,
+            col: EOF_COLUMN,
+        })
     }
 
     pub(crate) fn push_i9n(&self, col: usize) -> Self {
@@ -95,7 +119,7 @@ where
             situation: I9nErrorSituation {
                 relation,
                 expected: self.current_i9n(),
-                actual: self.current_col(),
+                actual: self.current_loc().col,
             },
             ctx,
         }

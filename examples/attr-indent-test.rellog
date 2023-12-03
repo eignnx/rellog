@@ -1,0 +1,24 @@
+
+[[import {
+    this
+    that
+    the_other
+}]]
+
+[blarg]
+    - body1
+    - of
+    - blarg
+
+[blarg] body2_of_blarg
+
+[doc
+    - indented
+    - block
+]
+
+[doc "inline"]
+
+[doc
+    "indented?"
+]

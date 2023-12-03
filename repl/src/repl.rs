@@ -35,10 +35,6 @@ pub struct Repl {
 }
 
 impl Repl {
-    pub fn new_loading_std_lib() -> Self {
-        Self::new_loading_files(vec!["./librellog/src/std/std.rellog".to_string()])
-    }
-
     pub fn new_loading_files(fnames: Vec<String>) -> Self {
         let line_editor = Arc::new(LineEditor::new());
         let kb = KnowledgeBase::default();
@@ -68,12 +64,15 @@ impl Repl {
             Err(AppErr::FileOpen(fname, io_err)) => {
                 println!(
                     "{}",
-                    Color::Red.paint(format!("# Error loading file `{}`: {}", &fname, &io_err))
+                    Color::Red.paint(format!("# Error loading file `{}`:\n\t{}", &fname, &io_err))
                 );
                 return Err(AppErr::FileOpen(fname, io_err));
             }
             Err(e) => {
-                println!("{}", Color::Red.paint(format!("# Error loading file: {e}")));
+                println!(
+                    "{}",
+                    Color::Red.paint(format!("# Error loading file `{}`:\n\t{e}", &fname))
+                );
                 self.files_failed_to_load.insert(fname);
                 return Err(e);
             }
@@ -354,13 +353,16 @@ fn load_module_from_string(
     src: impl AsRef<str>,
     filename: PathBuf,
 ) -> AppRes<ast::Module> {
-    let tokens = lex::tokenize_into(tok_buf, src.as_ref(), filename)?;
+    let tokens = lex::tokenize_into(tok_buf, src.as_ref(), filename.clone())?;
 
     let m = match parse::entire_module(tokens) {
         Ok(m) => m,
         Err(verbose_err) => {
             println!("{verbose_err}");
-            return Err(AppErr::Parse(verbose_err));
+            return Err(AppErr::Parse {
+                fname: Some(filename),
+                err: verbose_err,
+            });
         }
     };
 

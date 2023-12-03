@@ -1,6 +1,8 @@
 use std::{
+    cell::RefCell,
     fmt::{self, Display, Formatter},
     iter,
+    path::PathBuf,
 };
 
 use char_list::CharList;
@@ -10,7 +12,7 @@ use nom::{
     error::{context, ParseError},
     error::{ContextError, ErrorKind},
     multi::{many0, many1, separated_list1},
-    sequence::{preceded, tuple},
+    sequence::{delimited, preceded, tuple},
     Finish, IResult, Parser,
 };
 use nom_i9n::{I9nError, I9nErrorCtx, I9nErrorSituation, I9nInput, TokenizedInput};
@@ -36,12 +38,14 @@ type Toks<'ts> = I9nInput<BaseInput<'ts>, TokenFinder<'ts>>;
 /// TODO: Replace with Miette error type!
 #[derive(Debug)]
 pub struct Error<'ts> {
-    stack: Vec<(BaseInput<'ts>, Problem<'ts>)>,
+    pub fname: Box<RefCell<Option<PathBuf>>>,
+    stack: Vec<(BaseInput<'ts>, Problem)>,
 }
 
 impl<'ts> From<LexError> for Error<'ts> {
     fn from(le: LexError) -> Self {
         Self {
+            fname: Box::new(RefCell::new(le.file.clone())),
             stack: vec![(&[], Problem::LexError(le))],
         }
     }
@@ -49,24 +53,28 @@ impl<'ts> From<LexError> for Error<'ts> {
 
 impl<'ts> Display for Error<'ts> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let (last, init) = self.stack.split_last().unwrap();
-        for (i, problem) in init {
+        let user_input_buf = PathBuf::from("<unknown_src>");
+        let fname_borrow = self.fname.borrow();
+        let fname = fname_borrow.as_ref().unwrap_or(&user_input_buf);
+
+        for (i, problem) in &self.stack {
             let loc = match i {
-                [t, ..] => format!("{}:{}", t.line, t.col),
-                [] => "eof".into(),
+                [t, ..] => format!("{}:{}:{}", fname.display(), t.line, t.col),
+                [] => format!("{}:<end>", fname.display()),
             };
 
-            writeln!(f, "\t[{loc}] {problem} because...")?;
+            writeln!(f, "\t[{loc}] {}", problem)?;
         }
-        let (i, last) = last;
-        writeln!(
-            f,
-            "\t...{last}\n\t\t(Last token: {}.)",
-            i.first().map_or_else(
-                || "end of input".into(),
-                |tok| format!("token `{}` at [{}:{}]", tok.value, tok.line, tok.col)
-            )
-        )?;
+
+        if let Some((i, _problem)) = self.stack.last() {
+            writeln!(
+                f,
+                "\t(Last token: `{}`)",
+                i.first()
+                    .map_or_else(|| "<eof>".to_string(), |tok| tok.value.to_string())
+            )?;
+        }
+
         Ok(())
     }
 }
@@ -74,6 +82,7 @@ impl<'ts> Display for Error<'ts> {
 impl<'ts> Error<'ts> {
     fn with_message(ts: Toks, message: String) -> Error {
         Error {
+            fname: Box::new(RefCell::new(None)),
             stack: vec![(ts.input(), Problem::CustomMessage(message))],
         }
     }
@@ -87,23 +96,21 @@ impl<'ts> ContextError<Toks<'ts>> for Error<'ts> {
 }
 
 #[derive(Debug)]
-pub enum Problem<'ts> {
+pub enum Problem {
     /// TODO: replace with miette diagnostic or something
     CustomMessage(String),
     Context(&'static str),
-    Blah(Toks<'ts>),
     LexError(LexError),
 }
 
-impl<'ts> Display for Problem<'ts> {
+impl Display for Problem {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {
             Problem::CustomMessage(msg) => f.write_str(msg),
-            Problem::Context(msg) => write!(f, "in the context of {msg}"),
-            Problem::Blah(ts) => write!(f, "at tokens {:?}", &ts[..1]),
+            Problem::Context(msg) => write!(f, "While parsing {msg}"),
             Problem::LexError(le) => write!(
                 f,
-                "while tokenizing [{}:{}:{}]: {}",
+                "While tokenizing [{}:{}:{}]: {}",
                 le.file.as_ref().unwrap().to_string_lossy(),
                 le.line,
                 le.column,
@@ -116,14 +123,19 @@ impl<'ts> Display for Problem<'ts> {
 impl<'ts> ParseError<Toks<'ts>> for Error<'ts> {
     fn from_error_kind(input: Toks<'ts>, kind: ErrorKind) -> Self {
         Error {
-            stack: vec![(input.input(), Problem::CustomMessage(format!("{kind:?}")))],
+            fname: Box::new(RefCell::new(None)),
+            stack: vec![(
+                input.input(),
+                Problem::CustomMessage(kind.description().to_string()),
+            )],
         }
     }
 
     fn append(input: Toks<'ts>, kind: ErrorKind, mut other: Self) -> Self {
-        other
-            .stack
-            .push((input.input(), Problem::CustomMessage(format!("{kind:?}"))));
+        other.stack.push((
+            input.input(),
+            Problem::CustomMessage(kind.description().to_string()),
+        ));
         other
     }
 }
@@ -141,6 +153,7 @@ pub fn entire_term(ts: Toks) -> Result<RcTm, Error> {
 impl<'ts> From<I9nError<BaseInput<'ts>>> for Error<'ts> {
     fn from(e: I9nError<BaseInput<'ts>>) -> Self {
         Error {
+            fname: Box::new(RefCell::new(None)),
             stack: vec![(
                 e.input,
                 Problem::CustomMessage({
@@ -155,7 +168,7 @@ impl<'ts> From<I9nError<BaseInput<'ts>>> for Error<'ts> {
                         .first()
                         .map(|tok| tok.value.to_string())
                         .unwrap_or_else(|| "end of input".into());
-                    format!("Indentation error: {situation} {ctx} at token `{input_preview}`.")
+                    format!("Indentation error:\n\t\t{situation}\n\t\t{ctx}\n\t\tAt token `{input_preview}`.")
                 }),
             )],
         }
@@ -170,13 +183,13 @@ impl Display for I9nErrorSituationDisplay {
             nom_i9n::I9nRelation::NotGt => "not indented more than",
             nom_i9n::I9nRelation::NotEq => "not the same indentation as",
             nom_i9n::I9nRelation::Gt => "indented more than",
-            nom_i9n::I9nRelation::Eq => "the same indentation as",
+            nom_i9n::I9nRelation::Eq => "indented to the exact same level as",
             nom_i9n::I9nRelation::Lt => "indented less than",
         };
 
         write!(
             f,
-            "Current line was {relation} expected (expected={}, actual={})",
+            "Current line was {relation} the current block's indentation.\n\t\t(expected={}, actual={})",
             self.0.expected, self.0.actual
         )?;
 
@@ -191,25 +204,30 @@ impl Display for I9nErrorCtxDisplay {
         let msg = match self.0 {
             I9nErrorCtx::AtNewGroup => "at a new indentation group",
             I9nErrorCtx::WithinLine => "within a line",
-            I9nErrorCtx::AtNewLine => "at a new line",
+            I9nErrorCtx::AtNewLine => "at the beginning of a new line",
             I9nErrorCtx::AtGroupEnd => "at the end of an indentation group",
-            I9nErrorCtx::WithinLineButAfterStart => "within a line but after start",
+            I9nErrorCtx::WithinLineButAfterStart => "not at the beginning of a line",
         };
-        f.write_str(msg)
+        write!(f, "Location: {msg}.")
     }
 }
 
 fn tok<'ts>(tgt: Tok) -> impl Parser<Toks<'ts>, At<Tok>, Error<'ts>> {
     let p = move |ts: Toks<'ts>| -> Res<'ts, At<Tok>> {
+        println!("<parse:tok TRY=\"{tgt:?}\"");
         match ts.split_first() {
             Some((t, rest)) if t.as_ref() == &tgt => Ok((rest, t.clone())),
             Some((t, _)) => {
-                let e =
-                    Error::with_message(ts.clone(), format!("Expected {tgt:?}, got token {t:?}"));
+                let e = Error::with_message(
+                    ts.clone(),
+                    format!("Expected `{tgt}`, got token `{}`", t.value),
+                );
                 Err(nom::Err::Error(e))
             }
             None => Err(eof_error(ts)),
         }
+        .inspect(|_| println!("SUCCESS />"))
+        .inspect_err(|_| println!("FAIL />"))
     };
     nom_i9n::tok(p)
 }
@@ -264,12 +282,31 @@ fn txt(ts: Toks) -> Res<CharList> {
 }
 
 fn attr(ts: Toks) -> Res<(Sym, RcTm)> {
+    println!("<attr TRY>");
     alt((
         // [name Value]
-        tuple((sym, tm)),
+        tuple((
+            sym,
+            alt((
+                |ts| {
+                    println!("<attr:non_block_tm TRY in a new block />");
+                    delimited(
+                        nom_i9n::begin_block,
+                        nom_i9n::on_new_line(non_block_tm),
+                        nom_i9n::end_block,
+                    )
+                    .parse(ts)
+                },
+                |ts| {
+                    println!("<attr:non_block_tm FAIL in a new block />");
+                    println!("<attr:tm TRY />");
+                    tm.parse(ts)
+                },
+            )),
+        )),
         // [AttrVarSameName]
         var.map(|v| {
-            // `lower` created on separated line so INTERNER isn't shared AND mutated.
+            // `lower` created on separate line so INTERNER isn't shared AND mutated.
             let lower = format!("{}", heck::AsSnakeCase(&v.to_str()[..]));
             (lower.into(), Tm::Var(v))
         }),
@@ -278,40 +315,40 @@ fn attr(ts: Toks) -> Res<(Sym, RcTm)> {
     ))
     .map(|(sym, tm)| (sym, tm.into()))
     .parse(ts)
+    .inspect(|(_ts, x)| println!("SUCCESS, {x:?}\n</attr>"))
+    .inspect_err(|_| println!("FAIL\n</attr>"))
 }
 
 fn rel(ts: Toks) -> Res<Rel> {
     let (ts, _) = tok(OBrack).parse(ts)?;
     let (ts, attrs) = context(
-        "Expected relation",
+        "relation attributes",
         cut(separated_list1(
             tok(COBrack),
-            context(
-                "Expected relation attribute",
-                cut(alt((
-                    nom::sequence::delimited(
-                        nom_i9n::begin_block,
-                        nom_i9n::line(attr),
-                        nom_i9n::end_block,
-                    ),
-                    attr,
-                ))),
-            ),
+            context("relation attribute", cut(attr)),
         )),
     )
     .parse(ts)?;
 
-    let (ts, _) = tok(CBrack).parse(ts)?;
+    let (ts, _) = context("closing bracket for relation", cut(tok(CBrack))).parse(ts)?;
     let map = attrs.into_iter().collect::<Map<_, _>>();
     Ok((ts, map))
 }
 
 fn block_member(ts: Toks) -> Res<(Tok, Tm)> {
-    tuple((alt((tok(Dash), tok(Pipe))).map(At::value), tm)).parse(ts)
+    context(
+        "block member",
+        tuple((alt((tok(Dash), tok(Pipe))).map(At::value), tm)),
+    )
+    .parse(ts)
 }
 
 fn block(ts: Toks) -> Res<Tm> {
-    let (ts, pairs) = nom_i9n::indented_block(&mut nom_i9n::line(block_member)).parse(ts)?;
+    let (ts, pairs) = context(
+        "block",
+        nom_i9n::indented_block(&mut nom_i9n::on_new_line(block_member)),
+    )
+    .parse(ts)?;
 
     let first_functor = pairs[0].0.clone();
     let members = pairs
@@ -407,6 +444,24 @@ fn tilde_nesting(ts: Toks) -> Res<Tm> {
 }
 
 fn non_operator_tm(ts: Toks) -> Res<Tm> {
+    alt((non_operator_non_block_tm, block)).parse(ts)
+}
+
+fn non_block_tm(ts: Toks) -> Res<Tm> {
+    alt((
+        operator_tm,
+        parenthesized_tm,
+        sym.map(Tm::Sym),
+        var.map(Tm::Var),
+        num.map(Tm::Int),
+        txt.map(|t| Tm::Txt(t, Tm::Nil.into())),
+        rel.map(Tm::Rel),
+        list,
+    ))
+    .parse(ts)
+}
+
+fn non_operator_non_block_tm(ts: Toks) -> Res<Tm> {
     alt((
         parenthesized_tm,
         sym.map(Tm::Sym),
@@ -415,32 +470,52 @@ fn non_operator_tm(ts: Toks) -> Res<Tm> {
         txt.map(|t| Tm::Txt(t, Tm::Nil.into())),
         rel.map(Tm::Rel),
         list,
-        block,
     ))
     .parse(ts)
 }
 
 fn parenthesized_tm(ts: Toks) -> Res<Tm> {
-    let (ts, (_, t, _)) = tuple((tok(OParen), tm, tok(CParen))).parse(ts)?;
+    let (ts, _) = tok(OParen).parse(ts)?;
+    let (ts, t) = context(
+        "parenthesized term",
+        cut(alt((
+            nom_i9n::on_new_line(delimited(
+                nom_i9n::begin_block,
+                nom_i9n::on_new_line(non_block_tm),
+                nom_i9n::end_block,
+            )),
+            tm,
+        ))),
+    )
+    .parse(ts)?;
+    let (ts, _) = context("closing paren of parenthetical", cut(tok(CParen))).parse(ts)?;
     Ok((ts, t))
 }
 
 fn operator_tm(ts: Toks) -> Res<Tm> {
-    alt((and_list, eq_nesting, tilde_nesting)).parse(ts)
+    context("operator term", alt((and_list, eq_nesting, tilde_nesting))).parse(ts)
 }
 
 pub fn tm(ts: Toks) -> Res<Tm> {
-    alt((operator_tm, non_operator_tm)).parse(ts)
+    context("term", alt((operator_tm, non_operator_tm))).parse(ts)
 }
 
 fn rel_def(ts: Toks) -> Res<Item> {
-    let mut p = tuple((nom_i9n::line(rel), opt(block.map(Into::into))));
-    let (ts, (r, b)) = p.parse(ts)?;
+    let (ts, r) = context("relation definition", nom_i9n::on_new_line(rel)).parse(ts)?;
+    let (ts, b) =
+        opt(alt((block, nom_i9n::indented(&mut non_block_tm))).map(RcTm::from)).parse(ts)?;
     Ok((ts, Item::RelDef(r, b)))
 }
 
 fn directive(ts: Toks) -> Res<Item> {
-    let mut p = nom_i9n::line(tuple((tok(OBrack), rel, tok(CBrack))));
+    let mut p = context(
+        "directive",
+        nom_i9n::on_new_line(tuple((
+            tok(OBrack),
+            rel,
+            context("closing bracket of directive", cut(tok(CBrack))),
+        ))),
+    );
     let (ts, (_, r, _)) = p.parse(ts)?;
     Ok((ts, Item::Directive(r)))
 }

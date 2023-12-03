@@ -1,4 +1,5 @@
 #![deny(unused_must_use)]
+#![feature(result_option_inspect)]
 
 pub mod ast;
 pub mod data_structures;

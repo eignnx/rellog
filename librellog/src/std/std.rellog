@@ -307,3 +307,27 @@
     When `Goal` errors, all subsequent solutions will be cut.
     """
 ]
+
+[[comment
+    """
+    - [tm_in Rule][reified_tm_out ReifiedRule]
+    - [impl][rule Rule ~ ReifiedRule][Before][After]
+    """
+]]
+
+[goal Goal0][MetaParam][new_goal Goal]
+    - [rel Goal0][attrs Attrs0]
+    - [elementwise [key [scalar MetaParam]][attr_in [splat Attrs0]][attr_out [splat Attrs]]]
+    - [rel Goal][Attrs]
+
+[Key][attr_in [key K][value OldValue]][attr_out [key K][value NewValue]]
+    [if K = Key][then
+        [tm_in OldValue][reified_tm_out NewValue0]; (NewValue = (OldValue ~ NewValue0))
+    ][else
+        NewValue = OldValue
+    ]
+
+[if Cond][Then][Else]
+    - [goal Cond][Truth]
+    - [rel [true Then][false Else]][key Truth][value Callable]
+    - Callable
