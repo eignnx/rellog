@@ -40,7 +40,7 @@ impl fmt::Display for DisplayUnifierSet {
                         writeln!(f, " = {}", TmDisplayer::default().indented(&root_tm))?
                     }
                     TermKind::Var(v) if v.is_original() => writeln!(f, " = {v}")?,
-                    _ => {}
+                    _ => writeln!(f)?,
                 }
             }
         }

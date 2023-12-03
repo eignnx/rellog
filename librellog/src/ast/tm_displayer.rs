@@ -109,7 +109,7 @@ impl<'tm> TmDisplayer<'tm> {
             || sym
                 .chars()
                 .next()
-                .map(|c| !c.is_alphabetic() && !c.is_ascii_lowercase())
+                .map(|c| !c.is_alphabetic() || !c.is_ascii_lowercase())
                 .expect("empty str case handled above")
         {
             write!(f, "'{sym}'")
