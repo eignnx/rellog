@@ -10,7 +10,7 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_until, take_while, take_while1},
     character::complete::{multispace0, satisfy},
-    combinator::{all_consuming, fail, opt, recognize},
+    combinator::{all_consuming, cut, fail, opt, recognize},
     error::{context, VerboseError},
     multi::many0,
     sequence::{delimited, preceded, terminated, tuple},
@@ -83,21 +83,27 @@ fn text_literal<'i>(i: Span<'i>) -> Res<'i, CharList> {
     .parse(i)
 }
 
-pub fn sym(i: Span) -> Res<Sym> {
-    let quoted_sym = delimited(
+fn unquoted_sym(i: Span) -> Res<Sym> {
+    recognize(tuple((
+        satisfy(|c| c.is_alphabetic() && c.is_lowercase()),
+        take_while(|c: char| (c.is_alphabetic() && c.is_lowercase()) || c.is_numeric() || c == '_'),
+    )))
+    .map(|span: Span| -> Sym { span.fragment().into() })
+    .parse(i)
+}
+
+fn quoted_sym(i: Span) -> Res<Sym> {
+    delimited(
         tag("'"),
         recognize(take_while(|c: char| c != '\'')),
         tag("'"),
-    );
+    )
+    .map(|span: Span| -> Sym { span.fragment().into() })
+    .parse(i)
+}
 
-    let unquoted_sym = recognize(tuple((
-        satisfy(|c| c.is_alphabetic() && c.is_lowercase()),
-        take_while(|c: char| (c.is_alphabetic() && c.is_lowercase()) || c.is_numeric() || c == '_'),
-    )));
-
-    alt((quoted_sym, unquoted_sym))
-        .map(|span: Span| -> Sym { span.fragment().into() })
-        .parse(i)
+pub fn sym(i: Span) -> Res<Sym> {
+    alt((quoted_sym, unquoted_sym)).parse(i)
 }
 
 pub fn var(i: Span) -> Res<Var> {
@@ -107,7 +113,13 @@ pub fn var(i: Span) -> Res<Var> {
 
     let nat_sym = take_while1(char::is_numeric).map(|i: Span| Sym::from(i));
 
-    let suffix_parser = preceded(tag("."), alt((sym, nat_sym)));
+    let suffix_parser = preceded(
+        tag(Var::SUFFIX_SEPARATOR),
+        context(
+            "unquoted symbol or non-negative whole number",
+            cut(alt((unquoted_sym, nat_sym))),
+        ),
+    );
 
     name_parser
         .and(opt(suffix_parser))
@@ -177,7 +189,7 @@ impl Display for LexError {
 
 impl<'i> From<VerboseError<Span<'i>>> for LexError {
     fn from(ve: VerboseError<Span<'i>>) -> Self {
-        debug_assert!(ve.errors.len() == 1);
+        // debug_assert!(ve.errors.len() == 1);
         let (i, _kind) = ve.errors.first().expect("nonempty error list");
         let fragment = i.fragment().trim_start();
         let preview_len = fragment.len().min(5);

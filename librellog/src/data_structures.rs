@@ -57,6 +57,8 @@ impl From<Generation> for Tm {
 }
 
 impl Var {
+    pub const SUFFIX_SEPARATOR: &'static str = ".";
+
     pub fn from_repl(name: impl Into<IStr>, suffix: Option<IStr>) -> Self {
         Self {
             name: name.into(),
