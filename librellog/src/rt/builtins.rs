@@ -1117,6 +1117,26 @@ impl BuiltinsMap {
         });
 
         def_builtin!(intrs, |state, u, [clause_head][clause_body] as rel| {
+            let clause_head = clause_head.clone();
+            let clause_body = clause_body.clone();
+
+            if let Tm::Var(..) = clause_head.as_ref() {
+                let clauses = state.rt.db.relations.iter().flat_map(|(_sig, clauses)| clauses);
+                return Box::new(clauses
+                    .into_iter()
+                    .flat_map(move |Clause { head: h, body: b }| {
+                        let head = Tm::Rel(h.clone()).into();
+                        u.unify(&clause_head, &head).and_then(|u| {
+                            u.unify(&clause_body, &if let Some(b) = b {
+                                b.clone()
+                            } else {
+                                tm!([true]).into()
+                            })
+                        })
+                    })
+                    .map(Ok));
+            }
+
             let Some(clause_head_rel) = clause_head.try_as_rel() else {
                 return soln_stream::error(Err::ArgumentTypeError {
                     rel: rel.to_string(),
@@ -1129,9 +1149,6 @@ impl BuiltinsMap {
             let Some(clauses) = state.rt.db.index_match(clause_head_rel, &u, state.rt.debug_mode.get()) else {
                 return soln_stream::failure();
             };
-
-            let clause_head = clause_head.clone();
-            let clause_body = clause_body.clone();
 
             Box::new(clauses
                 .into_iter()
