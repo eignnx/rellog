@@ -425,7 +425,6 @@ fn right_associative_binop(
 
         let output = terms
             .into_iter()
-            .rev()
             .reduce(|so_far, next| Tm::BinOp(bin_op_symbol, so_far.into(), next.into()))
             .expect("At least 2 items since its a binop");
 
