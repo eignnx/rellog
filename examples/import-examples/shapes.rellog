@@ -1,18 +1,17 @@
-[[import {
-    circle::[circle_radius][circle_area]
-    quads::{
-        self
-        rectangle::[rect_width][rect_height][rect_area]
-        square::[square_width][square_area]
-    }
-}][submodules {
-    circle
-    quads
-}][export {
-    [shape][area]
-    circle
-    quads
-}]]
+[[imports
+    - circle::[circle_radius][circle_area]
+    - quads::
+        - self
+        - rectangle::[rect_width][rect_height][rect_area]
+        - square::[square_width][square_area]
+][submodules
+    - circle
+    - quads
+][exports
+    - [shape][area]
+    - circle
+    - quads
+]]
 
 
 [shape {square Width}][Area]

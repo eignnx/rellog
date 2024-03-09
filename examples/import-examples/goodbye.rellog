@@ -1,0 +1,4 @@
+[[exports [GoodbyeWorld]]]
+
+[goodbye_world]
+    - [io_writeln "Goodbye, world!"][stream stdout]

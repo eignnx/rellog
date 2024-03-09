@@ -289,15 +289,15 @@
 
 [sig [FilePath][Clauses][Directives]][doc
     """
-    Relates a rellog source file given by `FilePath` to that files contained 
+    Relates a rellog source file given by `FilePath` to that file's contained 
     `Clauses` and `Directives`.
     """
 ]
 
-[undocumented_sig S]
-    - [clause_head S][clause_body B]
-    - [not [Sig][Doc] ~ S]
-    - [not [Sig][Doc]; (Sig ~ S)]
+[undocumented_sig Sig]
+    - [clause_head Sig][clause_body B]
+    - [not [Sig.2][Doc] ~ Sig]
+    - [not [Sig.2][Doc]; (Sig.2 ~ Sig)]
 
 [sig [Goal][Truth]][doc
     """

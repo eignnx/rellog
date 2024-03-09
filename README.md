@@ -4,7 +4,7 @@ It means "Relational Prolog".
 
 ## Idea
 
-Instead of predicates, this implementation focuses on relations. While a Prolog predicate can be thought of a symbol and an ordered tuple of arguments, a relation is an unordered collection name-value pairs (called attributes).
+Instead of predicates, this implementation focuses on relations. A Prolog predicate can be thought of as a name and an ordered tuple of arguments, but a Rellog relation is an unordered collection of name-value pairs (called attributes).
 
 While in Prolog you might write
 
@@ -15,13 +15,13 @@ append([1, 2], [3, 4], Compound)
 in Rellog you could write any of the following:
 
 ```clojure
-[prefix {1, 2}][suffix {3, 4}][compound Compound]
-[prefix {1, 2}][suffix {3, 4}][Compound]
-[suffix {3, 4}][prefix {1, 2}][Compound]
-[suffix {3, 4}][Compound][prefix {1, 2}]
-[prefix {1, 2}][Compound][suffix {3, 4}]
-[Compound][suffix {3, 4}][prefix {1, 2}]
-[Compound][prefix {1, 2}][suffix {3, 4}]
+[prefix {1 2}][suffix {3 4}][compound Compound]
+[prefix {1 2}][suffix {3 4}][Compound]
+[suffix {3 4}][prefix {1 2}][Compound]
+[suffix {3 4}][Compound][prefix {1 2}]
+[prefix {1 2}][Compound][suffix {3 4}]
+[Compound][suffix {3 4}][prefix {1 2}]
+[Compound][prefix {1 2}][suffix {3 4}]
 ```
 
 ## Example
@@ -69,6 +69,22 @@ $ cargo run
 
 ## Language Reference
 
+### Table of Contents
+- [Overview: The Big Ideas](#overview-the-big-ideas)
+- [Getting Help](#getting-help)
+- [Clauses](#clauses)
+- [Rellog Values](#rellog-values)
+    - [Symbols](#symbols)
+    - [Integers](#integers)
+    - [Text Strings](#text-strings)
+    - [Variables](#variables)
+    - [Relations](#relations)
+    - [Operators](#operators)
+    - [Lists](#lists)
+    - [Blocks](#blocks)
+- [The REPL](#the-repl)
+
+
 ### Overview: The Big Ideas
 
 Rellog is all about ***relations***. A relation is a set of associations of values (kinda like a set of dictionaries each of which have the same schema).
@@ -79,7 +95,7 @@ An example of a relation might be a student-teacher relationship. In Rellog, the
 [[comment "Fact #1:"]]
 [student gideon][teacher dr_blum]
 
-[[comment "# Fact #2:"]]
+[[comment "Fact #2:"]]
 [student aditya][teacher dr_blum]
 ```
 
@@ -162,7 +178,7 @@ There are many relations predefined for you to use in your Rellog code. Use the 
 -- [Sig][Doc]
 
     - Sig = [Prefix][Suffix][Compound]
-    - Help =
+    - Doc =
        """
        Relates a list `Compound` to some partitioning 
        of itself into a `Prefix` and a `Suffix`. Also 
@@ -203,7 +219,7 @@ A clause is a top-level definition. A clause is either:
     ```
 1. A **rule**:
 
-    A rule has conditions. Heres an example of a rule:
+    A rule has conditions. Here's an example of a rule:
     ```yaml
     [mortal X]
         - [human X]
@@ -445,127 +461,3 @@ There are several commands that directly interact with the REPL. Most of them be
 | `:u <PATH>`, `:unload <PATH>` | Sometimes you want to stop paying attention to a file (maybe it was deleted and is no longer relevant). You can tell the REPL to forget about the file with `:unload`. |
 | `:d`, `:debug` | Enters debugging mode. Once in, use `help` to learn how to use the debugger. |
 | `:q`, `:quit`, `:e`, `:exit`, `:wq` | Quit the REPL. Can also be done with `CTRL-C` or `CTRL-D`. |
-
-### The Standard Library
-
-The standard library is located in the `librellog/src/std` directory. You will have to load files in via the REPL for now (use the `:load` REPL command and provide it the path).
-
-#### Generative Rules (Definite Clause Grammars)
-
-Location: `librellog/src/std/dcgs/list.rellog`
-
-A generative rule (or just "rule") is a relation that responds to the `[Rule][Before][After]` relation.
-
-The simplest rule is a list of values: `[rule {1 2 3}][Before][After]` appends the list `{1 2 3}` as a suffix of `Before`, and the combined list is bound to `After`.
-
-For example:
-
-```
--- (Before = {a b c}); [rule {1 2 3}][Before][After]
-|
-    - Before = {a b c}
-    - After = {a b c 1 2 3}
-```
-
-A relation can be a rule too if its body is an and-list of other rules:
-
-```
-[story]
-    - {once upon a time}
-    - {something happened}
-    - {the end}
-
--- [rule [story]][before {}][After]
-|
-    - After = {once upon a time something happened the end}
-```
-
-This process is recursive too, so you can have a rule called from inside another rule:
-
-```
-[story]
-    - {once upon a time}
-    - [story_body]
-    - {the end}
-
-[story_body]
-	- {i took a nap}
-
--- [rule [story]][before {}][After]
-|
-    - After = {once upon a time i took a nap the end}
-```
-
-There's also a shorthand relation `[Rule][Output]` which is the same as calling `[Rule][before {}][after Output]`.
-
-```
--- [rule [story]][Output]
-|
-    - Output = {once upon a time i took a nap the end}
-```
-
-Sometimes you need to do some logic inside your rule, but you don't want the rule system to try to get output from the relation you call. In that case use `logic=Term`:
-
-```
-[cond true][maybe_some_numbers {1 2 3}]
-[cond false][maybe_some_numbers {}]
-
-[my_rule NumbersIncluded]
-	- {a b c}
-	- logic=[cond NumbersIncluded][MaybeSomeNumbers]
-	- MaybeSomeNumbers
-	- {x y z}
-
--- [rule [my_rule true]][Output]
-|
-	- Output = {a b c 1 2 3 x y z}
-
--- [rule [my_rule false]][Output]
-|
-	- Output = {a b c x y z}
-```
-
-##### When to use Generative Rules?
-
-If you find yourself wanting to write a function, (e.g. "I just wanna transform this thing into this other thing and I don't care about going backwards") consider writing a generative rule.
-
-#### Elementwise Mapping
-
-Location: `librellog/src/std/elementwise.rellog`
-
-Often you have some data that you relate via a relation, like this:
-
-```
--- [pred 1][Succ]
-|
-	- Succ = 2
-```
-
-But then you find yourself rewriting the code to operate on *lists* of values:
-
-```
--- [pred {1 2 3}][succ Successors]
-# ERROR: `[Pred][Succ]` requires an int for key `pred`, but was given a list.
-```
-
-If this is you, try using the `[Elementwise]` relation.
-
-```
--- :load "./librellog/src/std/elementwise.rellog"
--- [elementwise [pred [splat {1 2 3}]][succ [splat Successors]]
-|
-	- Successors = {2 3 4}
-```
-
-Use `[Splat]` to indicate which arguments are lists that need to be mapped over. Use `[Scalar]` if the argument is ***not*** a list to be mapped over:
-
-```
--- [elementwise [io_writeln [splat {"hi" "there" "pal"}]][stream [scalar stdout]]]
-|
-	- [true]
-hi
-there
-pal
-```
-
-NOTE: relations of arity 1, 2, and 3 are currently the only sizes supported.

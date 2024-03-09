@@ -1,0 +1,14 @@
+[[imports
+    - hello::[hello_world]
+    - goodbye
+]]
+
+[[submodules
+    - hello
+    - goodbye
+]]
+
+
+[main]
+    - [hello_world]
+    - goodbye::[goodbye_world]

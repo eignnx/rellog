@@ -1,0 +1,7 @@
+[[exports [HelloWorld]]]
+
+[hello_world]
+    - [io_writeln "Hello, world!"][stream stdout]
+
+[hidden]
+    - [io_writeln "Uh-oh! This should be private to module `hello`!"][stream stdout]

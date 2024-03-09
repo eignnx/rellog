@@ -1,0 +1,32 @@
+
+
+[Imports]
+    - logic=[tm_in Imports][reified_tm_out ImportsReified]
+    - [reified_imports Imports ~ ImportsReified][current_path {}]
+
+[reified_imports ModName ~ [sym _]][CurrentPath]
+    - logic=
+        - [term ModName][text ModName.text]
+        - [Cwd]
+        - [txt_prefix Cwd][txt_suffix "/"][txt_compound BaseDir]
+        - [txt_prefix BaseDir][txt_suffix ModName.text][txt_compound FilePath]
+        - [FilePath][Clauses][directives _]
+        - [Clauses][mod_prefix ModName][ClausesPrefixed]
+    - ClausesPrefixed
+
+
+[mod_prefix _][clauses {}][clauses_prefixed {}]
+
+[ModPrefix][clauses {Clause ..Clauses}][clauses_prefixed {ModPrefix::Clause ..ClausesPrefixed}]
+    [ModPrefix][Clauses][ClausesPrefixed]
+
+
+[reified_imports {} ~ _] {}
+[reified_imports {Path ..Paths} ~ _]
+    - logic=
+        - [term ModName][text ModName.text]
+        - [Cwd]
+        - [txt_prefix Cwd][txt_suffix ModName.text][txt_compound FilePath]
+        - [FilePath][Clauses][directives _]
+        - [Clauses][mod_prefix ModName][ClausesPrefixed]
+    - ClausesPrefixed
