@@ -317,6 +317,6 @@ fn test_runtime() {
         .collect::<Vec<_>>();
 
     assert2::let_assert!([Ok(u)] = &solns[..]);
-    let answer_var = Tm::Var(Var::from_repl("Compound")).into();
+    let answer_var = Tm::Var(Var::from_repl("Compound", None)).into();
     assert2::check!(&u.reify_term(&answer_var).to_string() == "{1 2 3 4 5 6}");
 }
