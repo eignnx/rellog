@@ -31,7 +31,7 @@
 [macro_head
     [Doc]
 ][options {
-    [decorates [ClauseHead][clause_body _1]]
+    [decorates [ClauseHead][clause_body _]]
 }][macro_body
     - logic=[rel ClauseHead][Sig]
     - { [fact [Sig][Doc]] }
@@ -46,10 +46,13 @@
 [macro_head
     [ClauseDoc]
 ][options {
-    [decorates [ClauseHead][clause_body _1]]
+    [decorates [ClauseHead][clause_body _]]
 }][macro_body
     - { [fact [sig ClauseHead][doc ClauseDoc]] }
 ]
 
 [macro_head [Comment]][options {}][macro_body {}]
-[macro_head [Todo]][options {}][macro_body {}]
+
+[macro_head [Todo]][options {}][macro_body
+    { [fact [Todo]] }
+]
