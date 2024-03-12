@@ -1,0 +1,55 @@
+
+[prefix {}][Suffix][compound Suffix]
+[prefix {X ..Xs}][Suffix][compound {X ..Ys}]
+    - [prefix Xs][Suffix][compound Ys]
+
+[impl][rule MacroHead ~ [macro MacroInfo]][Before][After]
+    - MacroInfo = [NextRelDef]
+    - [MacroHead][Options][MacroBody]
+    - [provide_options [MacroHead][NextRelDef][Options]]
+    - [rule MacroBody][Before][After]
+
+[provide_options [NextRelDef][options {}][MacroHead]]
+[provide_options [NextRelDef][options {Opt ..Opts}][MacroHead]]
+    - [provide_option [NextRelDef][Opt][MacroHead]]
+    - [provide_options [NextRelDef][options Opts][MacroHead]]
+
+[provide_option [next_rel_def [ClauseHead][ClauseBody]][opt [decorates [ClauseHead][ClauseBody]]][MacroHead]]
+[provide_option [next_rel_def {}][opt [decorates [ClauseHead][ClauseBody]]][MacroHead]]
+    - [tm MacroHead][Txt]
+    - [io_write "Could not provide option for next_rel_def: "][stream stderr]
+    - [io_writeln Txt][stream stderr]
+    - [false]
+
+
+
+[sig [Doc]][doc
+    """
+    A macro that allows inline documentation of a relation's signature.
+    """
+]
+[macro_head
+    [Doc]
+][options {
+    [decorates [ClauseHead][clause_body _1]]
+}][macro_body
+    - logic=[rel ClauseHead][Sig]
+    - { [fact [Sig][Doc]] }
+]
+
+
+[sig [ClauseDoc]][doc
+    """
+    A macro that allows inline documentation of one specific clause of a relation.
+    """
+]
+[macro_head
+    [ClauseDoc]
+][options {
+    [decorates [ClauseHead][clause_body _1]]
+}][macro_body
+    - { [fact [sig ClauseHead][doc ClauseDoc]] }
+]
+
+[macro_head [Comment]][options {}][macro_body {}]
+[macro_head [Todo]][options {}][macro_body {}]

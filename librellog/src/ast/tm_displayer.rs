@@ -74,10 +74,17 @@ impl fmt::Display for Indent {
 }
 
 impl<'tm> TmDisplayer<'tm> {
-    pub fn indented(&self, tm: &'tm Tm) -> Self {
+    pub fn indenting(&self, tm: &'tm Tm) -> Self {
         Self {
             tm: Some(tm),
             indent: self.indent.indented(),
+        }
+    }
+
+    pub fn indented(&self) -> Self {
+        Self {
+            indent: self.indent.indented(),
+            ..self.clone()
         }
     }
 
@@ -170,7 +177,7 @@ impl<'tm> TmDisplayer<'tm> {
                 }
                 _ => {
                     writeln!(f, "[{sym}")?;
-                    writeln!(f, "{}{}", self.indent, self.indented(tm))?;
+                    writeln!(f, "{}{}", self.indent, self.indenting(tm))?;
                     write!(f, "{}]", self.dedented().indent)?;
                 }
             }
@@ -218,12 +225,12 @@ impl<'tm> TmDisplayer<'tm> {
         write!(f, "{{")?;
 
         loop {
-            write!(f, "{}", self.indented(&x))?;
+            write!(f, "{}", self.indenting(&x))?;
 
             match xs.as_ref() {
                 // xs = {y ...{}} = {y}
                 Tm::Cons(y, ys) if matches!(**ys, Tm::Nil) => {
-                    write!(f, " {}", self.indented(y))?;
+                    write!(f, " {}", self.indenting(y))?;
                     return write!(f, "}}");
                 }
                 // xs = {y ...ys} (continue loop)
@@ -232,7 +239,7 @@ impl<'tm> TmDisplayer<'tm> {
                 Tm::Nil => return write!(f, "}}"),
                 // Malformed list like: {1 2 ...3} (instead of {1 2 3 ...{}})
                 xs => {
-                    write!(f, "{SPACE}{}{}", Tok::Spread, self.indented(xs))?;
+                    write!(f, "{SPACE}{}{}", Tok::Spread, self.indenting(xs))?;
                     return write!(f, "}}");
                 }
             }
@@ -273,12 +280,12 @@ impl<'tm> TmDisplayer<'tm> {
         write!(f, "{{{sep}")?;
 
         loop {
-            write!(f, "{}", self.indented(&x))?;
+            write!(f, "{}", self.indenting(&x))?;
 
             match &*xs {
                 // xs = {y ...{}} = {y}
                 Tm::Cons(y, ys) if matches!(**ys, Tm::Nil) => {
-                    return write!(f, "{sep}{}{close_brace}", self.indented(y));
+                    return write!(f, "{sep}{}{close_brace}", self.indenting(y));
                 }
                 // xs = {y ...ys} (continue loop)
                 Tm::Cons(y, ys) => (x, xs) = (y.clone(), ys.clone()),
@@ -287,7 +294,7 @@ impl<'tm> TmDisplayer<'tm> {
 
                 // Malformed list like: {1 2 ...3} (instead of {1 2 3 ...{}})
                 xs => {
-                    return write!(f, "{sep}{}{}{close_brace}", Tok::Spread, self.indented(xs));
+                    return write!(f, "{sep}{}{}{close_brace}", Tok::Spread, self.indenting(xs));
                 }
             }
 

@@ -35,7 +35,7 @@ impl fmt::Display for DisplayUnifierSet {
                 }
                 match root_tm.classify_term() {
                     TermKind::NonVar => {
-                        writeln!(f, " = {}", TmDisplayer::default().indented(&root_tm))?
+                        writeln!(f, " = {}", TmDisplayer::default().indenting(&root_tm))?
                     }
                     TermKind::Var(v) if v.should_display_at_top_level() => writeln!(f, " = {v}")?,
                     _ => writeln!(f)?,

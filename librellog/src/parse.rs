@@ -527,15 +527,7 @@ pub fn module(ts: Toks) -> Res<Module> {
         .map(|items| {
             let mut m = Module::default();
             for item in items {
-                match item {
-                    Item::Directive(rel) => m.directives.push(rel),
-                    Item::RelDef(head, body) => {
-                        m.relations
-                            .entry(head.keys().cloned().collect())
-                            .or_default()
-                            .push(Clause { head, body });
-                    }
-                }
+                m.items.push(item);
             }
             m
         })

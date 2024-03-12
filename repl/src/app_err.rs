@@ -1,13 +1,11 @@
 use std::{fmt, path::PathBuf};
 
-use librellog::{lex, parse};
+use librellog::{lex, parse, rt};
 
 pub type AppRes<'ts, T> = Result<T, AppErr<'ts>>;
 
 #[derive(Debug)]
 pub enum AppErr<'ts> {
-    FileOpen(String, std::io::Error),
-    FileRead(String, std::io::Error),
     Lex {
         err: lex::LexError,
     },
@@ -17,6 +15,7 @@ pub enum AppErr<'ts> {
     },
     #[allow(unused)]
     IoError(Box<dyn std::error::Error>),
+    RtError(rt::Err),
 }
 
 impl<'ts> From<lex::LexError> for AppErr<'ts> {
@@ -34,18 +33,6 @@ impl<'ts> From<(Option<PathBuf>, parse::Error<'ts>)> for AppErr<'ts> {
 impl<'ts> fmt::Display for AppErr<'ts> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            AppErr::FileOpen(msg, io_err) => {
-                write!(
-                    f,
-                    "Could not open file `{msg}`.\n(io error: {:?})",
-                    io_err.kind()
-                )
-            }
-            AppErr::FileRead(msg, io_err) => write!(
-                f,
-                "Could not read file `{msg}`.\n(io error: {:?})",
-                io_err.kind()
-            ),
             AppErr::Lex { err } => write!(f, "Unable to tokenize:\n{}", err),
             AppErr::Parse { fname, err } => {
                 if let Some(fname) = fname {
@@ -54,6 +41,7 @@ impl<'ts> fmt::Display for AppErr<'ts> {
                 write!(f, "Unable to parse:\n{}", err)
             }
             AppErr::IoError(e) => write!(f, "An IO operation failed:\n{e}"),
+            AppErr::RtError(e) => write!(f, "An error occurred during runtime:\n{e}"),
         }
     }
 }

@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, HashSet},
+    collections::HashSet,
     fmt,
     iter::{self, DoubleEndedIterator},
     ops::Deref,
@@ -131,7 +131,7 @@ impl RcTm {
         Self::from(list)
     }
 
-    pub fn try_collect_txt_to_string(&self, buf: &mut String) -> Result<(), ()> {
+    pub fn try_collect_txt_to_string(&self, buf: &mut String) -> Result<(), RcTm> {
         let mut rc_tm = self;
         loop {
             match rc_tm.as_ref() {
@@ -140,7 +140,7 @@ impl RcTm {
                     rc_tm = tail;
                 }
                 Tm::Nil => break Ok(()),
-                _ => break Err(()),
+                _ => break Err(rc_tm.clone()),
             }
         }
     }
@@ -166,6 +166,12 @@ impl RcTm {
     pub fn sym_false() -> Self {
         Tm::Sym("false".into()).into()
     }
+
+    pub fn rel_true() -> Self {
+        Rel::new()
+            .insert(Sym::from("true"), Self::sym_true())
+            .into()
+    }
 }
 
 #[macro_export]
@@ -183,7 +189,7 @@ macro_rules! tm {
 
     ( $([$attr:ident])+ ) => {
         {
-            let mut rel = Rel::new();
+            let mut rel = $crate::ast::Rel::new();
 
             $(
                 rel.insert_mut(stringify!($attr).into(), RcTm::from(tm!($attr)));
@@ -212,7 +218,7 @@ macro_rules! rel_match {
         loop {
             $(
                 $(
-                    let $key = $expr.get(&IStr::from(stringify!($key)));
+                    let $key = $expr.get(&$crate::data_structures::Sym::from(stringify!($key)));
                 )+
                 if let ( $(Some($value),)+ ) = ( $($key, )+ ) {
                     break $block;
@@ -425,8 +431,8 @@ impl fmt::Display for Item {
             Item::RelDef(rel, body) => {
                 TmDisplayer::default().fmt_rel(rel, f)?;
                 if let Some(body) = body {
-                    let td = TmDisplayer::default().indented(body.as_ref());
-                    write!(f, " {td}",)?;
+                    let td = TmDisplayer::default().indenting(body.as_ref());
+                    write!(f, " {td}")?;
                 }
                 Ok(())
             }
@@ -441,6 +447,10 @@ pub struct Sig(Vector<Sym>);
 impl Sig {
     pub fn arity(&self) -> usize {
         self.0.len()
+    }
+
+    pub fn from_rel(rel: &Rel) -> Self {
+        Self::from_iter(rel.keys().cloned())
     }
 }
 
@@ -505,12 +515,23 @@ impl Dup for Clause {
     }
 }
 
-/// A single-file program (compilation unit).
+impl fmt::Display for Clause {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        TmDisplayer::default().fmt_rel(&self.head, f)?;
+        if let Some(body) = &self.body {
+            write!(f, "{}", TmDisplayer::default().indenting(body.as_ref()))?;
+        }
+        Ok(())
+    }
+}
+
+/// A representation of the syntax tree of a single source file.
 #[derive(Debug, Default, Clone)]
 pub struct Module {
-    pub directives: Vec<Rel>,
-    pub relations: BTreeMap<Sig, Vec<Clause>>,
-    pub dependencies: HashSet<IStr>,
+    /// It's important that the order of the definitions be kept at this point
+    /// so that a macro invocation (directive) can be told about the `Item` that
+    /// follows it.
+    pub items: Vec<Item>,
 }
 
 impl Module {
@@ -522,30 +543,12 @@ impl Module {
         let tokens = lex::tokenize_into(token_buf, LocatedSpan::new(src.as_ref()), filename)?;
         parse::entire_module(tokens)
     }
-
-    pub fn include(&mut self, mut other: Module) {
-        self.directives.append(&mut other.directives);
-        self.relations.append(&mut other.relations);
-    }
 }
 
 impl fmt::Display for Module {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        for dir in self.directives.iter() {
-            writeln!(f, "{dir}")?;
-        }
-
-        writeln!(f)?;
-
-        for (_sig, rel_defs) in self.relations.iter() {
-            for Clause { head, body } in rel_defs {
-                if let Some(body) = body {
-                    writeln!(f, "{head}{body}")?;
-                } else {
-                    writeln!(f, "{head}")?;
-                }
-            }
-            writeln!(f)?;
+        for item in &self.items {
+            writeln!(f, "{item}\n")?;
         }
         Ok(())
     }

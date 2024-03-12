@@ -284,6 +284,38 @@ impl BuiltinsMap {
             }
         });
 
+        def_builtin!(intrs, |_rt, u, [rel][sig] as r| {
+            match (rel.as_ref(), sig.as_ref()) {
+                (Tm::Var(_), Tm::Var(_)) => Err::InstantiationError {
+                    rel: r.to_string(),
+                    tm: rel.clone()
+                }.into(),
+
+                (Tm::Rel(rel), Tm::Var(..)) => {
+                    let sig_val = rel.iter().map(|(k, _)| {
+                        (*k, Tm::Var(Var::from_source(*k, None)).into())
+                    }).collect::<Rel>();
+                    let sig_val = Tm::Rel(sig_val).into();
+                    soln_stream::unifying(u, &sig_val, sig)
+                }
+
+                (Tm::Var(..), Tm::Rel(..)) => {
+                    soln_stream::unifying(u, rel, sig)
+                }
+
+                (Tm::Rel(_rel), Tm::Rel(_sig)) => soln_stream::unifying(u, rel, sig),
+
+                _ => Err::GenericError {
+                    rel: r.to_string(),
+                    msg: format!(
+                        "[rel][sig] requires two rel terms, received `{}` and `{}`.",
+                        rel,
+                        sig,
+                    )
+                }.into()
+            }
+        });
+
         def_builtin!(intrs, |_rt, u, [gt][lt] as rel| {
             match (gt.as_ref(), lt.as_ref()) {
                 (Tm::Int(gt), Tm::Int(lt)) => {
@@ -1100,7 +1132,9 @@ impl BuiltinsMap {
             let directive = directive.clone();
             Box::new(directives_clone
                 .into_iter()
-                .flat_map(move |rel| u.unify(&Tm::Rel(rel).into(), &directive))
+                .flat_map(move |dir| {
+                    u.unify(&Tm::Rel(dir.query).into(), &directive)
+                })
                 .map(Ok))
         });
 
@@ -1111,7 +1145,7 @@ impl BuiltinsMap {
                 .directives
                 .iter()
                 .cloned()
-                .map(|rel| Tm::Rel(rel).into());
+                .map(|dir| Tm::Rel(dir.query).into());
             let ds = RcTm::list_from_iter(it);
             soln_stream::unifying(u, directives, &ds)
         });
@@ -1235,7 +1269,10 @@ impl BuiltinsMap {
 
                     let KnowledgeBase { directives: ds, relations: rs } = kb;
 
-                    let ds = RcTm::list_from_iter(ds.into_iter().map(|rel| Tm::Rel(rel).into()));
+                    let ds = RcTm::list_from_iter(ds.into_iter().map(|dir| {
+                        tm!([directive Tm::Rel(dir.query).into()]).into()
+                    }));
+
                     let cs = RcTm::list_from_iter(rs.into_iter().flat_map(|(_sig, clauses)| {
                         clauses.into_iter().map(|clause| {
                             let Clause { head, body } = clause;
@@ -1257,6 +1294,22 @@ impl BuiltinsMap {
                     soln_stream::success(u)
                 }
                 _ => todo!()
+            }
+        });
+
+        def_builtin!(intrs, |_state, _u, [raises] as rel| {
+            if let Some(msg) = raises.try_as_sym() {
+                soln_stream::error(Err::GenericError {
+                    rel: rel.to_string(),
+                    msg: msg.to_string(),
+                })
+            } else {
+                soln_stream::error(Err::ArgumentTypeError {
+                    rel: rel.to_string(),
+                    key: "raises".into(),
+                    expected_ty: "symbol".into(),
+                    recieved_tm: raises.to_string(),
+                })
             }
         });
 

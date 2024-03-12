@@ -1,5 +1,9 @@
 #![deny(unused_must_use)]
 
+use std::path::PathBuf;
+
+use librellog::STD_LIB_ROOT;
+
 mod app_err;
 mod debugger;
 mod line_editor;
@@ -17,21 +21,23 @@ fn main() {
     let args: Vec<_> = std::env::args().skip(1).collect();
 
     let mut load_std_lib = true;
-    let mut tok_buf = Vec::new();
 
     for arg in &args {
         if arg == "--no-std" {
             load_std_lib = false;
         } else {
             let fname = arg;
-            tok_buf.clear();
-            let _ = repl.load_file(&mut tok_buf, fname.clone());
+            if let Err(_err) = repl.load_file(fname.clone()) {
+                // println!("Error loading file {}: {}", fname, err);
+            }
         }
     }
 
     if load_std_lib {
-        tok_buf.clear();
-        let _ = repl.load_file(&mut tok_buf, "./librellog/src/std/std.rellog".into());
+        let std_lib = PathBuf::from(STD_LIB_ROOT).join("std.rellog");
+        if let Err(_err) = repl.load_file(&std_lib) {
+            // println!("Error loading standard library: {}", err);
+        }
     }
 
     if args.is_empty() || args == ["--no-std"] {

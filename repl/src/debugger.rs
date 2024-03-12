@@ -39,7 +39,7 @@ impl librellog::rt::breakpoint::Breakpoint for Debugger {
 
         loop {
             let depth = rt.recursion_depth.get();
-            let query_disp = TmDisplayer::default().indented(query.as_ref());
+            let query_disp = TmDisplayer::default().indenting(query.as_ref());
             println!(
                 "[[breakpoint][event {event}][depth {depth}][query",
                 event = Color::Magenta.paint(event.to_string()),

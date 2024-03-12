@@ -1,0 +1,9 @@
+[[doc "This documents the [mortal] relation."]]
+[mortal X]
+    - [man X]
+
+[[doc "This documents the [man] relation."]]
+[[clause_doc "This documents only [man socrates]."]]
+[man socrates]
+[man plato]
+[man aristotle]

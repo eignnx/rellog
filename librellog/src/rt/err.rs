@@ -13,6 +13,7 @@ pub enum Err {
         tm: RcTm,
     },
     NoSuchRelation(Sig),
+    NoSuchMacro(Sig),
     ArgumentTypeError {
         rel: String,
         /// The attribute key that the incorrect value was passed to.
@@ -37,6 +38,14 @@ pub enum Err {
     },
     ParseError(String),
     LexError(String),
+    MacroExpansionError {
+        macro_name: String,
+        err: Box<Err>,
+    },
+    MacroImplemenationError {
+        macro_name: String,
+        msg: String,
+    },
 }
 
 impl fmt::Display for Err {
@@ -53,6 +62,9 @@ impl fmt::Display for Err {
             }
             Err::NoSuchRelation(sig) => {
                 write!(f, "No relation exists with signature `{sig}`.")
+            }
+            Err::NoSuchMacro(sig) => {
+                write!(f, "No macro could be found with signature `[{sig}]`.")
             }
             Err::ArgumentTypeError {
                 rel,
@@ -81,6 +93,18 @@ impl fmt::Display for Err {
             }
             Err::ParseError(msg) => write!(f, "{msg}"),
             Err::LexError(msg) => write!(f, "{msg}"),
+            Err::MacroExpansionError { macro_name, err } => {
+                write!(
+                    f,
+                    "Error during macro expansion of directive `[{macro_name}]`:\n\t- {err}"
+                )
+            }
+            Err::MacroImplemenationError { macro_name, msg } => {
+                write!(
+                    f,
+                    "Error in implementation of macro `{macro_name}`:\n\t- {msg}"
+                )
+            }
         }
     }
 }
@@ -93,6 +117,7 @@ impl From<Err> for Tm {
                 tm!([instantiation_error tm!([rel RcTm::sym(rel)][tm tm]).into()])
             }
             Err::NoSuchRelation(sig) => tm!([no_such_relation sig.into()]),
+            Err::NoSuchMacro(sig) => tm!([no_such_macro sig.into()]),
             Err::ArgumentTypeError {
                 rel,
                 key,
@@ -133,6 +158,22 @@ impl From<Err> for Tm {
             }
             Err::ParseError(e) => tm!([parse_error RcTm::sym(e)]),
             Err::LexError(e) => tm!([lex_error RcTm::sym(e)]),
+            Err::MacroExpansionError { macro_name, err } => tm!([macro_expansion_error tm!(
+                [macro_name
+                    RcTm::sym(macro_name)
+                ][err
+                    Tm::from(err.as_ref().clone()).into()
+                ]
+            ).into()]),
+            Err::MacroImplemenationError { macro_name, msg } => {
+                tm!([macro_implementation_error tm!(
+                [macro_name
+                    RcTm::sym(macro_name)
+                ][msg
+                    RcTm::sym(msg)
+                ]
+            ).into()])
+            }
         }
     }
 }

@@ -1,20 +1,20 @@
 use std::{
     cell::RefCell,
     collections::BTreeSet,
-    io::{self, Read},
     ops::ControlFlow,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::Arc,
 };
 
 use librellog::{
-    ast::{self, dup::TmDuplicator, RcTm},
+    ast::{dup::TmDuplicator, RcTm},
     lex::{
         self,
         tok::{At, Tok},
     },
     parse,
-    rt::{kb::KnowledgeBase, Rt, UnifierSet},
+    rt::UnifierSet,
+    session::Session,
     utils::display_unifier_set::DisplayUnifierSet,
 };
 use nu_ansi_term::Color;
@@ -28,7 +28,7 @@ use crate::{
 };
 
 pub struct Repl {
-    rt: Rt,
+    session: Session,
     line_editor: Arc<LineEditor>,
     files_loaded: BTreeSet<String>,
     files_failed_to_load: BTreeSet<String>,
@@ -37,57 +37,57 @@ pub struct Repl {
 impl Repl {
     pub fn new_loading_files(fnames: Vec<String>) -> Self {
         let line_editor = Arc::new(LineEditor::new());
-        let kb = KnowledgeBase::default();
-        let rt = Rt::new(kb).with_debugger(Debugger::new(line_editor.clone()));
+        let mut session = Session::new(".").unwrap_or_else(|e| {
+            println!(
+                "{}",
+                Color::Red.paint(format!("# Error creating session: {e}"))
+            );
+            println!("{}", Color::Red.paint("# Exiting..."));
+            std::process::exit(1);
+        });
+
+        session.rt = session.rt.with_debugger(Debugger::new(line_editor.clone()));
         let mut repl = Self {
-            rt,
+            session,
             line_editor,
             files_loaded: BTreeSet::new(),
             files_failed_to_load: BTreeSet::new(),
         };
 
-        let mut tok_buf = Vec::new();
         for fname in fnames {
-            let _ = repl.load_file(&mut tok_buf, fname);
+            let _ = repl.load_file(fname);
         }
 
         repl
     }
 
-    pub fn load_file<'ts>(
-        &mut self,
-        tok_buf: &'ts mut Vec<At<Tok>>,
-        fname: String,
-    ) -> AppRes<'ts, ()> {
-        let loaded_module = match load_module_from_file(tok_buf, fname.clone()) {
+    pub fn load_file<'ts>(&mut self, fname: impl AsRef<Path>) -> AppRes<'ts, ()> {
+        let fname = fname.as_ref();
+        let fname_path = PathBuf::from(fname);
+        let (nrels, ndirs) = match self.session.load_file(fname_path) {
             Ok(m) => m,
-            Err(AppErr::FileOpen(fname, io_err)) => {
-                println!(
-                    "{}",
-                    Color::Red.paint(format!("# Error loading file `{}`:\n\t{}", &fname, &io_err))
-                );
-                return Err(AppErr::FileOpen(fname, io_err));
-            }
             Err(e) => {
                 println!(
                     "{}",
-                    Color::Red.paint(format!("# Error loading file `{}`:\n\t{e}", &fname))
+                    Color::Red.paint(format!(
+                        "# Error loading file `{}`:\n\t{}",
+                        &fname.display(),
+                        &e
+                    ))
                 );
-                self.files_failed_to_load.insert(fname);
-                return Err(e);
+                self.files_failed_to_load
+                    .insert(fname.display().to_string());
+                return Err(AppErr::RtError(e));
             }
         };
-        let nrels = loaded_module.relations.len();
-        let ndirs = loaded_module.directives.len();
-        self.rt.db.import(loaded_module);
         println!(
             "{}",
             Color::Yellow.paint(format!(
                 "# Loaded `{}` ({nrels} relations, {ndirs} directives).",
-                fname
+                fname.display()
             ))
         );
-        self.files_loaded.insert(fname);
+        self.files_loaded.insert(fname.display().to_string());
         Ok(())
     }
 
@@ -95,7 +95,7 @@ impl Repl {
         let mut tok_buf = Vec::new();
 
         'outer: loop {
-            let debug = self.rt.debug_mode.get();
+            let debug = self.session.rt.debug_mode.get();
             self.line_editor.set_repl_mode(ReplMode::TopLevel { debug });
 
             let query_buf = match self.line_editor.read_line() {
@@ -120,8 +120,8 @@ impl Repl {
                     break 'outer;
                 }
                 [":debug" | ":d"] => {
-                    let new_mode = !self.rt.debug_mode.get();
-                    self.rt.debug_mode.set(new_mode);
+                    let new_mode = !self.session.rt.debug_mode.get();
+                    self.session.rt.debug_mode.set(new_mode);
                     if new_mode {
                         println!("{}", Color::Yellow.paint("# Entering debug mode."));
                     } else {
@@ -140,8 +140,7 @@ impl Repl {
                     continue 'outer;
                 }
                 [":load" | ":l", fname] => {
-                    let mut tok_buf = Vec::new();
-                    let _ = self.load_file(&mut tok_buf, fname.to_string());
+                    let _ = self.load_file(fname);
                     continue 'outer;
                 }
                 [":unload" | ":u", fname] => {
@@ -197,10 +196,10 @@ impl Repl {
         let mut no_solns_yet_found = true;
         let u = UnifierSet::new();
         let td = RefCell::new(TmDuplicator::default());
-        let mut solns = self.rt.solve_query(query, u, &td);
+        let mut solns = self.session.solve_query(query, u, &td);
         let mut or_bar_printed = false;
 
-        let debug = self.rt.debug_mode.get();
+        let debug = self.session.rt.debug_mode.get();
         self.line_editor
             .set_repl_mode(ReplMode::PrintingSolns { debug });
 
@@ -217,7 +216,15 @@ impl Repl {
                 }
                 Err(e) => {
                     println!("{}", Color::Red.paint(format!("Exception: {e}")));
-                    for (i, q) in self.rt.query_stack.borrow().iter().enumerate().rev() {
+                    for (i, q) in self
+                        .session
+                        .rt
+                        .query_stack
+                        .borrow()
+                        .iter()
+                        .enumerate()
+                        .rev()
+                    {
                         println!("{}", Color::Red.paint(format!("# ^[depth:{i:0>2}]: `{q}`")));
                     }
                     return ControlFlow::Continue(());
@@ -276,8 +283,16 @@ impl Repl {
             );
         }
 
-        if self.rt.debug_mode.get() {
-            for (i, q) in self.rt.query_stack.borrow().iter().enumerate().rev() {
+        if self.session.rt.debug_mode.get() {
+            for (i, q) in self
+                .session
+                .rt
+                .query_stack
+                .borrow()
+                .iter()
+                .enumerate()
+                .rev()
+            {
                 println!(
                     "{}",
                     Color::Yellow.paint(format!(
@@ -291,8 +306,8 @@ impl Repl {
         ControlFlow::Continue(())
     }
 
-    fn reload(&mut self, tok_buf: &mut Vec<At<Tok>>) {
-        self.rt.db.clear();
+    fn reload(&mut self, _tok_buf: &mut [At<Tok>]) {
+        self.session.rt.db.clear();
 
         let to_load: Vec<String> = self
             .files_loaded
@@ -301,7 +316,7 @@ impl Repl {
             .collect();
 
         for fname in to_load {
-            let _ = self.load_file(tok_buf, fname);
+            let _ = self.load_file(fname);
         }
     }
 }
@@ -339,32 +354,32 @@ fn parse_term(src: &str) -> Option<RcTm> {
     Some(query.source_vars_to_repl_vars())
 }
 
-fn load_module_from_file(tok_buf: &mut Vec<At<Tok>>, fname: String) -> AppRes<ast::Module> {
-    let f = std::fs::File::open(&fname).map_err(|e| AppErr::FileOpen(fname.clone(), e))?;
-    let mut r = io::BufReader::new(f);
-    let mut src = String::new();
-    r.read_to_string(&mut src)
-        .map_err(|e| AppErr::FileRead(fname.clone(), e))?;
-    load_module_from_string(tok_buf, src, fname.into())
-}
+// fn load_module_from_file(tok_buf: &mut Vec<At<Tok>>, fname: String) -> AppRes<ast::Module> {
+//     let f = std::fs::File::open(&fname).map_err(|e| AppErr::FileOpen(fname.clone(), e))?;
+//     let mut r = io::BufReader::new(f);
+//     let mut src = String::new();
+//     r.read_to_string(&mut src)
+//         .map_err(|e| AppErr::FileRead(fname.clone(), e))?;
+//     load_module_from_string(tok_buf, src, fname.into())
+// }
 
-fn load_module_from_string(
-    tok_buf: &mut Vec<At<Tok>>,
-    src: impl AsRef<str>,
-    filename: PathBuf,
-) -> AppRes<ast::Module> {
-    let tokens = lex::tokenize_into(tok_buf, src.as_ref(), filename.clone())?;
+// fn load_module_from_string(
+//     tok_buf: &mut Vec<At<Tok>>,
+//     src: impl AsRef<str>,
+//     filename: PathBuf,
+// ) -> AppRes<ast::Module> {
+//     let tokens = lex::tokenize_into(tok_buf, src.as_ref(), filename.clone())?;
 
-    let m = match parse::entire_module(tokens) {
-        Ok(m) => m,
-        Err(verbose_err) => {
-            println!("{verbose_err}");
-            return Err(AppErr::Parse {
-                fname: Some(filename),
-                err: verbose_err,
-            });
-        }
-    };
+//     let m = match parse::entire_module(tokens) {
+//         Ok(m) => m,
+//         Err(verbose_err) => {
+//             println!("{verbose_err}");
+//             return Err(AppErr::Parse {
+//                 fname: Some(filename),
+//                 err: verbose_err,
+//             });
+//         }
+//     };
 
-    Ok(m)
-}
+//     Ok(m)
+// }
