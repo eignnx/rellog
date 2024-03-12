@@ -1,12 +1,3 @@
-[sig [Prefix][Suffix][Compound]][doc
-    """
-    Relates a list `Compound` to some partitioning of itself into a `Prefix` 
-    and a `Suffix`. Also works for text strings.
-    """
-]
-[prefix {}][Suffix][compound Suffix]
-[prefix {A ..As}][Suffix][compound {A ..Compound}]
-    - [prefix As][suffix Suffix][Compound]
 
 [[comment
     """

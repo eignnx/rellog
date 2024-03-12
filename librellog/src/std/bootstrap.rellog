@@ -1,8 +1,4 @@
 
-[prefix {}][Suffix][compound Suffix]
-[prefix {X ..Xs}][Suffix][compound {X ..Ys}]
-    - [prefix Xs][Suffix][compound Ys]
-
 [impl][rule MacroHead ~ [macro MacroInfo]][Before][After]
     - MacroInfo = [NextRelDef]
     - [MacroHead][Options][MacroBody]
