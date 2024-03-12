@@ -23,7 +23,7 @@ impl Session {
     /// Create a new session with the given file system root.
     pub fn new(fs_root: impl AsRef<Path>) -> rt::Res<Self> {
         let mut macro_kb = KnowledgeBase::default();
-        for file in crate::STD_LIB_DEPS_NO_MACROS {
+        for file in crate::MACRO_RT_DEPS {
             macro_kb.include(file)?;
         }
         let macro_rt = Rt::new(macro_kb);

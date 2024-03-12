@@ -6,7 +6,7 @@
     """
 ]]
 
-[sig [Forward][Backward]][doc "Relates a list to its reversal."]
+[[doc "Relates a list to its reversal."]]
 [forward {}][backward {}]
 [forward {A ..As}][Backward]
     - [forward As][backward AsBackward]
@@ -23,7 +23,7 @@
 [list {Other ..Rest}][Member]
     - [list Rest][Member]
 
-[sig [List][Members]][doc "Relates a list to a (sub?)list of its members."]
+[[doc "Relates a list to a (sub?)list of its members."]]
 [List][members {}]
 [List][members {Member ..Rest}]
     - [List][members Rest]
@@ -45,41 +45,41 @@
 [must_be [num N]]
     - [must_be_num N]
 
-[sig [List][Last]][doc "Relates a list to its last element."]
+[[doc "Relates a list to its last element."]]
 [list {Last}][Last]
 [list {X ..Xs}][Last]
     - [list Xs][Last]
 
 [[todo "mode [list out][len in] is broken"]]
-[sig [List][Len]][doc "Relates a list to it's length."]
+[[doc "Relates a list to it's length."]]
 [list {}][len 0]
 [list {X ..Xs}][Len]
     - [list Xs][len XsLen]
     - [pred XsLen][succ Len]
 
 
-[sig [io {println}]][doc "Prints a newline character to stdout."]
+[[clause_doc "Prints a newline character to stdout."]]
 [io {println}]
     - [io_writeln ""][stream stdout]
 
-[sig [io {println Text}]][doc "Prints `Text` to stdout, followed by a newline character."]
+[[clause_doc "Prints `Text` to stdout, followed by a newline character."]]
 [io {println Text}]
     - [io_writeln Text][stream stdout]
 
-[sig [io {print Text}]][doc "Prints `Text` to stdout."]
+[[clause_doc "Prints `Text` to stdout."]]
 [io {print Text}]
     - [io_write Text][stream stdout]
 
 
-[sig [io {writeln Text}]][doc "Writes `Text` to `Stream`, followed by a newline character."]
+[[clause_doc "Writes `Text` to `Stream`, followed by a newline character."]]
 [io {writeln Stream Text}]
     - [io_writeln Text][Stream]
 
-[sig [io {writeln}]][doc "Writes a newline character to `Stream`."]
+[[clause_doc "Writes a newline character to `Stream`."]]
 [io {writeln Stream}]
     - [io_writeln ""][Stream]
 
-[sig [io {write Text}]][doc "Writes `Text` to `Stream`."]
+[[clause_doc "Writes `Text` to `Stream`."]]
 [io {write Stream Text}]
     - [io_write Text][Stream]
 
@@ -285,6 +285,7 @@
     """
 ]
 
+[[doc "Finds relations which have not been documented."]]
 [undocumented_sig Sig]
     - [clause_head Sig][clause_body B]
     - [not [Sig.2][Doc] ~ Sig]
@@ -329,13 +330,13 @@
         NewValue = OldValue
     ]
 
-[sig [If][Then][Else]][doc
+[[doc
     """
     Runs the goal passed as the value to the `If` key, if the goal fails this
     relation fails, if the goal succeeds (once or more) this relation succeeds
     (once or more).
     """
-]
+]]
 [if Cond][Then][Else]
     - [goal Cond][Truth]
     - [rel [true Then][false Else]][key Truth][value Callable]
