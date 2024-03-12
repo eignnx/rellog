@@ -18,7 +18,7 @@ use nom_i9n::{I9nError, I9nErrorCtx, I9nErrorSituation, I9nInput, TokenizedInput
 use rpds::Vector;
 
 use crate::{
-    ast::{BinOpSymbol, Clause, Item, Module, RcTm, Rel, Tm},
+    ast::{BinOpSymbol, Item, Module, RcTm, Rel, Tm},
     data_structures::{Int, Map, Sym, Var},
     lex::{
         tok::{
