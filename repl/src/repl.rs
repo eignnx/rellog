@@ -140,7 +140,9 @@ impl Repl {
                     continue 'outer;
                 }
                 [":load" | ":l", fname] => {
-                    let _ = self.load_file(fname);
+                    if let Some(fname) = self.parse_filename(fname) {
+                        let _ = self.load_file(fname);
+                    }
                     continue 'outer;
                 }
                 [":unload" | ":u", fname] => {
@@ -317,6 +319,36 @@ impl Repl {
 
         for fname in to_load {
             let _ = self.load_file(fname);
+        }
+    }
+
+    /// Allows both a native file path (using OS path separator) and a module
+    /// path (using `::` as a separator).
+    ///
+    /// If the path begins with `std::`, it is assumed to be a module path
+    /// referencing the standard library.
+    ///
+    /// Also handles the case where the `.rellog` file extension is omitted.
+    fn parse_filename(&self, fname: &str) -> Option<PathBuf> {
+        if let Some((_std, fname)) = fname.trim_start().split_once("std::") {
+            let mut path = PathBuf::from(librellog::STD_LIB_ROOT);
+            for part in fname.split("::") {
+                path.push(part);
+            }
+            if path.extension().is_none() {
+                path.set_extension("rellog");
+            } else {
+                println!(
+                    "{}",
+                    Color::Yellow.paint(
+                        "# Note: you don't need to include the `.rellog` \
+                        extension when importing via a module path."
+                    )
+                );
+            }
+            Some(path)
+        } else {
+            Some(PathBuf::from(fname))
         }
     }
 }

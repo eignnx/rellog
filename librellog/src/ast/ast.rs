@@ -1,11 +1,4 @@
-use std::{
-    collections::HashSet,
-    fmt,
-    iter::{self, DoubleEndedIterator},
-    ops::Deref,
-    path::PathBuf,
-    rc::Rc,
-};
+use std::{collections::HashSet, fmt, iter, ops::Deref, path::PathBuf, rc::Rc};
 
 use char_list::CharList;
 use heck::ToPascalCase;
