@@ -15,6 +15,10 @@ pub fn init_interner() {}
 pub const STD_LIB_ROOT: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/src/std");
 
 pub const MACRO_RT_DEPS: &[&str] = &[
-    concat!(env!("CARGO_MANIFEST_DIR"), "/src/std", "/bootstrap.rellog"),
+    concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/src/std",
+        "/macro_bootstrap.rellog"
+    ),
     concat!(env!("CARGO_MANIFEST_DIR"), "/src/std", "/dcgs/list.rellog"),
 ];
