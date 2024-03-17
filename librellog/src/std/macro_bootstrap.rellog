@@ -5,6 +5,7 @@
     - [provide_options [MacroHead][NextRelDef][Options]]
     - [rule MacroBody][Before][After]
 
+
 [provide_options [NextRelDef][options {}][MacroHead]]
 [provide_options [NextRelDef][options {Opt ..Opts}][MacroHead]]
     - [provide_option [NextRelDef][Opt][MacroHead]]
@@ -16,7 +17,6 @@
     - [io_write "Could not provide option for next_rel_def: "][stream stderr]
     - [io_writeln Txt][stream stderr]
     - [false]
-
 
 
 [sig [Doc]][doc
@@ -47,8 +47,16 @@
     - { [fact [sig ClauseHead][doc ClauseDoc]] }
 ]
 
+
 [macro_head [Comment]][options {}][macro_body {}]
+
 
 [macro_head [Todo]][options {}][macro_body
     { [fact [Todo]] }
 ]
+
+
+[macro_head [Exporting]][options {}][macro_body {}]
+
+
+[macro_head [Importing]][options {}][macro_body {}]
