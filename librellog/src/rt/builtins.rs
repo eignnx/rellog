@@ -325,6 +325,10 @@ impl BuiltinsMap {
                         soln_stream::failure()
                     }
                 }
+                (v @ Tm::Var(..), _) | (_, v @ Tm::Var(..)) => Err::InstantiationError {
+                    rel: rel.to_string(),
+                    tm: RcTm::from(v.clone()),
+                }.into(),
                 _ => Err::GenericError {
                     rel: rel.to_string(),
                     msg: "[gt][lt] accepts two concrete numbers".into()
@@ -341,6 +345,10 @@ impl BuiltinsMap {
                         soln_stream::failure()
                     }
                 }
+                (v @ Tm::Var(..), _) | (_, v @ Tm::Var(..)) => Err::InstantiationError {
+                    rel: rel.to_string(),
+                    tm: RcTm::from(v.clone()),
+                }.into(),
                 _ => Err::GenericError {
                     rel: rel.to_string(),
                     msg: "[gte][lte] accepts two concrete numbers".into()
