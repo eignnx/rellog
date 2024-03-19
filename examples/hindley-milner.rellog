@@ -1,0 +1,38 @@
+
+[[clause_doc "Int"]]
+[Tcx][tm [Int]][ty int]
+
+[[clause_doc "BoolTrue"]]
+[Tcx][tm true][ty bool]
+
+[[clause_doc "BoolFalse"]]
+[Tcx][tm false][ty bool]
+
+[[clause_doc "ListNil"]]
+[Tcx][tm {}][ty [list Ty.elem]]
+
+[[clause_doc "ListCons"]]
+[Tcx][tm {X ..Xs}][ty [list Ty.elem]]
+    - [Tcx][tm X][Ty.elem]
+    - [Tcx][tm Xs][ty [list Ty.elem]]
+
+[[clause_doc "Var"]]
+[Tcx][tm [sum {A B}]][ty int]
+    - [Tcx][tm A][ty int]
+    - [Tcx][tm B][ty int]
+
+[[clause_doc "Var"]]
+[Tcx][tm [Var]][Ty]
+    [list Tcx][member [Var][Ty]]
+
+[[clause_doc "Lam"]]
+[Tcx][tm Var ~ Tm.body][Ty]
+    - Tcx.ext = { [Var][Ty.var] ..Tcx }
+    - [Tcx.ext][Tm.body][Ty.body]
+    - Ty = {fn Ty.var Ty.body}
+
+[[clause_doc "Let"]]
+[Tcx][tm [let Var=Tm.rhs][in Tm.body]][Ty.body]
+    - [Tcx][Tm.rhs][Ty.rhs]
+    - Tcx.ext = { [Var][Ty.rhs] ..Tcx }
+    - [Tcx.ext][Tm.body][Ty.body]

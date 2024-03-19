@@ -1,0 +1,80 @@
+[[clause_doc "<:UnivVar"]]
+[in Tcx][sub [UnivVar]][sup [UnivVar]][out Tcx]
+
+[[clause_doc "<:Unit"]]
+[in Tcx][sub unit][sup unit][out Tcx]
+
+[[clause_doc "<:ExisVar"]]
+[in Tcx][sub [ExisVar]][sup [ExisVar]][out Tcx]
+
+[[clause_doc "<:->"]]
+[in Tcx.0][sub [Arg.sub][Ret.sub]][sup [Arg.sup][Ret.sup]][out Tcx]
+    - [sub Arg.sup][sup Arg.sub][in Tcx.0][out Tcx.1]
+    - [fn [subst Tcx.1][tm Ret.sub]][ret Ret.sub1]
+    - [fn [subst Tcx.1][tm Ret.sup]][ret Ret.sup1]
+    - [sub Ret.sub1][sup Ret.sup1][in Tcx.1][out Tcx]
+
+
+[fn [Subst][tm [UnivVar.0]]][ret [UnivVar]]
+    - [list Subst][member [old UnivVar.0][new UnivVar]]
+[fn [Subst][tm [UnivVar]]][ret [UnivVar]]
+    - [not [list Subst][member [old UnivVar][New._]]]
+[fn [Subst][tm unit]][ret unit]
+[fn [Subst][tm [ExisVar]]][Ret]
+    - [list Subst][member [ExisVar][Binding]]
+    - [fn [Subst][tm Binding]][Ret]
+[fn [Subst][tm [ExisVar]]][ret [ExisVar]]
+    - [not [list Subst][member [ExisVar][Binding]]]
+    - [list Subst][member [ExisVar]]
+[fn [Subst][tm [Arg.0][Ret.0]]][ret [Arg][Ret]]
+    - [fn [Subst][tm Arg.0]][ret Arg]
+    - [fn [Subst][tm Ret.0]][ret Ret]
+[fn [Subst][tm [forall UnivVar][Tm.0]]][ret [forall UnivVar][Tm]]
+    - [fn [Subst][tm Tm.0]][ret Tm]
+
+
+[[clause_doc "<:ForallLeft"]]
+[in Tcx.0][sub [forall UnivVar][Tm.0]][Sup][out Tcx]
+    - Tcx.ext = {[ExisVar] [marker ExisVar] ..Tcx.0}
+    - Subst = {[old UnivVar][new ExisVar]}
+    - [fn [Subst][Tm.0]][ret Tm.1]
+    - [in Tcx.ext][sub Tm.1][Sup][out Tcx.1]
+    - [compound Tcx.1][Prefix._][suffix {[marker ExisVar] ..Tcx}]
+
+[[comment
+    """
+    It might be nice to allow [..][..][..][out.Tcx] instead of having to write [out Tcx].
+    That would let me write:
+    ```
+        - [..][..][suffix {[marker ExisVar] ..out.Tcx}]
+    ```
+    Maybe `out.Tcx` is the same as `Tcx.out` but the order determines which name
+    is punned?
+    """
+]]
+
+[[clause_doc "<:ForallRight"]]
+[in Tcx.0][Sub][sup [forall UnivVar][Tm.0]][out Tcx.out]
+    - Tcx.ext = {[UnivVar] ..Tcx.0}
+    - [in Tcx.ext][Sub][sup Tm.0][out Tcx.1]
+    - [compound Tcx.1][prefix _][suffix {[UnivVar] ..Tcx.out}]
+
+[[clause_doc "InstantiateL"]]
+[in Tcx.0][sub [ExisVar]][Sup][out Tcx.out]
+    - [list Tcx.0][member [ExisVar]]
+    - Sup.freevars = {}
+    - [not [member [ExisVar]][list Sup.freevars]]
+    - [in Tcx.0][instantiate [sub [ExisVar]][Sup]][out Tcx.out]
+
+[fn [freevars unit]][ret {}]
+[fn [freevars [UnivVar]]][ret {}]
+[fn [freevars [ExisVar]]][ret {ExisVar}]
+[fn [freevars [Arg][Ret]]][ret Compound]
+    - [fn [freevars Arg]][ret Arg.fvs]
+    - [fn [freevars Ret]][ret Ret.fvs]
+    - [prefix Arg.fvs][suffix Ret.fvs][Compound]
+[fn [freevars [forall UnivVar][Tm]]][ret Tm.fvs]
+    - [fn [freevars Tm]][ret Tm.fvs]
+
+
+
