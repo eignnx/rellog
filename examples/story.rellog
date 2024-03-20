@@ -1,4 +1,4 @@
-[[importing std::dcgs::txt]]
+[[comment "[[importing std::dcgs::txt]]"]]
 
 [story]
     - "Once upon a time there was "
@@ -8,9 +8,9 @@
     - " who was very hungry."
 
 
-[animal aardvark][start_letter vowel] - "aardvark"
-[animal bear][start_letter consonant] - "bear"
+[animal aardvark][start_letter vowel] "aardvark"
+[animal bear][start_letter consonant] "bear"
 
 
-[a][start_letter vowel] - "an"
-[a][start_letter consonant] - "a"
+[a][start_letter vowel] "an"
+[a][start_letter consonant] "a"
