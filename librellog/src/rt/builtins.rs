@@ -524,7 +524,7 @@ impl BuiltinsMap {
 
         def_builtin!(intrs, |_rt, u, [txt_prefix][txt_suffix][txt_compound] as rel| {
             use Tm::{Txt, Var};
-            match (txt_prefix.as_ref(), txt_suffix.as_ref(), txt_suffix.as_ref()) {
+            match (txt_prefix.as_ref(), txt_suffix.as_ref(), txt_compound.as_ref()) {
                 (Txt(ref prefix_head, ref prefix_tail), Txt(suffix_head, suffix_tail), _) => {
                     let mut prefix_tail = prefix_tail;
 
