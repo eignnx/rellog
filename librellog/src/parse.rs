@@ -4,7 +4,6 @@ use std::{
     path::PathBuf,
 };
 
-use char_list::CharList;
 use nom::{
     branch::alt,
     combinator::{all_consuming, cut, opt},
@@ -18,7 +17,7 @@ use nom_i9n::{I9nError, I9nErrorCtx, I9nErrorSituation, I9nInput, TokenizedInput
 use rpds::Vector;
 
 use crate::{
-    ast::{BinOpSymbol, Item, Module, RcTm, Rel, Tm},
+    ast::{partial_txt::PartialTxt, BinOpSymbol, Item, Module, RcTm, Rel, Tm},
     data_structures::{Int, Map, Sym, Var},
     lex::{
         tok::{
@@ -266,7 +265,7 @@ fn num(ts: Toks) -> Res<Int> {
     }
 }
 
-fn txt(ts: Toks) -> Res<CharList> {
+fn txt(ts: Toks) -> Res<String> {
     match I9nInput::split_first(&ts).map(|(x, xs)| (x.clone().value(), xs)) {
         Some((Tok::Txt(s), rest)) => Ok((rest, s)),
         Some((t, _)) => Err(nom::Err::Error(Error::with_message(
@@ -443,7 +442,7 @@ fn non_block_tm(ts: Toks) -> Res<Tm> {
         sym.map(Tm::Sym),
         var.map(Tm::Var),
         num.map(Tm::Int),
-        txt.map(|t| Tm::Txt(t, Tm::Nil.into())),
+        txt.map(|s| Tm::Txt(PartialTxt::from(s))),
         rel.map(Tm::Rel),
         list,
     ))
@@ -456,7 +455,7 @@ fn non_operator_non_block_tm(ts: Toks) -> Res<Tm> {
         sym.map(Tm::Sym),
         var.map(Tm::Var),
         num.map(Tm::Int),
-        txt.map(|t| Tm::Txt(t, Tm::Nil.into())),
+        txt.map(|s| Tm::Txt(PartialTxt::from(s))),
         rel.map(Tm::Rel),
         list,
     ))

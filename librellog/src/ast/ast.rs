@@ -1,6 +1,5 @@
 use std::{collections::HashSet, fmt, iter, ops::Deref, path::PathBuf, rc::Rc};
 
-use char_list::CharList;
 use heck::ToPascalCase;
 use nom_locate::LocatedSpan;
 use rpds::{vector, Vector};
@@ -18,6 +17,8 @@ use crate::{
     parse::{self, Error},
 };
 
+use super::partial_txt::{PartialTxt, PartialTxtErr};
+
 pub type Rel = Map<Sym, RcTm>;
 
 /// A term.
@@ -26,7 +27,7 @@ pub enum Tm {
     Sym(Sym),
     Var(Var),
     Int(Int),
-    Txt(CharList, RcTm),
+    Txt(PartialTxt),
     Block(Tok, Vector<RcTm>),
     Rel(Rel),
     BinOp(BinOpSymbol, RcTm, RcTm),
@@ -51,9 +52,21 @@ impl Dup for Tm {
                 Tm::Rel(rel)
             }
             Tm::BinOp(op, x, y) => Tm::BinOp(*op, x.dup(duper), y.dup(duper)),
-            Tm::Txt(cl, tl) => Tm::Txt(cl.clone(), tl.dup(duper)),
+            Tm::Txt(txt) => {
+                // Better way to do this? See note in
+                // `<RcTm as DirectChildren>::map_direct_children`
+                let new_tail = txt.segment_tail().dup(duper);
+                let new_txt = PartialTxt::from_string_and_tail(txt.segment_as_str(), new_tail);
+                Tm::Txt(new_txt)
+            }
             Tm::Sym(_) | Tm::Int(_) | Tm::Nil => self.clone(),
         }
+    }
+}
+
+impl Default for Tm {
+    fn default() -> Self {
+        Self::Nil
     }
 }
 
@@ -124,16 +137,22 @@ impl RcTm {
         Self::from(list)
     }
 
-    pub fn try_collect_txt_to_string(&self, buf: &mut String) -> Result<(), RcTm> {
+    pub fn try_collect_txt_to_string(&self, buf: &mut String) -> Result<(), PartialTxtErr> {
         let mut rc_tm = self;
         loop {
             match rc_tm.as_ref() {
-                Tm::Txt(head, tail) => {
-                    buf.push_str(head.as_str());
-                    rc_tm = tail;
+                Tm::Txt(txt) => {
+                    buf.push_str(txt.segment_as_str());
+                    rc_tm = txt.segment_tail();
                 }
-                Tm::Nil => break Ok(()),
-                _ => break Err(rc_tm.clone()),
+                Tm::Nil => return Ok(()),
+                Tm::Var(var) => return Err(PartialTxtErr::UninstantiatedTail(var.clone())),
+                Tm::Sym(..)
+                | Tm::Int(..)
+                | Tm::Block(..)
+                | Tm::Rel(..)
+                | Tm::BinOp(..)
+                | Tm::Cons(..) => return Err(PartialTxtErr::NonTxtTail(rc_tm.clone())),
             }
         }
     }
@@ -164,6 +183,10 @@ impl RcTm {
         Rel::new()
             .insert(Sym::from("true"), Self::sym_true())
             .into()
+    }
+
+    pub fn is_nil(&self) -> bool {
+        matches!(self.as_ref(), Tm::Nil)
     }
 }
 
@@ -252,6 +275,12 @@ impl Deref for RcTm {
     }
 }
 
+impl Default for RcTm {
+    fn default() -> Self {
+        Tm::default().into()
+    }
+}
+
 impl<T: Into<Tm>> From<T> for RcTm {
     fn from(value: T) -> Self {
         RcTm(Rc::new(value.into()))
@@ -277,7 +306,7 @@ impl From<Sig> for RcTm {
 
 impl From<String> for RcTm {
     fn from(s: String) -> Self {
-        Self(Rc::new(Tm::Txt(CharList::from(s), Self(Rc::new(Tm::Nil)))))
+        Self(Rc::new(Tm::Txt(PartialTxt::from(s))))
     }
 }
 
@@ -312,7 +341,14 @@ impl ClassifyTerm<Var> for RcTm {
             (Tm::Sym(s1), Tm::Sym(s2)) => s1 == s2,
             (Tm::Var(_), Tm::Var(_)) => true,
             (Tm::Int(n1), Tm::Int(n2)) => n1 == n2,
-            (Tm::Txt(cl1, _), Tm::Txt(cl2, _)) => cl1 == cl2,
+            (Tm::Txt(txt1), Tm::Txt(txt2)) => {
+                // We don't *need* to walk the segments because this is supposed
+                // to be a superficial check.
+                let s1 = txt1.segment_as_str();
+                let s2 = txt2.segment_as_str();
+                let prefix_len = usize::min(s1.len(), s2.len());
+                &s1[..prefix_len] == &s2[..prefix_len]
+            }
             (Tm::Block(f1, _), Tm::Block(f2, _)) => f1 == f2,
             (Tm::Rel(r1), Tm::Rel(r2)) => r1.keys().eq(r2.keys()),
             (Tm::Cons(_, _), Tm::Cons(_, _)) => true,
@@ -327,7 +363,7 @@ impl DirectChildren<Var> for RcTm {
     fn direct_children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self> + 'a> {
         match self.as_ref() {
             Tm::Sym(_) | Tm::Var(_) | Tm::Int(_) | Tm::Nil => Box::new(iter::empty()),
-            Tm::Txt(_, tail) => Box::new(iter::once(tail)),
+            Tm::Txt(txt) => Box::new(iter::once(txt.segment_tail())),
             Tm::Block(_, members) => Box::new(members.iter()),
             Tm::Rel(rel) => Box::new(rel.values()),
             Tm::BinOp(_, x, y) => Box::new([x, y].into_iter()),
@@ -338,7 +374,15 @@ impl DirectChildren<Var> for RcTm {
     fn map_direct_children<'a>(&'a self, mut f: impl FnMut(&'a Self) -> Self + 'a) -> Self {
         match self.as_ref() {
             Tm::Sym(_) | Tm::Var(_) | Tm::Int(_) | Tm::Nil => self.clone(),
-            Tm::Txt(char_list, tail) => Tm::Txt(char_list.clone(), f(tail)).into(),
+            Tm::Txt(txt) => {
+                // Here we're only copying this segment's text content. Is this
+                // the best way to do it?
+                // Could we map the tail *first*, then see if it's still
+                // "equivalent" and only copy the text segment if it's not?
+                let new_tail = f(txt.segment_tail());
+                let txt_clone = PartialTxt::from_string_and_tail(txt.segment_as_str(), new_tail);
+                Tm::Txt(txt_clone).into()
+            }
             Tm::Block(functor, members) => {
                 Tm::Block(functor.clone(), members.iter().map(f).collect()).into()
             }

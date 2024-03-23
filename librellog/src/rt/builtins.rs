@@ -11,18 +11,13 @@ use unifier_set::DirectChildren;
 
 use crate::{
     ast::{
-        dup::{Dup, TmDuplicator},
-        Clause, RcTm, Rel, Sig, Tm,
+        dup::{Dup, TmDuplicator}, partial_txt::PartialTxt, Clause, RcTm, Rel, Sig, Tm
     },
     data_structures::{Int, Var},
     interner::IStr,
     lex::{self, tok::Tok},
     parse,
-    rt::{kb::KnowledgeBase, Err},
-    rt::{
-        soln_stream::{self, SolnStream},
-        UnifierSet,
-    },
+    rt::{kb::KnowledgeBase, soln_stream::{self, SolnStream}, Err, UnifierSet},
     tm,
     utils::int_counter::IntCounter,
 };
@@ -525,40 +520,21 @@ impl BuiltinsMap {
         def_builtin!(intrs, |_rt, u, [txt_prefix][txt_suffix][txt_compound] as rel| {
             use Tm::{Txt, Var};
             match (txt_prefix.as_ref(), txt_suffix.as_ref(), txt_compound.as_ref()) {
-                (Txt(ref prefix_head, ref prefix_tail), Txt(suffix_head, suffix_tail), _) => {
-                    let mut prefix_tail = prefix_tail;
-
-                    let mut segments = vec![prefix_head.clone()];
-
-                    while let Tm::Txt(prefix_hd, prefix_tl) = prefix_tail.as_ref() {
-                        segments.push(prefix_hd.clone());
-                        prefix_tail = prefix_tl;
-                    }
-
-                    let mut compound = suffix_head.clone();
-
-                    for segment in segments.into_iter().rev() {
-                        compound = compound.cons_str(segment);
-                    }
-
-                    let compound = Txt(compound, suffix_tail.clone()).into();
-                    soln_stream::unifying(u, txt_compound, &compound)
+                // -- [prefix "abc"][suffix "123"][Compound]
+                //  - Compound = "abc123"
+                (Txt(ref prefix), Txt(suffix), _) => {
+                    let compound = suffix.cons_partial_char_list(prefix);
+                    soln_stream::unifying(u, txt_compound, &Tm::Txt(compound).into())
                 }
 
                 // -- [prefix "abc"][Suffix][Compound]
                 //  - Compound = "abc[..Suffix]"
-                (Txt(cl, tl), Var(_), _) => {
-                    let Some(u) = u.unify(tl, txt_suffix) else {
+                (Txt(txt), Var(_), _) => {
+                    let Some(u) = u.unify(txt.final_tail(), txt_suffix) else {
                         return soln_stream::failure();
                     };
 
-                    let consed = Tm::Txt(cl.clone(), txt_suffix.clone()).into();
-
-                    let Some(u) = u.unify(&consed, txt_compound) else {
-                        return soln_stream::failure();
-                    };
-
-                    soln_stream::success(u)
+                    soln_stream::unifying(u, txt_prefix, txt_compound) 
                 }
 
                 _ => Err::GenericError {
@@ -897,15 +873,15 @@ impl BuiltinsMap {
                 });
             }
 
-            while let Tm::Txt(cl, tl) = text.as_ref() {
+            while let Tm::Txt(txt) = text.as_ref() {
                 use nu_ansi_term::Color;
-                let to_print = Color::LightGray.italic().paint(cl.as_str());
+                let to_print = Color::LightGray.italic().paint(txt.segment_as_str());
                 match stream {
                     StdStream::StdOut => print!("{to_print}"),
                     StdStream::StdErr => eprint!("{to_print}"),
                     _ => unreachable!(),
                 }
-                text = tl;
+                text = txt.segment_tail();
             }
 
             if !matches!(text.as_ref(), Tm::Nil) {
@@ -958,6 +934,7 @@ impl BuiltinsMap {
 
         def_builtin!(intrs, |_rt, u, [term][text] as rel| {
             match (term.as_ref(), text.as_ref()) {
+                // Parsing:
                 (Tm::Var(..), _) => {
                     let term_var = term;
                     let mut src_buf = String::new();
@@ -984,10 +961,14 @@ impl BuiltinsMap {
 
                     soln_stream::unifying(u, &term, term_var)
                 }
+
+                // Outputting string repr:
                 (_, Tm::Var(..) | Tm::Txt(..)) => {
-                    let term = Tm::Txt(term.to_string().into(), Tm::Nil.into()).into();
+                    let repr = term.to_string();
+                    let term = Tm::Txt(PartialTxt::from(repr)).into();
                     soln_stream::unifying(u, &term, text)
                 }
+
                 _ => Err::ArgumentTypeError {
                         rel: rel.to_string(),
                         key: "text".into(),
@@ -1045,11 +1026,11 @@ impl BuiltinsMap {
                 .as_os_str()
                 .to_string_lossy()
                 .into_owned();
-            soln_stream::unifying(u, cwd, &Tm::Txt(dir.into(), Tm::Nil.into()).into())
+            soln_stream::unifying(u, cwd, &Tm::Txt(dir.into()).into())
         });
 
         def_builtin!(intrs, |_rt, u, [cd] as rel| {
-            if !matches!(cd.as_ref(), Tm::Txt(_, _)) {
+            if !matches!(cd.as_ref(), Tm::Txt(..)) {
                 return Err::ArgumentTypeError {
                     rel: rel.to_string(),
                     key: "cd".into(),
@@ -1062,9 +1043,9 @@ impl BuiltinsMap {
             let mut path = String::new();
             let mut it = cd;
 
-            while let Tm::Txt(head, tail) = it.as_ref() {
-                path.push_str(head.as_str());
-                it = tail;
+            while let Tm::Txt(txt) = it.as_ref() {
+                path.push_str(txt.segment_as_str());
+                it = txt.segment_tail();
             }
 
             let &Tm::Nil = it.as_ref() else {
