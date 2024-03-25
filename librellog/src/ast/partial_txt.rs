@@ -3,7 +3,7 @@ use std::{cmp::Ordering, fmt, hash::Hash};
 use char_list::{seg_walker::SegmentWalker, CharList, CharListTail};
 use unifier_set::ClassifyTerm;
 
-use crate::data_structures::Var;
+use crate::{data_structures::Var, rt};
 
 use super::{
     dup::{Dup, TmDuplicator},
@@ -62,6 +62,24 @@ impl PartialTxt {
 
         Self::from_string_and_tail(content, tail_mapper(self.segment_tail()))
     }
+
+    /// Returns the length of as much of the text as is known right now.
+    pub fn partial_len(&self) -> usize {
+        self.0.partial_len()
+    }
+
+    pub fn segment_len(&self) -> usize {
+        self.0.segment_len()
+    }
+
+    pub fn car_cdr(&self) -> Result<Option<(char, PartialTxt)>, PartialTxtErr> {
+        let opt = self.0.car_cdr()?;
+        Ok(opt.map(|(ch, cl)| (ch, Self(cl))))
+    }
+
+    pub fn cons(&self, ch: char) -> PartialTxt {
+        Self(self.0.cons(ch))
+    }
 }
 
 #[derive(Debug)]
@@ -81,6 +99,19 @@ impl fmt::Display for PartialTxtErr {
                 f,
                 "Encountered text object with uninstantiated variable `{var}` as tail."
             ),
+        }
+    }
+}
+
+impl From<PartialTxtErr> for rt::Err {
+    fn from(value: PartialTxtErr) -> Self {
+        match value {
+            PartialTxtErr::NonTxtTail(tail) => Self::MalformedTxtTail(tail),
+            PartialTxtErr::UninstantiatedTail(var) => Self::UnexpectedPartialList {
+                rel: "<unknown>".to_string(),
+                key: "<unknown>".to_string(),
+                partial: Tm::Var(var).into(),
+            },
         }
     }
 }

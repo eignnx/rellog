@@ -11,18 +11,26 @@ use unifier_set::DirectChildren;
 
 use crate::{
     ast::{
-        dup::{Dup, TmDuplicator}, partial_txt::PartialTxt, Clause, RcTm, Rel, Sig, Tm
+        dup::{Dup, TmDuplicator},
+        partial_txt::{PartialTxt, PartialTxtErr},
+        Clause, RcTm, Rel, Sig, Tm,
     },
-    data_structures::{Int, Var},
+    data_structures::{Int, Sym, Var},
     interner::IStr,
     lex::{self, tok::Tok},
     parse,
-    rt::{kb::KnowledgeBase, soln_stream::{self, SolnStream}, Err, UnifierSet},
+    rt::{
+        kb::KnowledgeBase,
+        soln_stream::{self, SolnStream},
+        Err, UnifierSet,
+    },
     tm,
     utils::int_counter::IntCounter,
 };
 
 use super::Rt;
+
+mod txt_append;
 
 pub struct StateForBuiltin<'a> {
     rt: &'a Rt,
@@ -517,34 +525,82 @@ impl BuiltinsMap {
             }
         });
 
-        def_builtin!(intrs, |_rt, u, [txt_prefix][txt_suffix][txt_compound] as rel| {
-            use Tm::{Txt, Var};
-            match (txt_prefix.as_ref(), txt_suffix.as_ref(), txt_compound.as_ref()) {
-                // -- [prefix "abc"][suffix "123"][Compound]
-                //  - Compound = "abc123"
-                (Txt(ref prefix), Txt(suffix), _) => {
-                    let compound = suffix.cons_partial_char_list(prefix);
-                    soln_stream::unifying(u, txt_compound, &Tm::Txt(compound).into())
-                }
-
-                // -- [prefix "abc"][Suffix][Compound]
-                //  - Compound = "abc[..Suffix]"
-                (Txt(txt), Var(_), _) => {
-                    let Some(u) = u.unify(txt.final_tail(), txt_suffix) else {
-                        return soln_stream::failure();
+        def_builtin!(intrs, |_rt, u, [txt_car][txt_cdr][txt_cons] as rel| {
+            let txt_car_opt = match txt_car.as_ref() {
+                Tm::Sym(sym) => {
+                    let sym_str = sym.to_str();
+                    let mut it = sym_str.chars();
+                    let Some(first) = it.next() else {
+                         return soln_stream::error(Err::ArgumentTypeError {
+                            rel: rel.to_string(),
+                            key: "txt_car".to_string(),
+                            expected_ty: "single character symbol".to_string(),
+                            recieved_tm: txt_car.to_string() 
+                        });
                     };
+                    let None = it.next() else {
+                         return soln_stream::error(Err::ArgumentTypeError {
+                            rel: rel.to_string(),
+                            key: "txt_car".to_string(),
+                            expected_ty: "single character symbol".to_string(),
+                            recieved_tm: txt_car.to_string() 
+                        });
+                    };
+                    Some(first)
+                }
+                Tm::Var(_) => None,
+                _ => return soln_stream::error(Err::ArgumentTypeError {
+                    rel: rel.to_string(),
+                    key: "txt_car".to_string(),
+                    expected_ty: "single character symbol".to_string(),
+                    recieved_tm: txt_car.to_string() 
+                })
+            };
 
-                    soln_stream::unifying(u, txt_prefix, txt_compound) 
+            match (txt_car_opt, txt_cdr.as_ref(), txt_cons.as_ref()) {
+                (_, _, Tm::Txt(txt)) => {
+                    match txt.car_cdr() {
+                        Err(e) => soln_stream::error(e.into()),
+                        Ok(None) => soln_stream::failure(),
+                        Ok(Some((c, cs))) => {
+                            let buf = String::from(c);
+                            let c_sym = Tm::Sym(Sym::from(&buf)).into();
+                            let Some(u) = u.unify(txt_car, &c_sym) else {
+                                return soln_stream::failure();
+                            };
+                            let cs = Tm::Txt(cs).into();
+                            soln_stream::unifying(u, txt_cdr, &cs)
+                        }
+                    }
+                }
+                (Some(first), Tm::Txt(cdr), _) => {
+                    let new_cons = Tm::Txt(cdr.cons(first)).into();
+                    soln_stream::unifying(u, txt_cons, &new_cons)
                 }
 
-                _ => Err::GenericError {
+                (Some(first), Tm::Var(..), _) => {
+                    let new_txt = PartialTxt::from_string_and_tail(first, txt_cdr.clone());
+                    let new_txt = Tm::Txt(new_txt).into();
+                    soln_stream::unifying(u, txt_cons, &new_txt)
+                }
+                (None, Tm::Var(..), Tm::Var(..)) => {
+                    soln_stream::error(Err::InstantiationError {
                         rel: rel.to_string(),
-                        msg: "only modes supported for `[txt_prefix][txt_suffix][txt_compound]`:\n\
-                            \t[[mode txt_[prefix in][suffix  in][compound out]]]\n\
-                            \t[[mode txt_[prefix in][suffix out][compound out]]]\n\
-                            ".into()
-                    }.into(),
+                        tm: txt_cons.clone()
+                    })
+                }
+                _ => soln_stream::error(Err::GenericError {
+                    rel: rel.to_string(),
+                    msg:
+                        "`[txt_car][txt_cdr][txt_cons]` requires either a symbol or a variable for \
+                        `txt_car`, a text or variable for `txt_cdr`, and a text object or variable \
+                        for `txt_cons`.".to_string()
+                })
             }
+        });
+
+        def_builtin!(intrs, |_rt, u, [txt_prefix][txt_suffix][txt_compound] as rel| {
+            txt_append::prefix_suffix_compound(&rel, u, txt_prefix, txt_suffix, txt_compound)
         });
 
         def_builtin!(intrs, |_rt, u, [sum][x][y] as rel| {

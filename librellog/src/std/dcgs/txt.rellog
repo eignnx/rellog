@@ -1,6 +1,12 @@
 [[exporting { [Rule][Output] [Rule][Before][After] }]]
 
 
+[text_prefix ""][TextSuffix][text_compound TextSuffix]
+[TextPrefix][TextSuffix][TextCompound]
+    - [txt_cons TextPrefix][txt_car C][txt_cdr Cs]
+    - [text_prefix Cs][TextSuffix][text_compound Bs]
+    - [txt_car C][txt_cdr Bs][txt_cons TextCompound]
+
 [Rule][Output]
     - [Rule][before ""][after Output]
 

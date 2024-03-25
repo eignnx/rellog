@@ -31,6 +31,7 @@ pub enum Err {
         key: String,
         partial: RcTm,
     },
+    MalformedTxtTail(RcTm),
     IoError(String),
     MaxRecursionDepthExceeded {
         depth: usize,
@@ -83,6 +84,12 @@ impl fmt::Display for Err {
             }
             Err::UnexpectedPartialList { rel, key, partial } => {
                 write!(f, "The relation `{rel}` received a partial list for it's `{key}` argument: {partial}")
+            }
+            Err::MalformedTxtTail(tail) => {
+                write!(
+                    f,
+                    "Encountered text object with non-text non-var non-nil tail: {tail}"
+                )
             }
             Err::IoError(err) => f.write_str(err),
             Err::MaxRecursionDepthExceeded { depth, query } => {
@@ -148,6 +155,7 @@ impl From<Err> for Tm {
                     partial
                 ]
             ).into()]),
+            Err::MalformedTxtTail(tail) => tm!([malformed_txt_tail tail]),
             Err::IoError(msg) => tm!([io_error RcTm::sym(msg)]),
             Err::MaxRecursionDepthExceeded { depth, query } => {
                 tm!([max_recursion_depth_exceeded tm!(
