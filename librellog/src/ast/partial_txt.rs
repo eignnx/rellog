@@ -44,7 +44,7 @@ impl PartialTxt {
         self.0.segment_as_bytes()
     }
 
-    pub fn partial_segments<'a>(&'a self) -> SegmentWalker<'a, RcTm> {
+    pub fn partial_segments(&self) -> SegmentWalker<'_, RcTm> {
         self.0.partial_segments()
     }
 

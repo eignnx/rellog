@@ -347,7 +347,7 @@ impl ClassifyTerm<Var> for RcTm {
                 let s1 = txt1.segment_as_str();
                 let s2 = txt2.segment_as_str();
                 let prefix_len = usize::min(s1.len(), s2.len());
-                &s1[..prefix_len] == &s2[..prefix_len]
+                s1[..prefix_len] == s2[..prefix_len]
             }
             (Tm::Block(f1, _), Tm::Block(f2, _)) => f1 == f2,
             (Tm::Rel(r1), Tm::Rel(r2)) => r1.keys().eq(r2.keys()),

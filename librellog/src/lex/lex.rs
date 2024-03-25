@@ -218,11 +218,13 @@ pub fn tokenize<'i>(
         })
 }
 
+type RellogTokenFinder<'tokbuf> = TokenizedInput<&'tokbuf [At<Tok>], At<Tok>>;
+
 pub fn tokenize_into<'i, 'buf>(
     buf: &'buf mut Vec<At<Tok>>,
     src: impl Into<Span<'i>> + 'i,
     filename: PathBuf,
-) -> Result<I9nInput<&'buf [At<Tok>], TokenizedInput<&'buf [At<Tok>], At<Tok>>>, LexError> {
+) -> Result<I9nInput<&'buf [At<Tok>], RellogTokenFinder<'buf>>, LexError> {
     *buf = tokenize(src, filename)?;
     Ok(I9nInput::from(&**buf))
 }

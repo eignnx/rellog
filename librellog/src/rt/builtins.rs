@@ -12,7 +12,7 @@ use unifier_set::DirectChildren;
 use crate::{
     ast::{
         dup::{Dup, TmDuplicator},
-        partial_txt::{PartialTxt, PartialTxtErr},
+        partial_txt::PartialTxt,
         Clause, RcTm, Rel, Sig, Tm,
     },
     data_structures::{Int, Sym, Var},
