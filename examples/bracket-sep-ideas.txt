@@ -1,0 +1,353 @@
+:[sig [ClauseDoc]][doc
+    """
+    A macro that allows inline documentation of one specific clause of a relation.
+    """
+]
+[macro_head
+    [ClauseDoc]
+][options {
+    [decorates [ClauseHead][clause_body _]]
+}][macro_body
+    - { [fact [sig ClauseHead][doc ClauseDoc]] }
+]
+
+[fn [Subst][tm [UnivVar.0]]][ret [UnivVar]]
+    - [list Subst][member [old UnivVar.0][new UnivVar]]
+[fn [Subst][tm [UnivVar]]][ret [UnivVar]]
+    - [not [list Subst][member [old UnivVar][New._]]]
+[fn [Subst][tm unit]][ret unit]
+[fn [Subst][tm [ExisVar]]][Ret]
+    - [list Subst][member [ExisVar][Binding]]
+    - [fn [Subst][tm Binding]][Ret]
+[fn [Subst][tm [ExisVar]]][ret [ExisVar]]
+    - [not [list Subst][member [ExisVar][Binding]]]
+    - [list Subst][member [ExisVar]]
+[fn [Subst][tm [Arg.0][Ret.0]]][ret [Arg][Ret]]
+    - [fn [Subst][tm Arg.0]][ret Arg]
+    - [fn [Subst][tm Ret.0]][ret Ret]
+[fn [Subst][tm [forall UnivVar][Tm.0]]][ret [forall UnivVar][Tm]]
+    - [fn [Subst][tm Tm.0]][ret Tm]
+
+--------------------------------------------------------------------------------
+
+:[sig [ClauseDoc]//doc
+    """
+    A macro that allows inline documentation of one specific clause of a relation.
+    """
+]
+[macro_head
+    [ClauseDoc]
+//options {
+    [decorates [ClauseHead//clause_body _]]
+}//macro_body
+    - { [fact [sig ClauseHead//doc ClauseDoc]] }
+]
+
+[fn [Subst//tm [UnivVar.0]]//ret [UnivVar]]
+    - [list Subst//member [old UnivVar.0//new UnivVar]]
+[fn [Subst//tm [UnivVar]]//ret [UnivVar]]
+    - [not [list Subst//member [old UnivVar//New._]]]
+[fn [Subst//tm unit]//ret unit]
+[fn [Subst//tm [ExisVar]]//Ret]
+    - [list Subst//member [ExisVar//Binding]]
+    - [fn [Subst//tm Binding]//Ret]
+[fn [Subst//tm [ExisVar]]//ret [ExisVar]]
+    - [not [list Subst//member [ExisVar//Binding]]]
+    - [list Subst//member [ExisVar]]
+[fn [Subst//tm [Arg.0//Ret.0]]//ret [Arg//Ret]]
+    - [fn [Subst//tm Arg.0]//ret Arg]
+    - [fn [Subst//tm Ret.0]//ret Ret]
+[fn [Subst//tm [forall UnivVar//Tm.0]]//ret [forall UnivVar//Tm]]
+    - [fn [Subst//tm Tm.0]//ret Tm]
+
+--------------------------------------------------------------------------------
+
+:[sig [ClauseDoc]|doc
+    """
+    A macro that allows inline documentation of one specific clause of a relation.
+    """
+]
+[macro_head
+    [ClauseDoc]
+|options {
+    [decorates [ClauseHead|clause_body _]]
+}|macro_body
+    - { [fact [sig ClauseHead|doc ClauseDoc]] }
+]
+
+[fn [Subst|tm [UnivVar.0]]|ret [UnivVar]]
+    - [list Subst|member [old UnivVar.0|new UnivVar]]
+[fn [Subst|tm [UnivVar]]|ret [UnivVar]]
+    - [not [list Subst|member [old UnivVar|New._]]]
+[fn [Subst|tm unit]|ret unit]
+[fn [Subst|tm [ExisVar]]|Ret]
+    - [list Subst|member [ExisVar|Binding]]
+    - [fn [Subst|tm Binding]|Ret]
+[fn [Subst|tm [ExisVar]]|ret [ExisVar]]
+    - [not [list Subst|member [ExisVar|Binding]]]
+    - [list Subst|member [ExisVar]]
+[fn [Subst|tm [Arg.0|Ret.0]]|ret [Arg|Ret]]
+    - [fn [Subst|tm Arg.0]|ret Arg]
+    - [fn [Subst|tm Ret.0]|ret Ret]
+[fn [Subst|tm [forall UnivVar|Tm.0]]|ret [forall UnivVar|Tm]]
+    - [fn [Subst|tm Tm.0]|ret Tm]
+
+--------------------------------------------------------------------------------
+
+:[sig=[ClauseDoc] doc=
+    """
+    A macro that allows inline documentation of one specific clause of a relation.
+    """
+]
+[macro_head=
+    [ClauseDoc]
+ options={
+    [decorates=[ClauseHead clause_body=_]]
+} macro_body=
+    - { [fact=[sig=ClauseHead doc=ClauseDoc]] }
+]
+
+[fn=[Subst tm=[UnivVar.0]] ret=[UnivVar]]
+    - [list=Subst member=[old=UnivVar.0 new=UnivVar]]
+[fn=[Subst tm=[UnivVar]] ret=[UnivVar]]
+    - [not=[list=Subst member=[old=UnivVar New._]]]
+[fn=[Subst tm=unit] ret=unit]
+[fn=[Subst tm=[ExisVar]] Ret]
+    - [list=Subst member=[ExisVar Binding]]
+    - [fn=[Subst tm=Binding] Ret]
+[fn=[Subst tm=[ExisVar]] ret=[ExisVar]]
+    - [not=[list=Subst member=[ExisVar Binding]]]
+    - [list=Subst member=[ExisVar]]
+[fn=[Subst tm=[Arg.0 Ret.0]] ret=[Arg Ret]]
+    - [fn=[Subst tm=Arg.0] ret=Arg]
+    - [fn=[Subst tm=Ret.0] ret=Ret]
+[fn=[Subst tm=[forall UnivVar Tm.0]] ret=[forall=UnivVar Tm]]
+    - [fn=[Subst tm=Tm.0] ret=Tm]
+
+--------------------------------------------------------------------------------
+
+:[sig [ClauseDoc] doc
+    """
+    A macro that allows inline documentation of one specific clause of a relation.
+    """
+]
+[macro_head
+    [ClauseDoc]
+ options {
+    [decorates [ClauseHead clause_body _]]
+} macro_body
+    - { [fact [sig ClauseHead doc ClauseDoc]] }
+]
+
+[fn [Subst tm [UnivVar.0]] ret [UnivVar]]
+    - [list Subst member [old UnivVar.0 new UnivVar]]
+[fn [Subst tm [UnivVar]] ret [UnivVar]]
+    - [not [list Subst member [old UnivVar New._]]]
+[fn [Subst tm unit] ret unit]
+[fn [Subst tm [ExisVar]] Ret]
+    - [list Subst member [ExisVar Binding]]
+    - [fn [Subst tm Binding] Ret]
+[fn [Subst tm [ExisVar]] ret [ExisVar]]
+    - [not [list Subst member [ExisVar Binding]]]
+    - [list Subst member [ExisVar]]
+[fn [Subst tm [Arg.0 Ret.0]] ret [Arg Ret]]
+    - [fn [Subst tm Arg.0] ret Arg]
+    - [fn [Subst tm Ret.0] ret Ret]
+[fn [Subst tm [forall UnivVar Tm.0]] ret [forall UnivVar Tm]]
+    - [fn [Subst tm Tm.0] ret Tm]
+
+--------------------------------------------------------------------------------
+
+:[sig [ClauseDoc], doc
+    """
+    A macro that allows inline documentation of one specific clause of a relation.
+    """
+]
+[macro_head
+    [ClauseDoc],
+options {
+    [decorates [ClauseHead, clause_body _]]
+},
+macro_body
+    - { [fact [sig ClauseHead, doc ClauseDoc]] }
+]
+
+[fn [Subst, tm [UnivVar.0]], ret [UnivVar]]
+    - [list Subst, member [old UnivVar.0, new UnivVar]]
+[fn [Subst, tm [UnivVar]], ret [UnivVar]]
+    - [not [list Subst, member [old UnivVar, New._]]]
+[fn [Subst, tm unit], ret unit]
+[fn [Subst, tm [ExisVar]], Ret]
+    - [list Subst, member [ExisVar, Binding]]
+    - [fn [Subst, tm Binding], Ret]
+[fn [Subst, tm [ExisVar]], ret [ExisVar]]
+    - [not [list Subst, member [ExisVar, Binding]]]
+    - [list Subst, member [ExisVar]]
+[fn [Subst, tm [Arg.0, Ret.0]], ret [Arg, Ret]]
+    - [fn [Subst, tm Arg.0], ret Arg]
+    - [fn [Subst, tm Ret.0], ret Ret]
+[fn [Subst, tm [forall UnivVar, Tm.0]], ret [forall UnivVar, Tm]]
+    - [fn [Subst, tm Tm.0], ret Tm]
+
+--------------------------------------------------------------------------------
+
+:[sig [ClauseDoc] . doc
+    """
+    A macro that allows inline documentation of one specific clause of a relation.
+    """
+]
+[macro_head
+    [ClauseDoc]
+ . options {
+    [decorates [ClauseHead . clause_body _]]
+} . macro_body
+    - { [fact [sig ClauseHead . doc ClauseDoc]] }
+]
+
+[fn [Subst . tm [UnivVar.0]] . ret [UnivVar]]
+    - [list Subst . member [old UnivVar.0 . new UnivVar]]
+[fn [Subst . tm [UnivVar]] . ret [UnivVar]]
+    - [not [list Subst . member [old UnivVar . New._]]]
+[fn [Subst . tm unit] . ret unit]
+[fn [Subst . tm [ExisVar]] . Ret]
+    - [list Subst . member [ExisVar . Binding]]
+    - [fn [Subst . tm Binding] . Ret]
+[fn [Subst . tm [ExisVar]] . ret [ExisVar]]
+    - [not [list Subst . member [ExisVar . Binding]]]
+    - [list Subst . member [ExisVar]]
+[fn [Subst . tm [Arg.0 . Ret.0]] . ret [Arg . Ret]]
+    - [fn [Subst . tm Arg.0] . ret Arg]
+    - [fn [Subst . tm Ret.0] . ret Ret]
+[fn [Subst . tm [forall UnivVar . Tm.0]] . ret [forall UnivVar . Tm]]
+    - [fn [Subst . tm Tm.0] . ret Tm]
+
+--------------------------------------------------------------------------------
+
+:[sig [ClauseDoc] ; doc
+    """
+    A macro that allows inline documentation of one specific clause of a relation.
+    """
+]
+[macro_head
+    [ClauseDoc]
+ ; options {
+    [decorates [ClauseHead ; clause_body _]]
+} ; macro_body
+    - { [fact [sig ClauseHead ; doc ClauseDoc]] }
+]
+
+[fn [Subst ; tm [UnivVar.0]] ; ret [UnivVar]]
+    - [list Subst ; member [old UnivVar.0 ; new UnivVar]]
+[fn [Subst ; tm [UnivVar]] ; ret [UnivVar]]
+    - [not [list Subst ; member [old UnivVar ; New._]]]
+[fn [Subst ; tm unit] ; ret unit]
+[fn [Subst ; tm [ExisVar]] ; Ret]
+    - [list Subst ; member [ExisVar ; Binding]]
+    - [fn [Subst ; tm Binding] ; Ret]
+[fn [Subst ; tm [ExisVar]] ; ret [ExisVar]]
+    - [not [list Subst ; member [ExisVar ; Binding]]]
+    - [list Subst ; member [ExisVar]]
+[fn [Subst ; tm [Arg.0 ; Ret.0]] ; ret [Arg ; Ret]]
+    - [fn [Subst ; tm Arg.0] ; ret Arg]
+    - [fn [Subst ; tm Ret.0] ; ret Ret]
+[fn [Subst ; tm [forall UnivVar ; Tm.0]] ; ret [forall UnivVar ; Tm]]
+    - [fn [Subst ; tm Tm.0] ; ret Tm]
+
+--------------------------------------------------------------------------------
+
+:[sig [ClauseDoc] / doc
+    """
+    A macro that allows inline documentation of one specific clause of a relation.
+    """
+]
+[macro_head
+    [ClauseDoc]
+ / options {
+    [decorates [ClauseHead / clause_body _]]
+} / macro_body
+    - { [fact [sig ClauseHead / doc ClauseDoc]] }
+]
+
+[fn [Subst / tm [UnivVar.0]] / ret [UnivVar]]
+    - [list Subst / member [old UnivVar.0 / new UnivVar]]
+[fn [Subst / tm [UnivVar]] / ret [UnivVar]]
+    - [not [list Subst / member [old UnivVar / New._]]]
+[fn [Subst / tm unit] / ret unit]
+[fn [Subst / tm [ExisVar]] / Ret]
+    - [list Subst / member [ExisVar / Binding]]
+    - [fn [Subst / tm Binding] / Ret]
+[fn [Subst / tm [ExisVar]] / ret [ExisVar]]
+    - [not [list Subst / member [ExisVar / Binding]]]
+    - [list Subst / member [ExisVar]]
+[fn [Subst / tm [Arg.0 / Ret.0]] / ret [Arg / Ret]]
+    - [fn [Subst / tm Arg.0] / ret Arg]
+    - [fn [Subst / tm Ret.0] / ret Ret]
+[fn [Subst / tm [forall UnivVar / Tm.0]] / ret [forall UnivVar / Tm]]
+    - [fn [Subst / tm Tm.0] / ret Tm]
+
+--------------------------------------------------------------------------------
+
+[sig [ClauseDoc] | doc
+    """
+    A macro that allows inline documentation of one specific clause of a relation.
+    """
+]
+[macro_head
+    [ClauseDoc]
+| options {
+        [decorates [ClauseHead | clause_body _]]
+    }
+| macro_body
+    - { [fact [sig ClauseHead | doc ClauseDoc]] }
+]
+
+[fn [Subst | tm [UnivVar.0]] | ret [UnivVar]]
+    - [list Subst | member [old UnivVar.0 | new UnivVar]]
+[fn [Subst | tm [UnivVar]] | ret [UnivVar]]
+    - [not [list Subst | member [old UnivVar | New._]]]
+[fn [Subst | tm unit] | ret unit]
+[fn [Subst | tm [ExisVar]] | Ret]
+    - [list Subst | member [ExisVar | Binding]]
+    - [fn [Subst | tm Binding] | Ret]
+[fn [Subst | tm [ExisVar]] | ret [ExisVar]]
+    - [not [list Subst | member [ExisVar | Binding]]]
+    - [list Subst | member [ExisVar]]
+[fn [Subst | tm [Arg.0 | Ret.0]] | ret [Arg | Ret]]
+    - [fn [Subst | tm Arg.0] | ret Arg]
+    - [fn [Subst | tm Ret.0] | ret Ret]
+[fn [Subst | tm [forall UnivVar | Tm.0]] | ret [forall UnivVar | Tm]]
+    - [fn [Subst | tm Tm.0] | ret Tm]
+
+--------------------------------------------------------------------------------
+
+:[sig [ClauseDoc] , doc
+    """
+    A macro that allows inline documentation of one specific clause of a relation.
+    """
+]
+[macro_head
+    [ClauseDoc]
+ , options {
+    [decorates [ClauseHead , clause_body _]]
+} , macro_body
+    - { [fact [sig ClauseHead , doc ClauseDoc]] }
+]
+
+[fn [Subst , tm [UnivVar.0]] , ret [UnivVar]]
+    - [list Subst , member [old UnivVar.0 , new UnivVar]]
+[fn [Subst , tm [UnivVar]] , ret [UnivVar]]
+    - [not [list Subst , member [old UnivVar , New._]]]
+[fn [Subst , tm unit] , ret unit]
+[fn [Subst , tm [ExisVar]] , Ret]
+    - [list Subst , member [ExisVar , Binding]]
+    - [fn [Subst , tm Binding] , Ret]
+[fn [Subst , tm [ExisVar]] , ret [ExisVar]]
+    - [not [list Subst , member [ExisVar , Binding]]]
+    - [list Subst , member [ExisVar]]
+[fn [Subst , tm [Arg.0 , Ret.0]] , ret [Arg , Ret]]
+    - [fn [Subst , tm Arg.0] , ret Arg]
+    - [fn [Subst , tm Ret.0] , ret Ret]
+[fn [Subst , tm [forall UnivVar , Tm.0]] , ret [forall UnivVar , Tm]]
+    - [fn [Subst , tm Tm.0] , ret Tm]
+
+--------------------------------------------------------------------------------

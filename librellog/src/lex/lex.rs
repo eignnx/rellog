@@ -17,69 +17,66 @@ use nom::{
 };
 use nom_i9n::{I9nInput, TokenizedInput};
 
-fn text_literal<'i>(i: Span<'i>) -> Res<'i, String> {
-    alt((
-        move |i: Span<'i>| {
-            let start_col = i.get_column() - 1;
-            let (i, _) = tag(r#"""""#)(i)?;
-            let (i, text) = take_until(r#"""""#)(i)?;
-            let (i, _) = tag(r#"""""#)(i)?;
+fn text_literal(i: Span<'_>) -> Res<'_, String> {
+    alt((multiline_txt_lit, single_line_txt_lit)).parse(i)
+}
 
-            let mut out = String::new();
+fn single_line_txt_lit(i: Span<'_>) -> Res<'_, String> {
+    let (i, _) = tag("\"")(i)?;
+    let (i, text) = take_while(|c: char| c != '"')(i)?;
+    let (i, _) = tag("\"")(i)?;
+    Ok((i, String::from(*text.fragment())))
+}
 
-            if text.starts_with('\n') || text.starts_with("\r\n") {
-                // _ _ _ """
-                // _ _ _ _ _ asdf
-                // _ _ _ """
-                // should produce
-                // """
-                // _ _ asdf
-                // """
-                for line in text.lines().skip(1) {
-                    if line.trim().is_empty() {
-                        out.push('\n');
-                    } else {
-                        if line.len() <= start_col {
-                            return context(
-                                "Not enough indentation in multiline string literal.",
-                                fail,
-                            )
-                            .parse(i);
-                        }
-                        let dedented = &line[start_col..];
-                        out.push_str(dedented);
-                    }
-                }
+fn multiline_txt_lit(i: Span<'_>) -> Res<'_, String> {
+    let start_col = i.get_column() - 1;
+    let (i, _) = tag(r#"""""#)(i)?;
+    let (i, text) = take_until(r#"""""#)(i)?;
+    let (i, _) = cut(tag(r#"""""#))(i)?;
 
-                if out.ends_with('\n') {
-                    out.pop();
-                }
-            } else {
-                // _ _ _ """adsf
-                // _ _ _ _ _ _ asdf
-                // _ _ _ """
-                // should produce
-                // "adsf\n _ asdf"
-                out.push_str(text.lines().next().unwrap_or_default());
+    let mut out = String::new();
+
+    if text.starts_with('\n') || text.starts_with("\r\n") {
+        // _ _ _ """
+        // _ _ _ _ _ asdf
+        // _ _ _ """
+        // should produce
+        // """
+        // _ _ asdf
+        // """
+        for line in text.lines().skip(1) {
+            if line.trim().is_empty() {
                 out.push('\n');
-                let start_col = start_col + 3;
-                for line in text.lines().skip(1) {
-                    out.push_str(&line[start_col..]);
-                    out.push('\n');
+            } else {
+                if line.len() <= start_col {
+                    return context("Not enough indentation in multiline string literal.", fail)
+                        .parse(i);
                 }
-                out.pop();
+                let dedented = &line[start_col..];
+                out.push_str(dedented);
             }
+        }
 
-            Ok((i, out))
-        },
-        move |i: Span<'i>| {
-            let (i, _) = tag("\"")(i)?;
-            let (i, text) = take_while(|c: char| c != '"')(i)?;
-            let (i, _) = tag("\"")(i)?;
-            Ok((i, String::from(*text.fragment())))
-        },
-    ))
-    .parse(i)
+        if out.ends_with('\n') {
+            out.pop();
+        }
+    } else {
+        // _ _ _ """adsf
+        // _ _ _ _ _ _ asdf
+        // _ _ _ """
+        // should produce
+        // "adsf\n _ asdf"
+        out.push_str(text.lines().next().unwrap_or_default());
+        out.push('\n');
+        let start_col = start_col + 3;
+        for line in text.lines().skip(1) {
+            out.push_str(&line[start_col..]);
+            out.push('\n');
+        }
+        out.pop();
+    }
+
+    Ok((i, out))
 }
 
 fn unquoted_sym(i: Span) -> Res<Sym> {

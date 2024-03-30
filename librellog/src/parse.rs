@@ -17,7 +17,7 @@ use nom_i9n::{I9nError, I9nErrorCtx, I9nErrorSituation, I9nInput, TokenizedInput
 use rpds::Vector;
 
 use crate::{
-    ast::{partial_txt::PartialTxt, BinOpSymbol, Item, Module, RcTm, Rel, Tm},
+    ast::{txt::Segment, BinOpSymbol, Item, Module, RcTm, Rel, Tm},
     data_structures::{Int, Map, Sym, Var},
     lex::{
         tok::{
@@ -442,7 +442,7 @@ fn non_block_tm(ts: Toks) -> Res<Tm> {
         sym.map(Tm::Sym),
         var.map(Tm::Var),
         num.map(Tm::Int),
-        txt.map(|s| Tm::Txt(PartialTxt::from(s))),
+        txt.map(|s| Tm::TxtSeg(Segment::from(s))),
         rel.map(Tm::Rel),
         list,
     ))
@@ -455,7 +455,7 @@ fn non_operator_non_block_tm(ts: Toks) -> Res<Tm> {
         sym.map(Tm::Sym),
         var.map(Tm::Var),
         num.map(Tm::Int),
-        txt.map(|s| Tm::Txt(PartialTxt::from(s))),
+        txt.map(|s| Tm::TxtSeg(Segment::from(s))),
         rel.map(Tm::Rel),
         list,
     ))
