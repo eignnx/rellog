@@ -50,4 +50,10 @@ impl IStr {
     {
         self.into()
     }
+
+    pub fn is_one_char(&self) -> bool {
+        let s = self.to_str();
+        let mut cs = s.chars();
+        cs.next().is_some_and(|_| cs.next().is_none())
+    }
 }

@@ -4,6 +4,7 @@ pub mod breakpoint;
 pub mod builtins;
 mod err;
 pub mod kb;
+#[allow(clippy::module_inception)]
 mod rt;
 pub mod soln_stream;
 

@@ -7,8 +7,7 @@ use std::{
 use nom::{
     branch::alt,
     combinator::{all_consuming, cut, opt},
-    error::{context, ParseError},
-    error::{ContextError, ErrorKind},
+    error::{context, ContextError, ErrorKind, ParseError},
     multi::{many0, many1, separated_list1},
     sequence::{delimited, preceded, tuple},
     Finish, IResult, Parser,
@@ -17,7 +16,7 @@ use nom_i9n::{I9nError, I9nErrorCtx, I9nErrorSituation, I9nInput, TokenizedInput
 use rpds::Vector;
 
 use crate::{
-    ast::{txt::Segment, BinOpSymbol, Item, Module, RcTm, Rel, Tm},
+    ast::{BinOpSymbol, Item, Module, RcTm, Rel, Tm},
     data_structures::{Int, Map, Sym, Var},
     lex::{
         tok::{
@@ -27,6 +26,10 @@ use crate::{
         LexError,
     },
 };
+
+use self::txt_tmpl::txt;
+
+mod txt_tmpl;
 
 type Res<'ts, T> = IResult<Toks<'ts>, T, Error<'ts>>;
 type BaseInput<'ts> = &'ts [At<Tok>];
@@ -210,6 +213,17 @@ impl Display for I9nErrorCtxDisplay {
     }
 }
 
+#[macro_export]
+macro_rules! expect_token {
+    ($ts:expr, $p:pat => $e:expr, $t:pat => $err_msg:expr) => {
+        match ::nom_i9n::I9nInput::split_first(&$ts).map(|(x, xs)| (x.clone().value(), xs)) {
+            Some(($p, i)) => Ok((i, $e)),
+            Some(($t, _)) => Err(nom::Err::Error(Error::with_message($ts, format!($err_msg)))),
+            None => Err($crate::parse::eof_error($ts)),
+        }
+    };
+}
+
 fn tok<'ts>(tgt: Tok) -> impl Parser<Toks<'ts>, At<Tok>, Error<'ts>> {
     let p = move |ts: Toks<'ts>| -> Res<'ts, At<Tok>> {
         match ts.split_first() {
@@ -233,47 +247,27 @@ fn eof_error(ts: Toks) -> nom::Err<Error> {
 }
 
 fn sym(ts: Toks) -> Res<Sym> {
-    match I9nInput::split_first(&ts).map(|(x, xs)| (x.clone().value(), xs)) {
-        Some((Tok::Sym(s), rest)) => Ok((rest, s)),
-        Some((t, _)) => Err(nom::Err::Error(Error::with_message(
-            ts,
-            format!("Expected symbol, found {t:?}"),
-        ))),
-        None => Err(eof_error(ts)),
-    }
+    expect_token!(
+        ts,
+        Tok::Sym(s) => s,
+        t => "Expected symbol, found {t:?}"
+    )
 }
 
 fn var(ts: Toks) -> Res<Var> {
-    match I9nInput::split_first(&ts).map(|(x, xs)| (x.clone().value(), xs)) {
-        Some((Tok::Var(v), rest)) => Ok((rest, v)),
-        Some((t, _)) => Err(nom::Err::Error(Error::with_message(
-            ts,
-            format!("Expected variable, found {t:?}"),
-        ))),
-        None => Err(eof_error(ts)),
-    }
+    expect_token!(
+        ts,
+        Tok::Var(v) => v,
+        t => "Expected variable, found {t:?}"
+    )
 }
 
 fn num(ts: Toks) -> Res<Int> {
-    match I9nInput::split_first(&ts).map(|(x, xs)| (x.clone().value(), xs)) {
-        Some((Tok::Int(n), rest)) => Ok((rest, n)),
-        Some((t, _)) => Err(nom::Err::Error(Error::with_message(
-            ts,
-            format!("Expected number, found {t:?}"),
-        ))),
-        None => Err(eof_error(ts)),
-    }
-}
-
-fn txt(ts: Toks) -> Res<String> {
-    match I9nInput::split_first(&ts).map(|(x, xs)| (x.clone().value(), xs)) {
-        Some((Tok::Txt(s), rest)) => Ok((rest, s)),
-        Some((t, _)) => Err(nom::Err::Error(Error::with_message(
-            ts,
-            format!("Expected text literal, found {t:?}"),
-        ))),
-        None => Err(eof_error(ts)),
-    }
+    expect_token!(
+        ts,
+        Tok::Int(n) => n,
+        t => "Expected number, found {t:?}"
+    )
 }
 
 fn attr(ts: Toks) -> Res<(Sym, RcTm)> {
@@ -442,7 +436,7 @@ fn non_block_tm(ts: Toks) -> Res<Tm> {
         sym.map(Tm::Sym),
         var.map(Tm::Var),
         num.map(Tm::Int),
-        txt.map(|s| Tm::TxtSeg(Segment::from(s))),
+        txt,
         rel.map(Tm::Rel),
         list,
     ))
@@ -455,7 +449,7 @@ fn non_operator_non_block_tm(ts: Toks) -> Res<Tm> {
         sym.map(Tm::Sym),
         var.map(Tm::Var),
         num.map(Tm::Int),
-        txt.map(|s| Tm::TxtSeg(Segment::from(s))),
+        txt,
         rel.map(Tm::Rel),
         list,
     ))

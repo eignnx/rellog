@@ -16,7 +16,7 @@ use crate::{
         txt::{Segment, TxtErr},
         Clause, RcTm, Rel, Sig, Tm,
     },
-    data_structures::{Int, Sym, Var},
+    data_structures::{Int, Var},
     interner::IStr,
     lex::{self, tok::Tok},
     parse,

@@ -7,77 +7,82 @@ use crate::{
 };
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_until, take_while, take_while1},
+    bytes::complete::{tag, take_till, take_while, take_while1},
     character::complete::{multispace0, satisfy},
-    combinator::{all_consuming, cut, fail, opt, recognize},
+    combinator::{cut, fail, opt, recognize},
     error::{context, VerboseError},
     multi::many0,
-    sequence::{delimited, preceded, terminated, tuple},
+    sequence::{delimited, preceded, tuple},
     Finish, Parser,
 };
 use nom_i9n::{I9nInput, TokenizedInput};
 
-fn text_literal(i: Span<'_>) -> Res<'_, String> {
-    alt((multiline_txt_lit, single_line_txt_lit)).parse(i)
-}
+use super::tok::SPREAD;
 
-fn single_line_txt_lit(i: Span<'_>) -> Res<'_, String> {
-    let (i, _) = tag("\"")(i)?;
-    let (i, text) = take_while(|c: char| c != '"')(i)?;
-    let (i, _) = tag("\"")(i)?;
-    Ok((i, String::from(*text.fragment())))
-}
+// fn text_literal(i: Span<'_>) -> Res<'_, String> {
+//     let (i, raw_text) = alt((multiline_txt_lit, single_line_txt_lit)).parse(i)?;
+//     let txt_tm = parse_txt_lit_content(&raw_text);
+//     todo!();
+//     Ok((i, txt_tm))
+// }
 
-fn multiline_txt_lit(i: Span<'_>) -> Res<'_, String> {
-    let start_col = i.get_column() - 1;
-    let (i, _) = tag(r#"""""#)(i)?;
-    let (i, text) = take_until(r#"""""#)(i)?;
-    let (i, _) = cut(tag(r#"""""#))(i)?;
+// fn single_line_txt_lit(i: Span) -> Res<String> {
+//     let (i, _) = tag("\"")(i)?;
+//     let (i, text) = take_while(|c: char| c != '"')(i)?;
+//     let (i, _) = tag("\"")(i)?;
+//     Ok((i, String::from(*text.fragment())))
+// }
 
-    let mut out = String::new();
+// fn multiline_txt_lit(i: Span) -> Res<String> {
+//     let start_col = i.get_column() - 1;
+//     let (i, _) = tag(r#"""""#)(i)?;
+//     let (i, text) = take_until(r#"""""#)(i)?;
+//     let (i, _) = cut(tag(r#"""""#))(i)?;
 
-    if text.starts_with('\n') || text.starts_with("\r\n") {
-        // _ _ _ """
-        // _ _ _ _ _ asdf
-        // _ _ _ """
-        // should produce
-        // """
-        // _ _ asdf
-        // """
-        for line in text.lines().skip(1) {
-            if line.trim().is_empty() {
-                out.push('\n');
-            } else {
-                if line.len() <= start_col {
-                    return context("Not enough indentation in multiline string literal.", fail)
-                        .parse(i);
-                }
-                let dedented = &line[start_col..];
-                out.push_str(dedented);
-            }
-        }
+//     let mut out = String::new();
 
-        if out.ends_with('\n') {
-            out.pop();
-        }
-    } else {
-        // _ _ _ """adsf
-        // _ _ _ _ _ _ asdf
-        // _ _ _ """
-        // should produce
-        // "adsf\n _ asdf"
-        out.push_str(text.lines().next().unwrap_or_default());
-        out.push('\n');
-        let start_col = start_col + 3;
-        for line in text.lines().skip(1) {
-            out.push_str(&line[start_col..]);
-            out.push('\n');
-        }
-        out.pop();
-    }
+//     if text.starts_with('\n') || text.starts_with("\r\n") {
+//         // _ _ _ """
+//         // _ _ _ _ _ asdf
+//         // _ _ _ """
+//         // should produce
+//         // """
+//         // _ _ asdf
+//         // """
+//         for line in text.lines().skip(1) {
+//             if line.trim().is_empty() {
+//                 out.push('\n');
+//             } else {
+//                 if line.len() <= start_col {
+//                     return context("Not enough indentation in multiline string literal.", fail)
+//                         .parse(i);
+//                 }
+//                 let dedented = &line[start_col..];
+//                 out.push_str(dedented);
+//             }
+//         }
 
-    Ok((i, out))
-}
+//         if out.ends_with('\n') {
+//             out.pop();
+//         }
+//     } else {
+//         // _ _ _ """adsf
+//         // _ _ _ _ _ _ asdf
+//         // _ _ _ """
+//         // should produce
+//         // "adsf\n _ asdf"
+//         out.push_str(text.lines().next().unwrap_or_default());
+//         out.push('\n');
+//         let start_col = start_col + 3;
+//         for line in text.lines().skip(1) {
+//             out.push_str(&line[start_col..]);
+//             out.push('\n');
+//         }
+//         out.pop();
+//     }
+
+//     Ok((i, out))
+// }
 
 fn unquoted_sym(i: Span) -> Res<Sym> {
     recognize(tuple((
@@ -132,33 +137,6 @@ fn int(i: Span) -> Res<Int> {
         .parse(i)
 }
 
-fn one_token(i: Span) -> Res<At<Tok>> {
-    let (i, _) = multispace0(i)?;
-    alt((
-        int.map(Tok::Int),
-        text_literal.map(Tok::Txt),
-        sym.map(Tok::Sym),
-        var.map(Tok::Var),
-        tag("][").map(|_| Tok::COBrack),
-        tag("[").map(|_| Tok::OBrack),
-        tag("]").map(|_| Tok::CBrack),
-        tag("{").map(|_| Tok::OBrace),
-        tag("}").map(|_| Tok::CBrace),
-        tag("(").map(|_| Tok::OParen),
-        tag(")").map(|_| Tok::CParen),
-        tag("-").map(|_| Tok::Dash),
-        tag("|").map(|_| Tok::Pipe),
-        tag(",").map(|_| Tok::Comma),
-        tag(";").map(|_| Tok::Semicolon),
-        tag("..").map(|_| Tok::Spread),
-        tag("=").map(|_| Tok::Equal),
-        tag("~").map(|_| Tok::Tilde),
-        tag("::").map(|_| Tok::PathSep),
-    ))
-    .map(|t| t.at(i))
-    .parse(i)
-}
-
 #[derive(Debug, Clone)]
 pub struct LexError {
     pub file: Option<PathBuf>,
@@ -199,20 +177,143 @@ impl<'i> From<VerboseError<Span<'i>>> for LexError {
     }
 }
 
+#[derive(Debug, Clone, Copy)]
+enum LexCtx {
+    QuotedTxt,
+    TripleQuotedTxt,
+    Expr,
+}
+
+fn tokenize_impl<'i>(mut input: Span<'i>, ts: &mut Vec<At<Tok>>) -> Res<'i, ()> {
+    let mut stack: Vec<LexCtx> = vec![LexCtx::Expr];
+
+    while !input.is_empty() {
+        let i = input;
+        let state = *stack
+            .last()
+            .expect("stack begins initialized with LexCtx::Expr");
+
+        let (i, t) = match state {
+            LexCtx::Expr => {
+                let (i, _) = multispace0(i)?;
+                input = i;
+                let (i, t) = alt((
+                    int.map(Tok::Int),
+                    sym.map(Tok::Sym),
+                    var.map(Tok::Var),
+                    tag("\"\"\"").map(|_| Tok::OTripleQuote),
+                    tag("\"").map(|_| Tok::OQuote),
+                    // Nested alt because max tuple size is 21.
+                    alt((
+                        tag("[{").map(|_| Tok::OTxtInterp), // Keep this in here for error reporting purposes.
+                        tag("][").map(|_| Tok::COBrack),
+                        tag("[").map(|_| Tok::OBrack),
+                        tag("]").map(|_| Tok::CBrack),
+                        tag("{").map(|_| Tok::OBrace),
+                        tag("}").map(|_| Tok::CBrace),
+                        tag("(").map(|_| Tok::OParen),
+                        tag(")").map(|_| Tok::CParen),
+                    )),
+                    tag("-").map(|_| Tok::Dash),
+                    tag("|").map(|_| Tok::Pipe),
+                    tag(",").map(|_| Tok::Comma),
+                    tag(";").map(|_| Tok::Semicolon),
+                    tag(SPREAD).map(|_| Tok::Spread),
+                    tag("=").map(|_| Tok::Equal),
+                    tag("~").map(|_| Tok::Tilde),
+                    tag("::").map(|_| Tok::PathSep),
+                ))
+                .parse(i)?;
+
+                match t {
+                    Tok::OQuote => stack.push(LexCtx::QuotedTxt),
+                    Tok::OTripleQuote => stack.push(LexCtx::TripleQuotedTxt),
+                    _ => {}
+                }
+
+                (i, t.at(input))
+            }
+
+            LexCtx::QuotedTxt | LexCtx::TripleQuotedTxt => {
+                let mut buf = String::new();
+                let mut inp = i;
+                loop {
+                    // Just search for 1 end quote (or open bracket). We'll deal with
+                    // triple quotes after.
+                    let (i, content) = take_till(|c| c == '"' || c == '[').parse(inp)?;
+                    buf.push_str(content.as_ref());
+                    // Gotta do a double check because `take_till` can't search for both
+                    // triple quotes AND open bracket.
+                    match state {
+                        LexCtx::QuotedTxt if i.starts_with('"') => {
+                            break (i, Tok::CQuote.at(input));
+                        }
+                        LexCtx::TripleQuotedTxt if i.starts_with("\"\"\"") => {
+                            break (i, Tok::CTripleQuote.at(input));
+                        }
+                        _ if i.starts_with("[{") && i.is_empty() => {
+                            break (i, Tok::OTxtInterp.at(input));
+                        }
+                        _ => {} // Otherwise, we need to keep searching for the triple quote (or bracket).
+                    }
+                    inp = i;
+                }
+            }
+        };
+
+        match &t.value {
+            Tok::OQuote => {
+                stack.push(LexCtx::QuotedTxt);
+            }
+            Tok::CQuote => {
+                let Some(LexCtx::QuotedTxt) = stack.pop() else {
+                    return context("Mismatched quote mark", fail).parse(i);
+                };
+            }
+            Tok::OTripleQuote => {
+                stack.push(LexCtx::TripleQuotedTxt);
+            }
+            Tok::CTripleQuote => {
+                let Some(LexCtx::TripleQuotedTxt) = stack.pop() else {
+                    return context("Mismatched triple quote mark", fail).parse(i);
+                };
+            }
+            Tok::OTxtInterp => {
+                let Some(LexCtx::Expr) = stack.pop() else {
+                    return context("Unmatched opening text interpolation bracket pair", fail)
+                        .parse(i);
+                };
+                stack.push(LexCtx::Expr);
+            }
+            Tok::CTxtInterp => {
+                let Some(LexCtx::Expr) = stack.pop() else {
+                    return context("Unmatched closing text interpolation bracket pair", fail)
+                        .parse(i);
+                };
+            }
+            _ => {}
+        }
+
+        ts.push(t);
+        input = i;
+    }
+
+    Ok((input, ()))
+}
+
 pub fn tokenize<'i>(
     src: impl Into<Span<'i>> + 'i,
     filename: PathBuf,
 ) -> Result<Vec<At<Tok>>, LexError> {
-    let src: Span = src.into();
-    all_consuming(terminated(many0(one_token), multispace0))
-        .parse(src)
+    let input: Span = src.into();
+    let mut ts = Vec::new();
+    tokenize_impl(input, &mut ts)
         .finish()
-        .map(|(_i, tokens)| tokens)
-        .map_err(|e| {
-            let mut e = LexError::from(e);
-            e.file = Some(filename);
-            e
-        })
+        .map_err(|e| LexError {
+            file: Some(filename),
+            ..LexError::from(e)
+        })?;
+    Ok(ts)
 }
 
 type RellogTokenFinder<'tokbuf> = TokenizedInput<&'tokbuf [At<Tok>], At<Tok>>;
@@ -294,6 +395,29 @@ mod block_tests {
             COBrack,
             Var(src_var("Poiu")),
             CBrack,
+        ];
+
+        assert_eq!(actual, expected, "Input was {:?}", src);
+    }
+
+    #[test]
+    fn test_txt_interpolation() {
+        let src = r#" "BEFORE[{X}]AFTER" "#;
+
+        let actual = tokenize(src, "blah.rellog".into())
+            .unwrap()
+            .into_iter()
+            .map(At::value)
+            .collect::<Vec<_>>();
+
+        let expected = vec![
+            OQuote,
+            TxtContent("BEFORE".to_string()),
+            OTxtInterp,
+            Var(src_var("X")),
+            CTxtInterp,
+            TxtContent("AFTER".to_string()),
+            CQuote,
         ];
 
         assert_eq!(actual, expected, "Input was {:?}", src);
