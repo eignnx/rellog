@@ -1,4 +1,5 @@
 #![deny(unused_must_use)]
+#![feature(assert_matches)]
 
 pub mod ast;
 pub mod data_structures;

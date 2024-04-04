@@ -370,6 +370,13 @@ fn list(ts: Toks) -> Res<Tm> {
             break (ts, Tm::Nil);
         }
 
+        if ts.is_empty() {
+            return Err(nom::Err::Error(Error::with_message(
+                ts,
+                "Expected spread or closing brace".to_owned(),
+            )));
+        }
+
         let (new_ts, element) = tm.parse(ts)?;
         xs_reversed.push(element);
         ts = new_ts;

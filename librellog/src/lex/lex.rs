@@ -1,4 +1,4 @@
-use std::{fmt::Display, path::PathBuf, str::FromStr};
+use std::{assert_matches::debug_assert_matches, fmt::Display, path::PathBuf, str::FromStr};
 
 use crate::{
     data_structures::{Int, Sym, Var},
@@ -7,9 +7,9 @@ use crate::{
 };
 use nom::{
     branch::alt,
-    bytes::complete::{tag, take_till, take_while, take_while1},
-    character::complete::{multispace0, satisfy},
-    combinator::{cut, fail, opt, recognize},
+    bytes::complete::{tag, take_while, take_while1},
+    character::complete::{anychar, multispace0, satisfy},
+    combinator::{cut, fail, not, opt, recognize, value},
     error::{context, VerboseError},
     multi::many0,
     sequence::{delimited, preceded, tuple},
@@ -179,9 +179,46 @@ impl<'i> From<VerboseError<Span<'i>>> for LexError {
 
 #[derive(Debug, Clone, Copy)]
 enum LexCtx {
-    QuotedTxt,
-    TripleQuotedTxt,
     Expr,
+    Quoted(Quote),
+    TxtInterp,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Quote {
+    One,
+    Three,
+}
+
+fn expr_tok(i: Span) -> Res<Tok> {
+    let (i, _) = multispace0(i)?;
+    alt((
+        int.map(Tok::Int),
+        sym.map(Tok::Sym),
+        var.map(Tok::Var),
+        value(Tok::OTripleQuote, tag("\"\"\"")),
+        value(Tok::OQuote, tag("\"")),
+        // Nested alt because max tuple size is 21.
+        alt((
+            tag("[{").map(|_| Tok::OTxtInterp), // Keep this in here for error reporting purposes.
+            tag("][").map(|_| Tok::COBrack),
+            tag("[").map(|_| Tok::OBrack),
+            tag("]").map(|_| Tok::CBrack),
+            tag("{").map(|_| Tok::OBrace),
+            tag("}").map(|_| Tok::CBrace),
+            tag("(").map(|_| Tok::OParen),
+            tag(")").map(|_| Tok::CParen),
+        )),
+        tag("-").map(|_| Tok::Dash),
+        tag("|").map(|_| Tok::Pipe),
+        tag(",").map(|_| Tok::Comma),
+        tag(";").map(|_| Tok::Semicolon),
+        tag(SPREAD).map(|_| Tok::Spread),
+        tag("=").map(|_| Tok::Equal),
+        tag("~").map(|_| Tok::Tilde),
+        tag("::").map(|_| Tok::PathSep),
+    ))
+    .parse(i)
 }
 
 fn tokenize_impl<'i>(mut input: Span<'i>, ts: &mut Vec<At<Tok>>) -> Res<'i, ()> {
@@ -195,98 +232,73 @@ fn tokenize_impl<'i>(mut input: Span<'i>, ts: &mut Vec<At<Tok>>) -> Res<'i, ()> 
 
         let (i, t) = match state {
             LexCtx::Expr => {
-                let (i, _) = multispace0(i)?;
-                input = i;
-                let (i, t) = alt((
-                    int.map(Tok::Int),
-                    sym.map(Tok::Sym),
-                    var.map(Tok::Var),
-                    tag("\"\"\"").map(|_| Tok::OTripleQuote),
-                    tag("\"").map(|_| Tok::OQuote),
-                    // Nested alt because max tuple size is 21.
-                    alt((
-                        tag("[{").map(|_| Tok::OTxtInterp), // Keep this in here for error reporting purposes.
-                        tag("][").map(|_| Tok::COBrack),
-                        tag("[").map(|_| Tok::OBrack),
-                        tag("]").map(|_| Tok::CBrack),
-                        tag("{").map(|_| Tok::OBrace),
-                        tag("}").map(|_| Tok::CBrace),
-                        tag("(").map(|_| Tok::OParen),
-                        tag(")").map(|_| Tok::CParen),
-                    )),
-                    tag("-").map(|_| Tok::Dash),
-                    tag("|").map(|_| Tok::Pipe),
-                    tag(",").map(|_| Tok::Comma),
-                    tag(";").map(|_| Tok::Semicolon),
-                    tag(SPREAD).map(|_| Tok::Spread),
-                    tag("=").map(|_| Tok::Equal),
-                    tag("~").map(|_| Tok::Tilde),
-                    tag("::").map(|_| Tok::PathSep),
-                ))
-                .parse(i)?;
-
+                let (i, t) = expr_tok(input)?;
                 match t {
-                    Tok::OQuote => stack.push(LexCtx::QuotedTxt),
-                    Tok::OTripleQuote => stack.push(LexCtx::TripleQuotedTxt),
+                    Tok::OQuote => stack.push(LexCtx::Quoted(Quote::One)),
+                    Tok::OTripleQuote => stack.push(LexCtx::Quoted(Quote::Three)),
                     _ => {}
                 }
 
                 (i, t.at(input))
             }
 
-            LexCtx::QuotedTxt | LexCtx::TripleQuotedTxt => {
+            LexCtx::Quoted(q) => {
                 let mut buf = String::new();
-                let mut inp = i;
-                loop {
-                    // Just search for 1 end quote (or open bracket). We'll deal with
-                    // triple quotes after.
-                    let (i, content) = take_till(|c| c == '"' || c == '[').parse(inp)?;
-                    buf.push_str(content.as_ref());
-                    // Gotta do a double check because `take_till` can't search for both
-                    // triple quotes AND open bracket.
-                    match state {
-                        LexCtx::QuotedTxt if i.starts_with('"') => {
-                            break (i, Tok::CQuote.at(input));
-                        }
-                        LexCtx::TripleQuotedTxt if i.starts_with("\"\"\"") => {
-                            break (i, Tok::CTripleQuote.at(input));
-                        }
-                        _ if i.starts_with("[{") && i.is_empty() => {
-                            break (i, Tok::OTxtInterp.at(input));
-                        }
-                        _ => {} // Otherwise, we need to keep searching for the triple quote (or bracket).
-                    }
-                    inp = i;
-                }
+                let (i, content) = recognize(many0(alt((
+                    match q {
+                        Quote::One => not(tag("\"")).and(anychar),
+                        Quote::Three => not(tag("\"\"\"")).and(anychar),
+                    },
+                    not(tag("[{")).and(anychar),
+                ))))
+                .parse(input)?;
+                buf.push_str(content.as_ref());
+                ts.push(Tok::TxtContent(buf).at(input));
+                input = i;
+                // Now parse escape or closing quote.
+                let (i, end) = alt((
+                    match q {
+                        Quote::One => value(Tok::CQuote, tag("\"")),
+                        Quote::Three => value(Tok::CTripleQuote, tag("\"\"\"")),
+                    },
+                    value(Tok::OTxtInterp, tag("[{")),
+                ))
+                .parse(i)?;
+                (i, end.at(input))
+            }
+            LexCtx::TxtInterp => {
+                let close_interp = value(Tok::CTxtInterp, tag("}]"));
+                alt((expr_tok, close_interp))
+                    .map(|t| t.at(input))
+                    .parse(i)?
             }
         };
 
         match &t.value {
-            Tok::OQuote => {
-                stack.push(LexCtx::QuotedTxt);
-            }
+            // Tok::OQuote => {
+            //     debug_assert_matches!(stack.last(), Some(LexCtx::Expr | LexCtx::TxtInterp) | None);
+            //     stack.push(LexCtx::Quoted(Quote::One));
+            // }
             Tok::CQuote => {
-                let Some(LexCtx::QuotedTxt) = stack.pop() else {
+                let Some(LexCtx::Quoted(Quote::One)) = stack.pop() else {
                     return context("Mismatched quote mark", fail).parse(i);
                 };
             }
-            Tok::OTripleQuote => {
-                stack.push(LexCtx::TripleQuotedTxt);
-            }
+            // Tok::OTripleQuote => {
+            //     debug_assert_matches!(stack.last(), Some(LexCtx::Expr | LexCtx::TxtInterp) | None);
+            //     stack.push(LexCtx::Quoted(Quote::Three));
+            // }
             Tok::CTripleQuote => {
-                let Some(LexCtx::TripleQuotedTxt) = stack.pop() else {
+                let Some(LexCtx::Quoted(Quote::Three)) = stack.pop() else {
                     return context("Mismatched triple quote mark", fail).parse(i);
                 };
             }
             Tok::OTxtInterp => {
-                let Some(LexCtx::Expr) = stack.pop() else {
-                    return context("Unmatched opening text interpolation bracket pair", fail)
-                        .parse(i);
-                };
-                stack.push(LexCtx::Expr);
+                debug_assert!(matches!(stack.last(), Some(LexCtx::Quoted(_))));
+                stack.push(LexCtx::TxtInterp);
             }
             Tok::CTxtInterp => {
-                let Some(LexCtx::Expr) = stack.pop() else {
+                let Some(LexCtx::TxtInterp) = stack.pop() else {
                     return context("Unmatched closing text interpolation bracket pair", fail)
                         .parse(i);
                 };
@@ -380,6 +392,7 @@ mod block_tests {
 
     #[test]
     fn tokenize_relation_term() {
+        crate::init_interner();
         let src = r#"[asdf Qwerty][Poiu]"#;
 
         let actual = tokenize(src, "blah.rellog".into())
@@ -402,6 +415,7 @@ mod block_tests {
 
     #[test]
     fn test_txt_interpolation() {
+        crate::init_interner();
         let src = r#" "BEFORE[{X}]AFTER" "#;
 
         let actual = tokenize(src, "blah.rellog".into())
