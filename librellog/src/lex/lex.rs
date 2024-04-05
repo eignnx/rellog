@@ -1,4 +1,4 @@
-use std::{assert_matches::debug_assert_matches, fmt::Display, path::PathBuf, str::FromStr};
+use std::{fmt::Display, path::PathBuf, str::FromStr};
 
 use crate::{
     data_structures::{Int, Sym, Var},
@@ -18,71 +18,6 @@ use nom::{
 use nom_i9n::{I9nInput, TokenizedInput};
 
 use super::tok::SPREAD;
-
-// fn text_literal(i: Span<'_>) -> Res<'_, String> {
-//     let (i, raw_text) = alt((multiline_txt_lit, single_line_txt_lit)).parse(i)?;
-//     let txt_tm = parse_txt_lit_content(&raw_text);
-//     todo!();
-//     Ok((i, txt_tm))
-// }
-
-// fn single_line_txt_lit(i: Span) -> Res<String> {
-//     let (i, _) = tag("\"")(i)?;
-//     let (i, text) = take_while(|c: char| c != '"')(i)?;
-//     let (i, _) = tag("\"")(i)?;
-//     Ok((i, String::from(*text.fragment())))
-// }
-
-// fn multiline_txt_lit(i: Span) -> Res<String> {
-//     let start_col = i.get_column() - 1;
-//     let (i, _) = tag(r#"""""#)(i)?;
-//     let (i, text) = take_until(r#"""""#)(i)?;
-//     let (i, _) = cut(tag(r#"""""#))(i)?;
-
-//     let mut out = String::new();
-
-//     if text.starts_with('\n') || text.starts_with("\r\n") {
-//         // _ _ _ """
-//         // _ _ _ _ _ asdf
-//         // _ _ _ """
-//         // should produce
-//         // """
-//         // _ _ asdf
-//         // """
-//         for line in text.lines().skip(1) {
-//             if line.trim().is_empty() {
-//                 out.push('\n');
-//             } else {
-//                 if line.len() <= start_col {
-//                     return context("Not enough indentation in multiline string literal.", fail)
-//                         .parse(i);
-//                 }
-//                 let dedented = &line[start_col..];
-//                 out.push_str(dedented);
-//             }
-//         }
-
-//         if out.ends_with('\n') {
-//             out.pop();
-//         }
-//     } else {
-//         // _ _ _ """adsf
-//         // _ _ _ _ _ _ asdf
-//         // _ _ _ """
-//         // should produce
-//         // "adsf\n _ asdf"
-//         out.push_str(text.lines().next().unwrap_or_default());
-//         out.push('\n');
-//         let start_col = start_col + 3;
-//         for line in text.lines().skip(1) {
-//             out.push_str(&line[start_col..]);
-//             out.push('\n');
-//         }
-//         out.pop();
-//     }
-
-//     Ok((i, out))
-// }
 
 fn unquoted_sym(i: Span) -> Res<Sym> {
     recognize(tuple((
@@ -143,6 +78,7 @@ pub struct LexError {
     pub line: usize,
     pub column: usize,
     pub fragment: String,
+    pub description: String,
 }
 
 impl Display for LexError {
@@ -152,27 +88,40 @@ impl Display for LexError {
             line,
             column,
             fragment,
+            description,
         } = self;
-        write!(
-            f,
-            "[{}:{line}:{column}]: `{fragment}…`",
-            file.as_ref().unwrap().to_string_lossy()
-        )
+        let file = file.as_ref().map_or("".into(), |f| f.to_string_lossy());
+        writeln!(f, "TOKENIZATION ERROR")?;
+        writeln!(f, "[{file}:{line}:{column}]: {description}")?;
+        writeln!(f, "⇒ `{fragment}`")?;
+        Ok(())
     }
 }
 
 impl<'i> From<VerboseError<Span<'i>>> for LexError {
     fn from(ve: VerboseError<Span<'i>>) -> Self {
-        // debug_assert!(ve.errors.len() == 1);
-        let (i, _kind) = ve.errors.first().expect("nonempty error list");
-        let fragment = i.fragment().trim_start();
-        let preview_len = fragment.len().min(5);
-        let fragment = fragment[..preview_len].to_string();
+        let (i, kind) = ve.errors.first().expect("nonempty error list");
+        let fragment = i.fragment();
+        const PREVIEW_LEN: usize = 5;
+        let preview_len = usize::min(fragment.len(), PREVIEW_LEN);
+        let ellipsis_indicator = if preview_len == PREVIEW_LEN {
+            '…'
+        } else {
+            '␃'
+        };
+        let fragment = format!("{}{}", &fragment[..preview_len], ellipsis_indicator);
         Self {
             file: None,
             line: i.location_line() as usize,
             column: i.get_column(), // TODO: use `i.get_utf8_column()` instead?
             fragment,
+            description: match kind {
+                nom::error::VerboseErrorKind::Context(msg) => msg.to_string(),
+                nom::error::VerboseErrorKind::Char(c) => format!("Expected character `{c}`"),
+                nom::error::VerboseErrorKind::Nom(e) => {
+                    format!("Parser `{}` failed to tokenize input", e.description())
+                }
+            },
         }
     }
 }
@@ -193,30 +142,34 @@ enum Quote {
 fn expr_tok(i: Span) -> Res<Tok> {
     let (i, _) = multispace0(i)?;
     alt((
-        int.map(Tok::Int),
-        sym.map(Tok::Sym),
-        var.map(Tok::Var),
-        value(Tok::OTripleQuote, tag("\"\"\"")),
-        value(Tok::OQuote, tag("\"")),
-        // Nested alt because max tuple size is 21.
+        // Nested `alt`s because max tuple size is 21.
         alt((
-            tag("[{").map(|_| Tok::OTxtInterp), // Keep this in here for error reporting purposes.
-            tag("][").map(|_| Tok::COBrack),
-            tag("[").map(|_| Tok::OBrack),
-            tag("]").map(|_| Tok::CBrack),
-            tag("{").map(|_| Tok::OBrace),
-            tag("}").map(|_| Tok::CBrace),
-            tag("(").map(|_| Tok::OParen),
-            tag(")").map(|_| Tok::CParen),
+            int.map(Tok::Int),
+            sym.map(Tok::Sym),
+            var.map(Tok::Var),
+            value(Tok::OTripleQuote, tag("\"\"\"")),
+            value(Tok::OQuote, tag("\"")),
         )),
-        tag("-").map(|_| Tok::Dash),
-        tag("|").map(|_| Tok::Pipe),
-        tag(",").map(|_| Tok::Comma),
-        tag(";").map(|_| Tok::Semicolon),
-        tag(SPREAD).map(|_| Tok::Spread),
-        tag("=").map(|_| Tok::Equal),
-        tag("~").map(|_| Tok::Tilde),
-        tag("::").map(|_| Tok::PathSep),
+        alt((
+            value(Tok::OTxtInterp, tag("[{")), // Keep this in here for error reporting purposes.
+            value(Tok::COBrack, tag("][")),
+            value(Tok::OBrack, tag("[")),
+            value(Tok::CBrack, tag("]")),
+            value(Tok::OBrace, tag("{")),
+            value(Tok::CBrace, tag("}")),
+            value(Tok::OParen, tag("(")),
+            value(Tok::CParen, tag(")")),
+        )),
+        alt((
+            value(Tok::Dash, tag("-")),
+            value(Tok::Pipe, tag("|")),
+            value(Tok::Comma, tag(",")),
+            value(Tok::Semicolon, tag(";")),
+            value(Tok::Spread, tag(SPREAD)),
+            value(Tok::Equal, tag("=")),
+            value(Tok::Tilde, tag("~")),
+            value(Tok::PathSep, tag("::")),
+        )),
     ))
     .parse(i)
 }
@@ -226,13 +179,14 @@ fn tokenize_impl<'i>(mut input: Span<'i>, ts: &mut Vec<At<Tok>>) -> Res<'i, ()> 
 
     while !input.is_empty() {
         let i = input;
+        let (i, _) = multispace0(i)?;
         let state = *stack
             .last()
             .expect("stack begins initialized with LexCtx::Expr");
 
         let (i, t) = match state {
             LexCtx::Expr => {
-                let (i, t) = expr_tok(input)?;
+                let (i, t) = context("Token in expression context", expr_tok)(input)?;
                 match t {
                     Tok::OQuote => stack.push(LexCtx::Quoted(Quote::One)),
                     Tok::OTripleQuote => stack.push(LexCtx::Quoted(Quote::Three)),
@@ -244,33 +198,46 @@ fn tokenize_impl<'i>(mut input: Span<'i>, ts: &mut Vec<At<Tok>>) -> Res<'i, ()> 
 
             LexCtx::Quoted(q) => {
                 let mut buf = String::new();
-                let (i, content) = recognize(many0(alt((
-                    match q {
-                        Quote::One => not(tag("\"")).and(anychar),
-                        Quote::Three => not(tag("\"\"\"")).and(anychar),
-                    },
-                    not(tag("[{")).and(anychar),
-                ))))
+                let (i, content) = context(
+                    "Text content",
+                    recognize(many0(
+                        not(alt((
+                            match q {
+                                Quote::One => tag("\""),
+                                Quote::Three => tag("\"\"\""),
+                            },
+                            tag("[{"),
+                        )))
+                        .and(anychar),
+                    )),
+                )
                 .parse(input)?;
                 buf.push_str(content.as_ref());
                 ts.push(Tok::TxtContent(buf).at(input));
                 input = i;
+
                 // Now parse escape or closing quote.
-                let (i, end) = alt((
-                    match q {
-                        Quote::One => value(Tok::CQuote, tag("\"")),
-                        Quote::Three => value(Tok::CTripleQuote, tag("\"\"\"")),
-                    },
-                    value(Tok::OTxtInterp, tag("[{")),
-                ))
+                let (i, end) = context(
+                    "Closing quote or escape",
+                    alt((
+                        match q {
+                            Quote::One => value(Tok::CQuote, tag("\"")),
+                            Quote::Three => value(Tok::CTripleQuote, tag("\"\"\"")),
+                        },
+                        value(Tok::OTxtInterp, tag("[{")),
+                    )),
+                )
                 .parse(i)?;
                 (i, end.at(input))
             }
             LexCtx::TxtInterp => {
                 let close_interp = value(Tok::CTxtInterp, tag("}]"));
-                alt((expr_tok, close_interp))
-                    .map(|t| t.at(input))
-                    .parse(i)?
+                context(
+                    "Expression token or closing template interpolation symbol `}]`",
+                    alt((close_interp, expr_tok)),
+                )
+                .map(|t| t.at(input))
+                .parse(i)?
             }
         };
 
@@ -319,13 +286,19 @@ pub fn tokenize<'i>(
 ) -> Result<Vec<At<Tok>>, LexError> {
     let input: Span = src.into();
     let mut ts = Vec::new();
-    tokenize_impl(input, &mut ts)
-        .finish()
-        .map_err(|e| LexError {
-            file: Some(filename),
-            ..LexError::from(e)
-        })?;
-    Ok(ts)
+    match tokenize_impl(input, &mut ts).finish() {
+        Ok((_, _)) => Ok(ts),
+        Err(e) => {
+            if e.errors.first().unwrap().0.fragment().is_empty() {
+                Ok(ts)
+            } else {
+                Err(LexError {
+                    file: Some(filename),
+                    ..LexError::from(e)
+                })
+            }
+        }
+    }
 }
 
 type RellogTokenFinder<'tokbuf> = TokenizedInput<&'tokbuf [At<Tok>], At<Tok>>;
@@ -419,7 +392,7 @@ mod block_tests {
         let src = r#" "BEFORE[{X}]AFTER" "#;
 
         let actual = tokenize(src, "blah.rellog".into())
-            .unwrap()
+            .unwrap_or_else(|e| panic!("{}", e))
             .into_iter()
             .map(At::value)
             .collect::<Vec<_>>();
