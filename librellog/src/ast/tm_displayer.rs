@@ -170,7 +170,7 @@ impl<'tm> TmDisplayer<'tm> {
                     // writeln!(f, "[{sym}")?;
                     // write!(f, "{}]", self.indent.dedented())?;
                 }
-                (s, Tm::Var(v)) if s.to_str().to_pascal_case() == v.to_str().as_ref() => {
+                (s, Tm::Var(v)) if s.to_str().to_pascal_case() == v.to_str().to_string() => {
                     write!(f, "[{v}]")?;
                     // writeln!(f, "[{v}")?;
                     // write!(f, "{}]", self.indent.dedented())?;
@@ -191,7 +191,7 @@ impl<'tm> TmDisplayer<'tm> {
                 (s1, Tm::Sym(s2)) if s1 == s2 => {
                     write!(f, "[{sym}]")?;
                 }
-                (s, Tm::Var(v)) if s.to_str().to_pascal_case() == v.to_str().as_ref() => {
+                (s, Tm::Var(v)) if s.to_str().to_pascal_case() == v.to_str().to_string() => {
                     write!(f, "[{v}]")?;
                 }
                 _ => write!(f, "[{sym} {}]", self.with_tm(tm.as_ref()))?,

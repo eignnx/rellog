@@ -1,0 +1,13 @@
+---
+source: librellog/src/lex/tests.rs
+expression: output
+input_file: librellog/src/lex/snapshot_tests/lex1.rellog
+---
+Ok(
+    [
+        OBrack@1:1,
+        Sym(Sym(mortal))@1:2,
+        Sym(Sym(socrates))@1:8,
+        CBrack@1:17,
+    ],
+)

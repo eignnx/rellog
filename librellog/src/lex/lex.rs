@@ -1,4 +1,4 @@
-use std::{fmt::Display, path::PathBuf, str::FromStr};
+use std::{assert_matches::debug_assert_matches, fmt::Display, path::PathBuf, str::FromStr};
 
 use crate::{
     data_structures::{Int, Sym, Var},
@@ -12,7 +12,7 @@ use nom::{
     combinator::{cut, fail, not, opt, recognize, value},
     error::{context, VerboseError},
     multi::many0,
-    sequence::{delimited, preceded, tuple},
+    sequence::{delimited, preceded, terminated, tuple},
     Finish, Parser,
 };
 use nom_i9n::{I9nInput, TokenizedInput};
@@ -147,7 +147,10 @@ fn expr_tok(i: Span) -> Res<Tok> {
             int.map(Tok::Int),
             sym.map(Tok::Sym),
             var.map(Tok::Var),
-            value(Tok::OTripleQuote, tag("\"\"\"")),
+            value(
+                Tok::OTripleQuote,
+                terminated(tag("\"\"\""), opt(alt((tag("\r\n"), tag("\n"))))),
+            ),
             value(Tok::OQuote, tag("\"")),
         )),
         alt((
@@ -187,49 +190,46 @@ fn tokenize_impl<'i>(mut input: Span<'i>, ts: &mut Vec<At<Tok>>) -> Res<'i, ()> 
         let (i, t) = match state {
             LexCtx::Expr => {
                 let (i, t) = context("Token in expression context", expr_tok)(input)?;
-                match t {
-                    Tok::OQuote => stack.push(LexCtx::Quoted(Quote::One)),
-                    Tok::OTripleQuote => stack.push(LexCtx::Quoted(Quote::Three)),
-                    _ => {}
-                }
-
                 (i, t.at(input))
             }
 
             LexCtx::Quoted(q) => {
                 let mut buf = String::new();
+                let close_quote = match q {
+                    Quote::One => |i| value(Tok::CQuote, tag("\"")).parse(i),
+                    Quote::Three => |i| {
+                        value(
+                            Tok::CTripleQuote,
+                            preceded(opt(alt((tag("\r\n"), tag("\n")))), tag("\"\"\"")),
+                        )
+                        .parse(i)
+                    },
+                };
+
                 let (i, content) = context(
                     "Text content",
                     recognize(many0(
-                        not(alt((
-                            match q {
-                                Quote::One => tag("\""),
-                                Quote::Three => tag("\"\"\""),
-                            },
-                            tag("[{"),
-                        )))
-                        .and(anychar),
+                        not(alt((&close_quote, value(Tok::OTxtInterp, tag("[{"))))).and(anychar),
                     )),
                 )
                 .parse(input)?;
+
                 buf.push_str(content.as_ref());
-                ts.push(Tok::TxtContent(buf).at(input));
+                if !buf.is_empty() {
+                    // Skip empty strings.
+                    ts.push(Tok::TxtContent(buf).at(input));
+                }
                 input = i;
 
                 // Now parse escape or closing quote.
                 let (i, end) = context(
                     "Closing quote or escape",
-                    alt((
-                        match q {
-                            Quote::One => value(Tok::CQuote, tag("\"")),
-                            Quote::Three => value(Tok::CTripleQuote, tag("\"\"\"")),
-                        },
-                        value(Tok::OTxtInterp, tag("[{")),
-                    )),
+                    alt((close_quote, value(Tok::OTxtInterp, tag("[{")))),
                 )
                 .parse(i)?;
                 (i, end.at(input))
             }
+
             LexCtx::TxtInterp => {
                 let close_interp = value(Tok::CTxtInterp, tag("}]"));
                 context(
@@ -242,26 +242,26 @@ fn tokenize_impl<'i>(mut input: Span<'i>, ts: &mut Vec<At<Tok>>) -> Res<'i, ()> 
         };
 
         match &t.value {
-            // Tok::OQuote => {
-            //     debug_assert_matches!(stack.last(), Some(LexCtx::Expr | LexCtx::TxtInterp) | None);
-            //     stack.push(LexCtx::Quoted(Quote::One));
-            // }
+            Tok::OQuote => {
+                debug_assert_matches!(stack.last(), Some(LexCtx::Expr | LexCtx::TxtInterp) | None);
+                stack.push(LexCtx::Quoted(Quote::One));
+            }
             Tok::CQuote => {
                 let Some(LexCtx::Quoted(Quote::One)) = stack.pop() else {
                     return context("Mismatched quote mark", fail).parse(i);
                 };
             }
-            // Tok::OTripleQuote => {
-            //     debug_assert_matches!(stack.last(), Some(LexCtx::Expr | LexCtx::TxtInterp) | None);
-            //     stack.push(LexCtx::Quoted(Quote::Three));
-            // }
+            Tok::OTripleQuote => {
+                debug_assert_matches!(stack.last(), Some(LexCtx::Expr | LexCtx::TxtInterp) | None);
+                stack.push(LexCtx::Quoted(Quote::Three));
+            }
             Tok::CTripleQuote => {
                 let Some(LexCtx::Quoted(Quote::Three)) = stack.pop() else {
                     return context("Mismatched triple quote mark", fail).parse(i);
                 };
             }
             Tok::OTxtInterp => {
-                debug_assert!(matches!(stack.last(), Some(LexCtx::Quoted(_))));
+                debug_assert_matches!(stack.last(), Some(LexCtx::Quoted(_)));
                 stack.push(LexCtx::TxtInterp);
             }
             Tok::CTxtInterp => {

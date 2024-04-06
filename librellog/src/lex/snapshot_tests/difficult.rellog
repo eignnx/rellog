@@ -1,0 +1,5 @@
+[provide_option [next_rel_def {}][opt [decorates [ClauseHead][ClauseBody]]][MacroHead]]
+    - [tm MacroHead][Txt]
+    - [io_write "Could not provide option for next_rel_def: "][stream stderr]
+    - [io_writeln Txt][stream stderr]
+    - [false]

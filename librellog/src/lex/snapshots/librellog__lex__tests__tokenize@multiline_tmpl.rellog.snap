@@ -1,0 +1,16 @@
+---
+source: librellog/src/lex/tests.rs
+expression: output
+input_file: librellog/src/lex/snapshot_tests/multiline_tmpl.rellog
+---
+Ok(
+    [
+        OTripleQuote@1:1,
+        TxtContent("Once upon a time, there was a ")@2:1,
+        OTxtInterp@2:31,
+        Spread@2:33,
+        Var(Var(Noun$))@2:35,
+        CTxtInterp@2:39,
+        CTripleQuote@2:41,
+    ],
+)

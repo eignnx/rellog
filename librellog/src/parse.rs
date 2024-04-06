@@ -540,11 +540,8 @@ pub fn module(ts: Toks) -> Res<Module> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        ast::{tm_displayer::TmDisplayer, txt::Segment},
-        lex::tokenize,
-        utils::my_nom::Span,
-    };
+    use crate::{ast::tm_displayer::TmDisplayer, lex::tokenize, utils::my_nom::Span};
+    use insta::assert_snapshot;
     use pretty_assertions::assert_eq;
     use rpds::vector;
 
@@ -688,8 +685,7 @@ mod tests {
         let formatted = TmDisplayer::default()
             .with_tm(&parse_to_tm(src))
             .to_string();
-
-        assert_eq!(formatted, src);
+        assert_snapshot!(formatted);
     }
 
     #[test]
@@ -698,8 +694,7 @@ mod tests {
         let src = r#"{X ...Xs}"#;
         let tm = parse_to_tm(src);
         let formatted = TmDisplayer::default().with_tm(&tm).to_string();
-
-        assert_eq!(formatted, src);
+        assert_snapshot!(formatted);
     }
 
     #[test]
@@ -707,16 +702,7 @@ mod tests {
         crate::init_interner();
         let src = r#"  "asdf[{Letter}]qwer"  "#;
         let actual = parse_to_tm(src);
-        dbg!(&actual);
-        let expected = Tm::TxtSeg(Segment::from_string_and_tail(
-            "asdf",
-            Tm::TxtCons(
-                Tm::Var(Var::from_source("Letter", None)).into(),
-                Tm::TxtSeg(Segment::from_string_and_tail("qwer", Tm::Nil.into())).into(),
-            )
-            .into(),
-        ));
-
-        assert_eq!(actual, expected);
+        let formatted = TmDisplayer::default().with_tm(&actual).to_string();
+        assert_snapshot!(formatted);
     }
 }

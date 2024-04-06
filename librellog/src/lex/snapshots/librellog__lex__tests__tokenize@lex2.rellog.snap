@@ -1,0 +1,12 @@
+---
+source: librellog/src/lex/tests.rs
+expression: output
+input_file: librellog/src/lex/snapshot_tests/lex2.rellog
+---
+Ok(
+    [
+        OQuote@1:1,
+        TxtContent("A simple string")@1:2,
+        CQuote@1:17,
+    ],
+)

@@ -19,7 +19,7 @@ use super::{sym, tok, var, Error, Res, Toks};
 enum TmplSegment {
     /// A run of literal text in a text template.
     ///
-    /// ```ignore
+    /// ```text
     /// "abc[{H I J}]xyz[{..Rest}]"
     ///  ^^^         ^^^
     ///  ex1         ex2
@@ -27,23 +27,23 @@ enum TmplSegment {
     TxtContent(String),
     /// An interpolation of a single character or variable. Does *not* include the spread operator.
     ///
-    /// ```ignore
+    /// ```text
     /// "abc[{Letter}]xyz[{..Rest}]"
     ///     ^^^^^^^^^^
     /// ```
     ///
-    /// ```ignore
+    /// ```text
     /// "abc[{D E F}]g" == "abc[{D}][{E}][{F}]g"
     /// ```
     CharInterp(Tm),
     /// An interpolation which reprents the tail of the text template.
     ///
-    /// ```ignore
+    /// ```text
     /// "abc[{..Rest}]"
     ///       ^^^^^^^
     /// ```
     ///
-    /// ```ignore
+    /// ```text
     /// "abc[{D E F ..Rest}]" == "abc[{D}][{E}][{F}][{..Rest}]"
     ///             ^^^^^^                          ^^^^^^^^^^
     /// ```

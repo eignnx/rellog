@@ -68,7 +68,7 @@ pub enum Tok {
     CTripleQuote,
 
     /// A run of literal characters contained in a text template literal.
-    /// ```ignore
+    /// ```text
     /// "abcdefg[{H I J}]klmnop[{..Rest}]"
     ///  ^^^^^^^         ^^^^^^
     ///  ex1             ex2
@@ -119,11 +119,17 @@ impl fmt::Display for Tok {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct At<T> {
     pub value: T,
     pub line: u32,
     pub col: usize,
+}
+
+impl<T: fmt::Debug> fmt::Debug for At<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}@{}:{}", self.value, self.line, self.col)
+    }
 }
 
 impl<T> At<T> {

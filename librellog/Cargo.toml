@@ -20,4 +20,5 @@ heck = "0.4.1"
 
 [dev-dependencies]
 assert2 = "0.3.6"
+insta = { version = "1.38.0", features = ["glob"] }
 pretty_assertions = "1.2.1"
