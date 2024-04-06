@@ -1,9 +1,9 @@
 use nom::{
     branch::alt,
-    combinator::{cut, fail},
+    combinator::cut,
     error::context,
     multi::{many0, many1},
-    sequence::{delimited, preceded, terminated},
+    sequence::{delimited, preceded},
     Parser,
 };
 
@@ -14,7 +14,7 @@ use crate::{
     lex::tok::Tok::{self, *},
 };
 
-use super::{sym, tm, tok, var, Error, Res, Toks};
+use super::{sym, tok, var, Error, Res, Toks};
 
 enum TmplSegment {
     /// A run of literal text in a text template.
