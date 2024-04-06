@@ -40,7 +40,7 @@ impl Repl {
         let mut session = Session::new(".").unwrap_or_else(|e| {
             println!(
                 "{}",
-                Color::Red.paint(format!("# Error creating session: {e}"))
+                Color::Red.paint(format!("# Error creating session:\n{e}"))
             );
             println!("{}", Color::Red.paint("# Exiting..."));
             std::process::exit(1);

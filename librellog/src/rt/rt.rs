@@ -307,7 +307,7 @@ fn test_runtime() {
 ";
 
     let tokens = lex::tokenize(src, "".into()).unwrap();
-    let module = parse::entire_module(tokens[..].into()).unwrap();
+    let module = parse::entire_module(tokens[..].into(), "<test_runtime>".into()).unwrap();
 
     let rt = Rt::new(module);
 

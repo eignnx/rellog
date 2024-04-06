@@ -76,8 +76,14 @@ impl Default for Tm {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct RcTm(Rc<Tm>);
+
+impl fmt::Debug for RcTm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", &self.0)
+    }
+}
 
 impl RcTm {
     pub fn try_as_list(&self) -> Option<(Vector<RcTm>, Option<Var>)> {
@@ -594,8 +600,9 @@ impl Module {
         filename: PathBuf,
         token_buf: &mut Vec<At<Tok>>,
     ) -> Result<Module, Error<'_>> {
-        let tokens = lex::tokenize_into(token_buf, LocatedSpan::new(src.as_ref()), filename)?;
-        parse::entire_module(tokens)
+        let tokens =
+            lex::tokenize_into(token_buf, LocatedSpan::new(src.as_ref()), filename.clone())?;
+        parse::entire_module(tokens, Some(filename))
     }
 }
 

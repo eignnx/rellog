@@ -1,7 +1,7 @@
 use std::{
     cell::RefCell,
     fmt::{self, Display, Formatter},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use nom::{
@@ -54,9 +54,9 @@ impl<'ts> From<LexError> for Error<'ts> {
 
 impl<'ts> Display for Error<'ts> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let user_input_buf = PathBuf::from("<unknown_src>");
         let fname_borrow = self.fname.borrow();
-        let fname = fname_borrow.as_ref().unwrap_or(&user_input_buf);
+        let binding = PathBuf::from("<unknown_src>");
+        let fname = fname_borrow.as_ref().unwrap_or(&binding);
 
         for (i, problem) in &self.stack {
             let loc = match i {
@@ -141,8 +141,11 @@ impl<'ts> ParseError<Toks<'ts>> for Error<'ts> {
     }
 }
 
-pub fn entire_module(ts: Toks) -> Result<Module, Error> {
-    let (_ts, m) = all_consuming(module)(ts).finish()?;
+pub fn entire_module(ts: Toks, fname: Option<impl AsRef<Path>>) -> Result<Module, Error> {
+    let (_ts, m) = all_consuming(module)(ts).finish().map_err(|e| {
+        *e.fname.borrow_mut() = fname.map(|p| p.as_ref().into());
+        e
+    })?;
     Ok(m)
 }
 
@@ -537,7 +540,11 @@ pub fn module(ts: Toks) -> Res<Module> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ast::tm_displayer::TmDisplayer, lex::tokenize, utils::my_nom::Span};
+    use crate::{
+        ast::{tm_displayer::TmDisplayer, txt::Segment},
+        lex::tokenize,
+        utils::my_nom::Span,
+    };
     use pretty_assertions::assert_eq;
     use rpds::vector;
 
@@ -693,5 +700,23 @@ mod tests {
         let formatted = TmDisplayer::default().with_tm(&tm).to_string();
 
         assert_eq!(formatted, src);
+    }
+
+    #[test]
+    fn txt_tmpl_with_interpolation() {
+        crate::init_interner();
+        let src = r#"  "asdf[{Letter}]qwer"  "#;
+        let actual = parse_to_tm(src);
+        dbg!(&actual);
+        let expected = Tm::TxtSeg(Segment::from_string_and_tail(
+            "asdf",
+            Tm::TxtCons(
+                Tm::Var(Var::from_source("Letter", None)).into(),
+                Tm::TxtSeg(Segment::from_string_and_tail("qwer", Tm::Nil.into())).into(),
+            )
+            .into(),
+        ));
+
+        assert_eq!(actual, expected);
     }
 }

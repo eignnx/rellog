@@ -10,7 +10,7 @@ use super::{
 };
 
 /// Newtype wrapper for implementing PartialOrd, Ord, PartialEq, Eq, and Hash.
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Segment(CharList<RcTm>);
 
 impl Deref for Segment {
@@ -23,6 +23,30 @@ impl Deref for Segment {
 impl<T: Into<CharList<RcTm>>> From<T> for Segment {
     fn from(value: T) -> Self {
         Segment(value.into())
+    }
+}
+
+impl fmt::Debug for Segment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let seg = self.segment_as_str();
+        let tail = if self.segment_tail().is_nil() {
+            "".to_string()
+        } else {
+            format!("->{:?}", self.segment_tail())
+        };
+        write!(f, "\"{seg}\"{tail}")
+    }
+}
+
+impl fmt::Display for Segment {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let seg = self.segment_as_str();
+        let tail = if self.segment_tail().is_nil() {
+            "".to_string()
+        } else {
+            format!("[{{..{}}}]", self.segment_tail())
+        };
+        write!(f, "\"{seg}{tail}\"")
     }
 }
 
@@ -287,7 +311,7 @@ fn cmp_text_content(
         }
 
         if !seg_a.is_empty() && !seg_b.is_empty() {
-            return Ok(seg_a.cmp(seg_b));
+            return Ok(seg_a.cmp(seg_b).then(tail_a.cmp(tail_b)));
         }
 
         if seg_a.is_empty() {

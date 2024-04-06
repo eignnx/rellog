@@ -27,16 +27,16 @@ fn main() {
             load_std_lib = false;
         } else {
             let fname = arg;
-            if let Err(_err) = repl.load_file(fname.clone()) {
-                // println!("Error loading file {}: {}", fname, err);
+            if let Err(err) = repl.load_file(fname.clone()) {
+                println!("Error loading file {}: {}", fname, err);
             }
         }
     }
 
     if load_std_lib {
         let std_lib = PathBuf::from(STD_LIB_ROOT).join("std.rellog");
-        if let Err(_err) = repl.load_file(&std_lib) {
-            // println!("Error loading standard library: {}", err);
+        if let Err(err) = repl.load_file(&std_lib) {
+            println!("Error loading standard library: {}", err);
         }
     }
 
