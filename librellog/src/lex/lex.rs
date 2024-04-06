@@ -24,7 +24,7 @@ fn unquoted_sym(i: Span) -> Res<Sym> {
         satisfy(|c| c.is_alphabetic() && c.is_lowercase()),
         take_while(|c: char| (c.is_alphabetic() && c.is_lowercase()) || c.is_numeric() || c == '_'),
     )))
-    .map(|span: Span| -> Sym { span.fragment().into() })
+    .map(|span: Span| -> Sym { Sym::from(*span.fragment()) })
     .parse(i)
 }
 
@@ -34,7 +34,7 @@ fn quoted_sym(i: Span) -> Res<Sym> {
         recognize(take_while(|c: char| c != '\'')),
         tag("'"),
     )
-    .map(|span: Span| -> Sym { span.fragment().into() })
+    .map(|span: Span| -> Sym { Sym::from(*span.fragment()) })
     .parse(i)
 }
 
@@ -43,11 +43,11 @@ pub fn sym(i: Span) -> Res<Sym> {
 }
 
 pub fn var(i: Span) -> Res<Var> {
-    let name_parser = recognize(
+    let mut name_parser = recognize(
         satisfy(|c| c.is_uppercase() || c == '_').and(many0(satisfy(|c| c.is_alphanumeric()))),
     );
 
-    let nat_sym = take_while1(char::is_numeric).map(|i: Span| Sym::from(i));
+    let nat_sym = take_while1(char::is_numeric).map(|i: Span| Sym::from(*i.fragment()));
 
     let suffix_parser = preceded(
         tag(Var::SUFFIX_SEPARATOR),
@@ -57,10 +57,9 @@ pub fn var(i: Span) -> Res<Var> {
         ),
     );
 
-    name_parser
-        .and(opt(suffix_parser))
-        .map(|(name, suffix)| Var::from_source(name, suffix))
-        .parse(i)
+    let (i, name) = name_parser.parse(i)?;
+    let (i, suffix) = opt(suffix_parser).parse(i)?;
+    Ok((i, Var::from_source(*name.fragment(), suffix)))
 }
 
 fn int(i: Span) -> Res<Int> {
@@ -181,16 +180,15 @@ fn tokenize_impl<'i>(mut input: Span<'i>, ts: &mut Vec<At<Tok>>) -> Res<'i, ()> 
     let mut stack: Vec<LexCtx> = vec![LexCtx::Expr];
 
     while !input.is_empty() {
-        let i = input;
-        let (i, _) = multispace0(i)?;
         let state = *stack
             .last()
             .expect("stack begins initialized with LexCtx::Expr");
 
         let (i, t) = match state {
             LexCtx::Expr => {
-                let (i, t) = context("Token in expression context", expr_tok)(input)?;
-                (i, t.at(input))
+                let (i_after_ws, _) = multispace0(input)?;
+                let (i, t) = context("Token in expression context", expr_tok)(i_after_ws)?;
+                (i, t.at(i_after_ws))
             }
 
             LexCtx::Quoted(q) => {
@@ -231,13 +229,14 @@ fn tokenize_impl<'i>(mut input: Span<'i>, ts: &mut Vec<At<Tok>>) -> Res<'i, ()> 
             }
 
             LexCtx::TxtInterp => {
+                let (i_after_ws, _) = multispace0(input)?;
                 let close_interp = value(Tok::CTxtInterp, tag("}]"));
                 context(
                     "Expression token or closing template interpolation symbol `}]`",
                     alt((close_interp, expr_tok)),
                 )
-                .map(|t| t.at(input))
-                .parse(i)?
+                .map(|t| t.at(i_after_ws))
+                .parse(i_after_ws)?
             }
         };
 

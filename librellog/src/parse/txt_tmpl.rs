@@ -3,7 +3,7 @@ use nom::{
     combinator::{cut, fail},
     error::context,
     multi::{many0, many1},
-    sequence::{delimited, preceded},
+    sequence::{delimited, preceded, terminated},
     Parser,
 };
 
@@ -14,7 +14,7 @@ use crate::{
     lex::tok::Tok::{self, *},
 };
 
-use super::{sym, tok, var, Error, Res, Toks};
+use super::{sym, tm, tok, var, Error, Res, Toks};
 
 enum TmplSegment {
     /// A run of literal text in a text template.
@@ -72,17 +72,19 @@ fn single_char_sym(ts: Toks) -> Res<Sym> {
 
 fn char_in_list_of_chars_interp(ts: Toks) -> Res<TmplSegment> {
     alt((
-        var.map(Tm::Var).map(TmplSegment::CharInterp),
-        single_char_sym.map(Tm::Sym).map(TmplSegment::CharInterp),
-        preceded(tok(Spread), var.map(Tm::Var).map(TmplSegment::TailInterp)),
         preceded(
-            tok(OQuote),
-            cut(context(
-                "Only single characters or variables representing them may be \
-                embedded in `[{...}]` blocks in text templates.",
-                fail,
+            tok(Spread),
+            alt((
+                (var.map(Tm::Var).map(TmplSegment::TailInterp)),
+                txt.map(TmplSegment::TailInterp),
+                cut(context(
+                    "spread expression: Only variables or text segments may be embedded in `[{… ..Tail}]` blocks in text templates.",
+                    |i| Err(nom::Err::Failure(Error::with_message(i, "Expected variable or text segment.".to_owned())))
+                ))
             )),
         ),
+        var.map(Tm::Var).map(TmplSegment::CharInterp),
+        single_char_sym.map(Tm::Sym).map(TmplSegment::CharInterp),
     ))
     .parse(ts)
 }
@@ -111,14 +113,14 @@ fn inner_txt_tmpl(ts: Toks) -> Res<Tm> {
 
     let tail = if let Some((i, TmplSegment::TailInterp(tail_interp))) = tail_interps.next() {
         if tail_interps.next().is_some() {
-            return Err(nom::Err::Error(Error::with_message(
+            return Err(nom::Err::Failure(Error::with_message(
                 ts,
                 "Only one tail interpolation (`[{..Tail}]`) segment is allowed in a text template."
                     .to_owned(),
             )));
         }
         if i != sections.iter().flatten().count() - 1 {
-            return Err(nom::Err::Error(Error::with_message(
+            return Err(nom::Err::Failure(Error::with_message(
                 ts,
                 "The tail interpolation segment (`[{..Tail}]`) must be the last \
                 segment in a text template."
@@ -133,6 +135,7 @@ fn inner_txt_tmpl(ts: Toks) -> Res<Tm> {
     let tmpl = sections
         .into_iter()
         .flatten()
+        .filter(|seg| !matches!(seg, TmplSegment::TailInterp(_)))
         .rfold(tail, |acc, seg| match seg {
             TmplSegment::TxtContent(s) => Tm::TxtSeg(Segment::from_string_and_tail(s, acc.into())),
             TmplSegment::CharInterp(tm) => Tm::TxtCons(tm.into(), acc.into()),

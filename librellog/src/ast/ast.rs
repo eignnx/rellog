@@ -339,7 +339,7 @@ impl From<Rel> for RcTm {
 
 impl From<&Tok> for RcTm {
     fn from(value: &Tok) -> Self {
-        Self(Rc::new(Tm::Sym(value.to_string().into())))
+        Self(Rc::new(Tm::Sym(Sym::from(value.to_string().as_ref()))))
     }
 }
 
@@ -454,7 +454,7 @@ pub const DEFERENCE_TABLE: &[BinOpSymbol] = &[
 
 impl From<BinOpSymbol> for Tm {
     fn from(value: BinOpSymbol) -> Self {
-        Tm::Sym(IStr::from(value.to_string()))
+        Tm::Sym(Sym::from(value.to_string().as_ref()))
     }
 }
 
@@ -538,8 +538,11 @@ impl From<&Sig> for Tm {
             .iter()
             .copied()
             .map(|sym| {
-                let pascal = sym.to_str().to_pascal_case();
-                (sym, RcTm::from(Tm::Var(Var::from_source(pascal, None))))
+                let pascal = sym.to_str().to_pascal_case().to_string();
+                (
+                    sym,
+                    RcTm::from(Tm::Var(Var::from_source(pascal.as_str(), None))),
+                )
             })
             .collect();
         Tm::Rel(rel)
@@ -549,7 +552,8 @@ impl From<&Sig> for Tm {
 impl fmt::Display for Sig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for key in &self.0 {
-            write!(f, "[{}]", key.to_str().to_pascal_case())?;
+            let key = key.to_str().to_pascal_case().to_string();
+            write!(f, "[{}]", key)?;
         }
         Ok(())
     }

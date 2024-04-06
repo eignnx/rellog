@@ -29,6 +29,8 @@ use crate::{
 
 use self::txt_tmpl::txt;
 
+#[cfg(test)]
+mod tests;
 mod txt_tmpl;
 
 type Res<'ts, T> = IResult<Toks<'ts>, T, Error<'ts>>;
@@ -287,11 +289,12 @@ fn attr(ts: Toks) -> Res<(Sym, RcTm)> {
                 tm,
             )),
         )),
-        // [AttrVarSameName] or [AttrVarSameName.3] or [AttrVarSameName.New]
+        // [AttrVarSameName] or [AttrVarSameName.3] or [AttrVarSameName.new]
         var.map(|v| {
             // `lower` created on separate line so INTERNER isn't shared AND mutated.
-            let lower = format!("{}", heck::AsSnakeCase(&v.name.to_str()[..]));
-            (lower.into(), Tm::Var(v))
+            let name = v.name.to_str().to_string();
+            let lower = Sym::from(format!("{}", heck::AsSnakeCase(name)).as_ref());
+            (lower, Tm::Var(v))
         }),
         // [attr_sym_same_name]
         sym.map(|s| (s, Tm::Sym(s))),
@@ -535,174 +538,4 @@ pub fn module(ts: Toks) -> Res<Module> {
             m
         })
         .parse(ts)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{ast::tm_displayer::TmDisplayer, lex::tokenize, utils::my_nom::Span};
-    use insta::assert_snapshot;
-    use pretty_assertions::assert_eq;
-    use rpds::vector;
-
-    #[track_caller]
-    fn parse_to_tm(src: &'static str) -> Tm {
-        let tokens = tokenize(Span::from(src), "blah.rellog".into()).unwrap();
-        let (rest, t) = tm.parse(tokens[..].into()).unwrap();
-
-        assert!(
-            rest.is_empty(),
-            "\nCould not parse entire input: ```\n{src}\n```\n\
-             Remaining input begins with: [{}]\n",
-            rest.iter()
-                .take(5)
-                .map(|tok| format!("`{}`", tok.as_ref()))
-                .collect::<Vec<_>>()
-                .join(", "),
-        );
-
-        t
-    }
-
-    #[test]
-    fn simple_nested_relation_tm() {
-        crate::init_interner();
-        let src = r#"[goal [List][Pred]][initial Sublist][final empty_list]"#;
-        let actual = parse_to_tm(src);
-
-        let expected = Tm::Rel(
-            vec![
-                (
-                    "goal".into(),
-                    Tm::Rel(
-                        vec![
-                            (
-                                "list".into(),
-                                Tm::Var(Var::from_source("List", None)).into(),
-                            ),
-                            (
-                                "pred".into(),
-                                Tm::Var(Var::from_source("Pred", None)).into(),
-                            ),
-                        ]
-                        .into_iter()
-                        .collect(),
-                    )
-                    .into(),
-                ),
-                (
-                    "initial".into(),
-                    Tm::Var(Var::from_source("Sublist", None)).into(),
-                ),
-                ("final".into(), Tm::Sym("empty_list".into()).into()),
-            ]
-            .into_iter()
-            .collect(),
-        );
-
-        assert_eq!(actual, expected, "Input was {:?}", src);
-    }
-
-    #[test]
-    fn simple_block() {
-        crate::init_interner();
-        let src = "
-    - [Blah]
-    - [Blah]
-    - [Blah]\n";
-
-        let actual = parse_to_tm(src);
-
-        let blah: RcTm = Tm::Rel(
-            vec![(
-                "blah".into(),
-                Tm::Var(Var::from_source("Blah", None)).into(),
-            )]
-            .into_iter()
-            .collect(),
-        )
-        .into();
-
-        let expected = Tm::Block(Dash, vector![blah.clone(), blah.clone(), blah.clone()]);
-
-        assert_eq!(actual, expected, "Input was {:?}", src);
-    }
-
-    #[test]
-    fn nested_block() {
-        crate::init_interner();
-        let src = "
-    - [Blah]
-    -
-        | [Blah]
-        | [Blah]
-    - [Blah]\n";
-
-        let actual = parse_to_tm(src);
-
-        let blah: RcTm = Tm::Rel(
-            vec![(
-                "blah".into(),
-                Tm::Var(Var::from_source("Blah", None)).into(),
-            )]
-            .into_iter()
-            .collect(),
-        )
-        .into();
-
-        let expected = Tm::Block(
-            Dash,
-            vector![
-                blah.clone(),
-                Tm::Block(Pipe, vector![blah.clone(), blah.clone()]).into(),
-                blah.clone()
-            ],
-        );
-
-        assert_eq!(actual, expected, "Input was {:?}", src);
-    }
-
-    #[test]
-    fn empty_list() {
-        crate::init_interner();
-        assert_eq!(parse_to_tm("{}"), Tm::Nil);
-    }
-
-    #[test]
-    fn singleton_list() {
-        crate::init_interner();
-        assert_eq!(
-            parse_to_tm("{123}"),
-            Tm::Cons(Tm::Int(123.into()).into(), Tm::Nil.into())
-        );
-    }
-
-    #[test]
-    fn multi_element_list() {
-        crate::init_interner();
-        let src = r#"{123 "asdf" {} [aardvark][Zebra] socrates Unknown {1 2 3}}"#;
-
-        let formatted = TmDisplayer::default()
-            .with_tm(&parse_to_tm(src))
-            .to_string();
-        assert_snapshot!(formatted);
-    }
-
-    #[test]
-    fn list_with_spread() {
-        crate::init_interner();
-        let src = r#"{X ...Xs}"#;
-        let tm = parse_to_tm(src);
-        let formatted = TmDisplayer::default().with_tm(&tm).to_string();
-        assert_snapshot!(formatted);
-    }
-
-    #[test]
-    fn txt_tmpl_with_interpolation() {
-        crate::init_interner();
-        let src = r#"  "asdf[{Letter}]qwer"  "#;
-        let actual = parse_to_tm(src);
-        let formatted = TmDisplayer::default().with_tm(&actual).to_string();
-        assert_snapshot!(formatted);
-    }
 }

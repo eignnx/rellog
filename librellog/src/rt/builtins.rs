@@ -16,8 +16,7 @@ use crate::{
         txt::{Segment, TxtErr},
         Clause, RcTm, Rel, Sig, Tm,
     },
-    data_structures::{Int, Var},
-    interner::IStr,
+    data_structures::{Int, Sym, Var},
     lex::{self, tok::Tok},
     parse,
     rt::{
@@ -143,7 +142,7 @@ impl BuiltinsMap {
             ) -> Box<dyn SolnStream + 'state>
             + 'static,
     ) {
-        let sig: Sig = sig.iter().map(|s| s.into()).collect();
+        let sig: Sig = sig.iter().map(|s| Sym::from(*s)).collect();
 
         self.0.insert(
             sig.clone(),
@@ -510,12 +509,12 @@ impl BuiltinsMap {
             match (pascal_case.as_ref(), snake_case.as_ref()) {
                 (Tm::Sym(pc), _) => {
                     let lower = format!("{}", heck::AsSnakeCase(&pc.to_str()[..]));
-                    let lower_sym = Tm::Sym(lower.into()).into();
+                    let lower_sym = Tm::Sym(Sym::from(lower.as_ref())).into();
                     soln_stream::unifying(u, &lower_sym, snake_case)
                 }
                 (_, Tm::Sym(sc)) => {
                     let lower = format!("{}", heck::AsPascalCase(&sc.to_str()[..]));
-                    let lower_sym = Tm::Sym(lower.into()).into();
+                    let lower_sym = Tm::Sym(Sym::from(lower.as_ref())).into();
                     soln_stream::unifying(u, &lower_sym, pascal_case)
                 }
                 _ => soln_stream::error(Err::GenericError {
@@ -1263,7 +1262,7 @@ impl BuiltinsMap {
                         ]).into(),
                     Tm::Block(f, members) => tm!([block
                         tm!([functor
-                                Tm::Sym(IStr::from(f.to_string())).into()
+                                Tm::Sym(Sym::from(f.to_string().as_ref())).into()
                             ][members
                                 RcTm::list_from_iter(members.iter().map(reify))
                             ]).into()
