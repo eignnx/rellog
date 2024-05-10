@@ -12,6 +12,13 @@ use crate::{
     tm,
 };
 
+const DEBUG_MACROS: Option<&'static str> = option_env!("DEBUG_MACROS");
+
+#[inline]
+fn debug_macros() -> bool {
+    matches!(DEBUG_MACROS, Some("true" | "TRUE" | "1" | "yes" | "y"))
+}
+
 pub struct Session {
     pub rt: Rt,
     pub macro_rt: Rt,
@@ -45,10 +52,8 @@ impl Session {
         self.rt.solve_query(query, u, td)
     }
 
-    const DEBUG_MACROS: bool = false;
-
     pub fn load_file(&mut self, path: PathBuf) -> rt::Res<(usize, usize)> {
-        if Self::DEBUG_MACROS {
+        if debug_macros() {
             self.macro_rt.debug_mode.set(true);
             self.macro_rt
                 .debugger
@@ -152,14 +157,8 @@ fn process_soln(
                 })?;
 
         rel_match!(clause_as_rel, {
-            [fact = rel_to_assert] => {
-                assert_fact_clause(dir, new_kb, rel_to_assert)?;
-                Ok(())
-            },
-            [head = head_tm][body = body_tm] => {
-                assert_head_body_clause(dir, new_kb, head_tm, body_tm)?;
-                Ok(())
-            },
+            [fact = rel_to_assert] => assert_fact_clause(dir, new_kb, rel_to_assert),
+            [head = head_tm][body = body_tm] => assert_head_body_clause(dir, new_kb, head_tm, body_tm),
             else => {
                 Err(rt::Err::MacroImplemenationError {
                     macro_name: dir.to_string(),
@@ -236,9 +235,9 @@ impl rt::breakpoint::Breakpoint for MacroDebugger {
         loop {
             eprint!("[macro debugger]=> ");
             std::io::stdin().read_line(&mut src_buf).unwrap();
-            let src_buf = src_buf.trim();
+            let cmd = src_buf.trim();
 
-            match src_buf {
+            match cmd {
                 "" => {
                     // Step.
                     break;
@@ -252,10 +251,17 @@ impl rt::breakpoint::Breakpoint for MacroDebugger {
                     eprintln!("Exiting...");
                     std::process::exit(0);
                 }
+                "?" | "help" | "h" => {
+                    eprintln!("Commands:");
+                    eprintln!("  <Enter> - Step");
+                    eprintln!("  q - Quit debugger");
+                    eprintln!("  x - Exit");
+                }
                 _ => {
-                    eprintln!("Command not recognized: {}", src_buf);
+                    eprintln!("Command not recognized: {}", cmd);
                 }
             }
+            src_buf.clear();
         }
 
         let query = rt.current_query();

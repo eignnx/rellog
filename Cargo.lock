@@ -223,17 +223,6 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "char-list"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a021510f4b204c06fca2e78761ec81aa4f434a84fb22b8ad383f67a365b3ef16"
-dependencies = [
- "embed-doc-image",
- "front-vec",
- "tracing",
-]
-
-[[package]]
-name = "char-list"
 version = "0.4.1"
 dependencies = [
  "assert2",
@@ -625,7 +614,7 @@ name = "librellog"
 version = "0.1.0"
 dependencies = [
  "assert2",
- "char-list 0.4.0",
+ "char-list",
  "heck",
  "insta",
  "lasso",
@@ -1407,7 +1396,7 @@ checksum = "e51733f11c9c4f72aa0c160008246859e340b00807569a0da0e7a1079b27ba85"
 
 [[package]]
 name = "unifier_set"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "dot_graph",
  "rpds 0.12.0",

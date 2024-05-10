@@ -1,5 +1,5 @@
 use super::*;
-use std::{fmt, iter};
+use std::iter;
 
 mod graph_viz;
 
@@ -45,17 +45,17 @@ impl ClassifyTerm<&'static str> for Term {
 }
 
 impl DirectChildren<&'static str> for Term {
-    fn direct_children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self> + 'a> {
+    fn direct_children<'a>(&'a self) -> Box<dyn Iterator<Item = Self> + 'a> {
         match self {
             Var(_) => Box::new(iter::empty()),
-            Pred(_, cs) => Box::new(cs.iter()),
+            Pred(_, cs) => Box::new(cs.iter().cloned()),
         }
     }
 
-    fn map_direct_children<'a>(&'a self, f: impl FnMut(&'a Self) -> Self + 'a) -> Self {
+    fn map_direct_children(&self, f: impl FnMut(&Self) -> Self) -> Self {
         match self {
             Var(_) => self.clone(),
-            Pred(h, cs) => Pred(h.clone(), cs.iter().map(f).collect()),
+            Pred(h, cs) => Pred(h, cs.iter().map(f).collect()),
         }
     }
 }
@@ -214,7 +214,7 @@ fn reify_term() {
 
 #[test]
 fn variables_of_var() {
-    let vs = Var("X").variables().copied().collect::<Vec<&str>>();
+    let vs = Var("X").variables().collect::<Vec<&str>>();
     assert_eq!(&vs, &["X"]);
 }
 
@@ -228,7 +228,7 @@ fn variables_of_compound_term() {
         vec![x.clone(), Pred("equiv", vec![y.clone(), y.clone()])],
     );
 
-    let vs = term.variables().copied().collect::<Vec<&str>>();
+    let vs = term.variables().collect::<Vec<&str>>();
 
     assert_eq!(&vs, &["X", "Y", "Y"]);
 }

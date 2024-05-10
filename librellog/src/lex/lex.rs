@@ -9,9 +9,9 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_while, take_while1},
     character::complete::{anychar, multispace0, satisfy},
-    combinator::{cut, fail, not, opt, recognize, value},
+    combinator::{cut, fail, not, opt, peek, recognize, value},
     error::{context, VerboseError},
-    multi::many0,
+    multi::{many0, many1},
     sequence::{delimited, preceded, terminated, tuple},
     Finish, Parser,
 };
@@ -183,7 +183,6 @@ fn tokenize_impl<'i>(mut input: Span<'i>, ts: &mut Vec<At<Tok>>) -> Res<'i, ()> 
         let state = *stack
             .last()
             .expect("stack begins initialized with LexCtx::Expr");
-
         let (i, t) = match state {
             LexCtx::Expr => {
                 let (i_after_ws, _) = multispace0(input)?;
@@ -192,7 +191,6 @@ fn tokenize_impl<'i>(mut input: Span<'i>, ts: &mut Vec<At<Tok>>) -> Res<'i, ()> 
             }
 
             LexCtx::Quoted(q) => {
-                let mut buf = String::new();
                 let close_quote = match q {
                     Quote::One => |i| value(Tok::CQuote, tag("\"")).parse(i),
                     Quote::Three => |i| {
@@ -212,7 +210,7 @@ fn tokenize_impl<'i>(mut input: Span<'i>, ts: &mut Vec<At<Tok>>) -> Res<'i, ()> 
                 )
                 .parse(input)?;
 
-                buf.push_str(content.as_ref());
+                let buf = dbg!(String::from(*content.fragment()));
                 if !buf.is_empty() {
                     // Skip empty strings.
                     ts.push(Tok::TxtContent(buf).at(input));

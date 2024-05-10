@@ -30,11 +30,11 @@ impl fmt::Debug for Segment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let seg = self.segment_as_str();
         let tail = if self.segment_tail().is_nil() {
-            "".to_string()
+            "Nil".to_string()
         } else {
-            format!("->{:?}", self.segment_tail())
+            format!("{:?}", self.segment_tail())
         };
-        write!(f, "\"{seg}\"{tail}")
+        write!(f, "\"{seg}\"->{tail}")
     }
 }
 
@@ -274,6 +274,7 @@ impl CharListTail for RcTm {
 
 impl Dup for Segment {
     fn dup(&self, duper: &mut TmDuplicator) -> Self {
+        // TODO: Is there a way to not have to copy the string?
         Self::from_string_and_tail(self.segment_as_str(), self.segment_tail().dup(duper))
     }
 }

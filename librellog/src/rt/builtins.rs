@@ -296,17 +296,15 @@ impl BuiltinsMap {
 
                 (Tm::Rel(rel), Tm::Var(..)) => {
                     let sig_val = rel.iter().map(|(k, _)| {
-                        (*k, Tm::Var(Var::from_source(*k, None)).into())
+                        let v = heck::ToPascalCase::to_pascal_case(&*k.to_str());
+                        (*k, Tm::Var(Var::from_source(v.as_ref(), None)).into())
                     }).collect::<Rel>();
                     let sig_val = Tm::Rel(sig_val).into();
                     soln_stream::unifying(u, &sig_val, sig)
                 }
 
-                (Tm::Var(..), Tm::Rel(..)) => {
-                    soln_stream::unifying(u, rel, sig)
-                }
-
-                (Tm::Rel(_rel), Tm::Rel(_sig)) => soln_stream::unifying(u, rel, sig),
+                (Tm::Var(..), Tm::Rel(..))
+                | (Tm::Rel(..), Tm::Rel(..)) => soln_stream::unifying(u, rel, sig),
 
                 _ => Err::GenericError {
                     rel: r.to_string(),
@@ -443,7 +441,7 @@ impl BuiltinsMap {
         });
 
         def_builtin!(intrs, |_state, u, [term][variables] as _rel| {
-            let vars: BTreeSet<Var> = term.variables().cloned().collect();
+            let vars: BTreeSet<Var> = term.variables().collect();
             let vars = RcTm::list_from_iter(vars.into_iter().map(RcTm::from));
             soln_stream::unifying(u, &vars, variables)
         });
@@ -1250,7 +1248,24 @@ impl BuiltinsMap {
                     ]).into(),
                     Tm::Int(..) => tm!([int tm.clone()]).into(),
                     Tm::Sym(..) => tm!([sym tm.clone()]).into(),
-                    Tm::TxtSeg(..) | Tm::TxtCons(..) => tm!([txt tm.clone()]).into(),
+                    Tm::TxtSeg(seg) => {
+                        tm!([txt
+                            tm!([seg
+                                Tm::Sym(Sym::from(seg.segment_as_str())).into()
+                            ][tail
+                                reify(seg.segment_tail())
+                            ]).into()
+                        ]).into()
+                    }
+                    Tm::TxtCons(car, cdr) => {
+                        tm!([txt
+                            tm!([car
+                                reify(car)
+                            ][cdr
+                                reify(cdr)
+                            ]).into()
+                        ]).into()
+                    }
                     Tm::BinOp(f, lhs, rhs) => tm!([binop
                         tm!([functor
                                 (*f).into()

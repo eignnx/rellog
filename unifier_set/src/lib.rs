@@ -179,7 +179,7 @@ where
         let mut u = self.clone();
 
         for (x_child, y_child) in x.direct_children().zip(y.direct_children()) {
-            u = u.unify(x_child, y_child)?;
+            u = u.unify(&x_child, &y_child)?;
         }
 
         Some(u)

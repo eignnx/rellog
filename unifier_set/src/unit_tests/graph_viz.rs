@@ -47,7 +47,7 @@ where
             Node::Child(parent) => {
                 let r = parent.to_string();
                 let n = dg::Node::new(&r);
-                let e = dg::Edge::new(&from_node_id, &r, "");
+                let e = dg::Edge::new(from_node_id, &r, "");
                 (n, e)
             }
             Node::Root(Root::Var(size)) => {
@@ -56,7 +56,7 @@ where
                     .shape(Some("record"))
                     .style(dg::Style::Bold)
                     .label(&format!("{size}"));
-                let e = dg::Edge::new(&from_node_id, &r, "");
+                let e = dg::Edge::new(from_node_id, &r, "");
                 (n, e)
             }
             Node::Root(Root::NonVar(term, size)) => {
@@ -76,7 +76,7 @@ where
                     .style(dg::Style::Bold)
                     .label(&format!("{term} | {size}"));
 
-                let e = dg::Edge::new(&from_node_id, &r, "");
+                let e = dg::Edge::new(from_node_id, &r, "");
 
                 (n, e)
             }

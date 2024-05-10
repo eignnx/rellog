@@ -16,6 +16,7 @@ use crate::{
 
 use super::{sym, tok, var, Error, Res, Toks};
 
+#[derive(Debug)]
 enum InterpSegment {
     /// An interpolation of a single character or variable. Does *not* include the spread operator.
     ///
@@ -33,6 +34,7 @@ enum InterpSegment {
     TailInterp(Tm),
 }
 
+#[derive(Debug)]
 enum TmplSegment {
     /// A run of literal text in a text template.
     ///
@@ -202,6 +204,7 @@ fn validate_interps<'ts>(ts: Toks<'ts>, segments: &[TmplSegment]) -> Res<'ts, Tm
 
 fn inner_txt_tmpl(ts: Toks) -> Res<Tm> {
     let (ts, segments): (_, Vec<TmplSegment>) = many0(tmpl_segment).parse(ts)?;
+    dbg!(&segments);
     let (_, tail) = validate_interps(ts.clone(), &segments[..])?;
 
     let mut tmpl = tail;
@@ -234,5 +237,7 @@ fn triple_quoted_txt_tmpl(ts: Toks) -> Res<Tm> {
 }
 
 pub fn txt(ts: Toks) -> Res<Tm> {
-    alt((triple_quoted_txt_tmpl, quoted_txt_tmpl)).parse(ts)
+    let (ts, text) = alt((triple_quoted_txt_tmpl, quoted_txt_tmpl)).parse(ts)?;
+    dbg!(&text);
+    Ok((ts, text))
 }

@@ -151,7 +151,16 @@ impl RcTm {
 
     pub fn try_as_char(&self) -> Option<char> {
         match self.as_ref() {
-            Tm::Sym(s) => s.to_str().chars().next(),
+            Tm::Sym(s) => {
+                let borr = s.to_str();
+                let mut chars = borr.chars();
+                let first = chars.next();
+                let rest = chars.next();
+                match (first, rest) {
+                    (Some(ch), None) => Some(ch),
+                    _ => None,
+                }
+            }
             _ => None,
         }
     }
@@ -162,7 +171,7 @@ impl RcTm {
                 Tm::TxtCons(car, cdr) => {
                     match car.try_as_char() {
                         Some(ch) => buf.push(ch),
-                        None => return Err(TxtErr::NonCharInTxt(car.clone())),
+                        None => return dbg!(Err(TxtErr::NonCharInTxt(car.clone()))),
                     }
                     cdr.try_collect_txt_to_string(buf)?;
                 }
@@ -171,7 +180,7 @@ impl RcTm {
                     seg.tail().try_collect_txt_to_string(buf)?;
                 }
                 Tm::Nil => return Ok(()),
-                Tm::Var(var) => return Err(TxtErr::UninstantiatedTail(var.clone())),
+                Tm::Var(var) => return dbg!(Err(TxtErr::UninstantiatedTail(var.clone()))),
                 Tm::Sym(..)
                 | Tm::Int(..)
                 | Tm::Block(..)
@@ -208,6 +217,17 @@ impl RcTm {
         Rel::new()
             .insert(Sym::from("true"), Self::sym_true())
             .into()
+    }
+
+    fn char(ch: char) -> RcTm {
+        let mut s = String::with_capacity(4);
+        s.push(ch);
+        Self::sym(s)
+    }
+
+    #[allow(dead_code)]
+    fn try_unwrap(self) -> Result<Tm, RcTm> {
+        Rc::try_unwrap(self.0).map_err(RcTm)
     }
 }
 
@@ -360,51 +380,179 @@ impl ClassifyTerm<Var> for RcTm {
     fn superficially_unifiable(&self, other: &Self) -> bool {
         match (self.as_ref(), other.as_ref()) {
             (Tm::Sym(s1), Tm::Sym(s2)) => s1 == s2,
-            (Tm::Var(_), Tm::Var(_)) => true,
+            (Tm::Var(_), _) | (_, Tm::Var(_)) => dbg!(true),
             (Tm::Int(n1), Tm::Int(n2)) => n1 == n2,
             (Tm::TxtSeg(seg1), Tm::TxtSeg(seg2)) => {
-                let s1 = seg1.segment_as_str();
-                let s2 = seg2.segment_as_str();
+                let s1 = dbg!(seg1.segment_as_str());
+                let s2 = dbg!(seg2.segment_as_str());
                 s1.starts_with(s2) || s2.starts_with(s1)
             }
-            (Tm::TxtCons(h1, _t1), Tm::TxtCons(h2, _t2)) => {
-                h1.superficially_unifiable(h2) // && t1.superficially_unifiable(t2)
+            (Tm::TxtCons(car1, cdr1), Tm::TxtCons(car2, cdr2)) => {
+                car1.superficially_unifiable(car2) //&& cdr1.superficially_unifiable(cdr2)
             }
+            (cons @ Tm::TxtCons(car, cdr), Tm::TxtSeg(seg))
+            | (Tm::TxtSeg(seg), cons @ Tm::TxtCons(car, cdr)) => {
+                dbg!(seg.segment_as_str(), car, cdr);
+                let first_char = match seg.segment_as_str().chars().next() {
+                    Some(c) => c,
+                    // If no chars in this segment, check tail.
+                    None => {
+                        println!(">>>>>>>>>>>>>>>>>>> No chars in string segment.");
+                        return RcTm::from(cons.clone())
+                            .superficially_unifiable(seg.segment_tail());
+                    }
+                };
+                dbg!(first_char);
+                let first_char_sym = RcTm::sym(first_char.to_string().as_str());
+                dbg!(car.superficially_unifiable(&first_char_sym))
+                // && cdr.superficially_unifiable(&seg_cdr)
+            }
+            (Tm::TxtSeg(seg), Tm::Nil) | (Tm::Nil, Tm::TxtSeg(seg)) => {
+                dbg!(dbg!(seg.segment_as_str()).is_empty())
+            }
+            (Tm::TxtCons(..), Tm::Nil) | (Tm::Nil, Tm::TxtCons(..)) => false,
             (Tm::Block(f1, _), Tm::Block(f2, _)) => f1 == f2,
             (Tm::Rel(r1), Tm::Rel(r2)) => r1.keys().eq(r2.keys()),
             (Tm::Cons(_, _), Tm::Cons(_, _)) => true,
             (Tm::Nil, Tm::Nil) => true,
             (Tm::BinOp(op1, _, _), Tm::BinOp(op2, _, _)) => op1 == op2,
-            _ => false,
+            ////////////////////////////////////////////////////////////////////
+            (Tm::Sym(_), Tm::Int(_))
+            | (Tm::Sym(_), Tm::Block(_, _))
+            | (Tm::Sym(_), Tm::Rel(_))
+            | (Tm::Sym(_), Tm::BinOp(_, _, _))
+            | (Tm::Sym(_), Tm::Cons(_, _))
+            | (Tm::Sym(_), Tm::Nil)
+            | (Tm::Sym(_), Tm::TxtCons(_, _))
+            | (Tm::Sym(_), Tm::TxtSeg(_)) => false,
+            (Tm::Int(_), Tm::Sym(_))
+            | (Tm::Int(_), Tm::Block(_, _))
+            | (Tm::Int(_), Tm::Rel(_))
+            | (Tm::Int(_), Tm::BinOp(_, _, _))
+            | (Tm::Int(_), Tm::Cons(_, _))
+            | (Tm::Int(_), Tm::Nil)
+            | (Tm::Int(_), Tm::TxtCons(_, _))
+            | (Tm::Int(_), Tm::TxtSeg(_)) => false,
+            (Tm::Block(_, _), Tm::Sym(_))
+            | (Tm::Block(_, _), Tm::Int(_))
+            | (Tm::Block(_, _), Tm::Rel(_))
+            | (Tm::Block(_, _), Tm::BinOp(_, _, _))
+            | (Tm::Block(_, _), Tm::Cons(_, _))
+            | (Tm::Block(_, _), Tm::Nil)
+            | (Tm::Block(_, _), Tm::TxtCons(_, _))
+            | (Tm::Block(_, _), Tm::TxtSeg(_)) => false,
+            (Tm::Rel(_), Tm::Sym(_))
+            | (Tm::Rel(_), Tm::Int(_))
+            | (Tm::Rel(_), Tm::Block(_, _))
+            | (Tm::Rel(_), Tm::BinOp(_, _, _))
+            | (Tm::Rel(_), Tm::Cons(_, _))
+            | (Tm::Rel(_), Tm::Nil)
+            | (Tm::Rel(_), Tm::TxtCons(_, _))
+            | (Tm::Rel(_), Tm::TxtSeg(_)) => false,
+            (Tm::BinOp(_, _, _), Tm::Sym(_))
+            | (Tm::BinOp(_, _, _), Tm::Int(_))
+            | (Tm::BinOp(_, _, _), Tm::Block(_, _))
+            | (Tm::BinOp(_, _, _), Tm::Rel(_))
+            | (Tm::BinOp(_, _, _), Tm::Cons(_, _))
+            | (Tm::BinOp(_, _, _), Tm::Nil)
+            | (Tm::BinOp(_, _, _), Tm::TxtCons(_, _))
+            | (Tm::BinOp(_, _, _), Tm::TxtSeg(_)) => false,
+            (Tm::Cons(_, _), Tm::Sym(_))
+            | (Tm::Cons(_, _), Tm::Int(_))
+            | (Tm::Cons(_, _), Tm::Block(_, _))
+            | (Tm::Cons(_, _), Tm::Rel(_))
+            | (Tm::Cons(_, _), Tm::BinOp(_, _, _))
+            | (Tm::Cons(_, _), Tm::Nil)
+            | (Tm::Cons(_, _), Tm::TxtCons(_, _))
+            | (Tm::Cons(_, _), Tm::TxtSeg(_)) => false,
+            (Tm::Nil, Tm::Sym(_))
+            | (Tm::Nil, Tm::Int(_))
+            | (Tm::Nil, Tm::Block(_, _))
+            | (Tm::Nil, Tm::Rel(_))
+            | (Tm::Nil, Tm::BinOp(_, _, _))
+            | (Tm::Nil, Tm::Cons(_, _)) => false,
+            (Tm::TxtCons(_, _), Tm::Sym(_))
+            | (Tm::TxtCons(_, _), Tm::Int(_))
+            | (Tm::TxtCons(_, _), Tm::Block(_, _))
+            | (Tm::TxtCons(_, _), Tm::Rel(_))
+            | (Tm::TxtCons(_, _), Tm::BinOp(_, _, _))
+            | (Tm::TxtCons(_, _), Tm::Cons(_, _)) => false,
+            (Tm::TxtSeg(_), Tm::Sym(_))
+            | (Tm::TxtSeg(_), Tm::Int(_))
+            | (Tm::TxtSeg(_), Tm::Block(_, _))
+            | (Tm::TxtSeg(_), Tm::Rel(_))
+            | (Tm::TxtSeg(_), Tm::BinOp(_, _, _))
+            | (Tm::TxtSeg(_), Tm::Cons(_, _)) => false,
         }
     }
 }
 
 impl DirectChildren<Var> for RcTm {
-    fn direct_children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self> + 'a> {
+    fn direct_children<'a>(&'a self) -> Box<dyn Iterator<Item = Self> + 'a> {
         match self.as_ref() {
             Tm::Sym(_) | Tm::Var(_) | Tm::Int(_) | Tm::Nil => Box::new(iter::empty()),
-            Tm::TxtSeg(seg) => Box::new(iter::once(seg.tail())),
-            Tm::TxtCons(car, cdr) => Box::new(iter::once(car).chain(iter::once(cdr))),
-            Tm::Block(_, members) => Box::new(members.iter()),
-            Tm::Rel(rel) => Box::new(rel.values()),
-            Tm::BinOp(_, x, y) => Box::new([x, y].into_iter()),
-            Tm::Cons(head, tail) => Box::new(iter::once(head).chain(iter::once(tail))),
+            // To the Rellog programmer, a direct child of `"abc"` is "bc",
+            // even if `"abc"` is a `TxtSeg`. In other words, text strings should
+            // feel just like cons cells of characters.
+            Tm::TxtSeg(seg) => match dbg!(seg.car_cdr()) {
+                Ok(Some((car, cdr))) => {
+                    Box::new([RcTm::char(car), Tm::TxtSeg(cdr).into()].into_iter())
+                }
+                _ => Box::new(iter::once(seg.tail().clone())),
+            },
+            Tm::TxtCons(car, cdr) => {
+                Box::new(iter::once(car.clone()).chain(iter::once(cdr.clone())))
+            }
+            Tm::Block(_, members) => Box::new(members.iter().cloned()),
+            Tm::Rel(rel) => Box::new(rel.values().cloned()),
+            Tm::BinOp(_, x, y) => Box::new([x, y].into_iter().cloned()),
+            Tm::Cons(head, tail) => {
+                Box::new(iter::once(head.clone()).chain(iter::once(tail.clone())))
+            }
         }
     }
 
-    fn map_direct_children<'a>(&'a self, mut f: impl FnMut(&'a Self) -> Self + 'a) -> Self {
+    fn map_direct_children(&self, mut f: impl FnMut(&Self) -> Self) -> Self {
         match self.as_ref() {
             Tm::Sym(_) | Tm::Var(_) | Tm::Int(_) | Tm::Nil => self.clone(),
-            Tm::TxtSeg(seg) => {
-                // // Here we're only copying this segment's text content. Is this
-                // // the best way to do it?
-                // // Could we map the tail *first*, then see if it's still
-                // // "equivalent" and only copy the text segment if it's not?
-                let new_tail = f(seg.tail());
-                let seg_clone = Segment::from_string_and_tail(seg.segment_as_str(), new_tail);
-                Tm::TxtSeg(seg_clone).into()
-            }
+            Tm::TxtSeg(seg) => match seg.car_cdr() {
+                Ok(Some((car, cdr))) => {
+                    // TODO(perf): Is it safe to reuse `car` instead of "computing" `new_car`?
+                    let Some(new_car) = f(&RcTm::char(car)).try_as_char() else {
+                        unreachable!()
+                    };
+                    let new_cdr_rctm = f(&Tm::TxtSeg(cdr).into());
+                    match new_cdr_rctm.as_ref() {
+                        Tm::TxtSeg(new_cdr) => Tm::TxtSeg(new_cdr.cons(new_car)).into(),
+                        other => Tm::TxtCons(RcTm::char(new_car), other.clone().into()).into(),
+                    }
+                }
+                Ok(None) => {
+                    println!(">>>>>>> car_cdr == Ok(None): Self == {self:?}, seg == {seg:?}");
+                    Tm::TxtSeg(Segment::from_string_and_tail(
+                        seg.segment_as_str(),
+                        f(seg.tail()),
+                    ))
+                    .into()
+                }
+                _ => unimplemented!(),
+            },
+            // Tm::TxtSeg(seg) => {
+            //     /////////////////////////////////////////
+            //     match seg.car_cdr() {
+            //         Ok(Some((car, cdr))) => {
+            //             let new_tail = f(&Tm::TxtSeg(cdr).into());
+            //             let seg_clone =
+            //                 Segment::from_string_and_tail(car.segment_as_str(), new_tail);
+            //             Tm::TxtSeg(seg_clone).into()
+            //         }
+            //         Ok(None) => self.clone(),
+            //         Err(_) => self.clone(),
+            //     }
+            //     // let new_tail = f(seg.tail());
+            //     // let seg_clone = Segment::from_string_and_tail(seg.segment_as_str(), new_tail);
+            //     // Tm::TxtSeg(seg_clone).into()
+            // }
             Tm::TxtCons(car, cdr) => Tm::TxtCons(f(car), f(cdr)).into(),
             Tm::Block(functor, members) => {
                 Tm::Block(functor.clone(), members.iter().map(f).collect()).into()

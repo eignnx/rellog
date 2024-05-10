@@ -7,18 +7,18 @@
 ]]
 
 [[doc "Relates a list to its reversal."]]
-[forward {}][backward {}]
-[forward {A ..As}][Backward]
-    - [forward As][backward AsBackward]
-    - [prefix AsBackward][suffix {A}][compound Backward]
-
 [[todo
     """
     `[[mode [forward out][backward in]]]` loops forever.
     Does it need to be an intrinsic?
     """
 ]]
+[forward {}][backward {}]
+[forward {A ..As}][Backward]
+    - [forward As][backward AsBackward]
+    - [prefix AsBackward][suffix {A}][compound Backward]
 
+[[doc "Relates a list to a member of that list."]]
 [list {Member ..Rest}][Member]
 [list {Other ..Rest}][Member]
     - [list Rest][Member]

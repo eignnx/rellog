@@ -3,8 +3,7 @@ use std::cell::{Cell, RefCell};
 use rpds::Vector;
 
 use crate::{
-    ast::dup::TmDuplicator,
-    ast::{BinOpSymbol, RcTm, Tm},
+    ast::{dup::TmDuplicator, tm_displayer::TmDisplayer, BinOpSymbol, RcTm, Tm},
     lex::tok::Tok,
     utils::{cloning_iter::CloningIterator, deferred_iter::DeferredIter},
 };
@@ -74,6 +73,10 @@ impl Rt {
         'rtb: 'it,
         'td: 'it,
     {
+        // eprintln!(
+        //     ">>> solve_query_impl:\n{}",
+        //     TmDisplayer::default().indenting(&query)
+        // );
         self.query_stack.borrow_mut().push(u.reify_term(&query));
         self.maybe_breakpoint(Event::Call);
 
@@ -91,11 +94,11 @@ impl Rt {
             Tm::Rel(_) => self.solve_rel(query.clone(), u, td),
             Tm::Block(functor, members) => match functor {
                 Tok::Pipe => Box::new(
-                    self.solve_or_block(members.clone(), u, td)
+                    self.solve_disjunctive_block(members.clone(), u, td)
                         .chain(self.deferred_decr_recursion_depth()),
                 ),
                 Tok::Dash => Box::new(
-                    self.solve_and_block(members.clone(), u, td)
+                    self.solve_conjunctive_block(members.clone(), u, td)
                         .chain(self.deferred_decr_recursion_depth()),
                 ),
                 _ => {
@@ -224,7 +227,7 @@ impl Rt {
         )
     }
 
-    fn solve_or_block<'rtb, 'td, 'it>(
+    fn solve_disjunctive_block<'rtb, 'td, 'it>(
         &'rtb self,
         members: Vector<RcTm>,
         u: UnifierSet,
@@ -239,7 +242,7 @@ impl Rt {
             .flat_map(move |q| self.solve_query_impl(q, u.clone(), td))
     }
 
-    fn solve_and_block<'rtb, 'td, 'it>(
+    fn solve_conjunctive_block<'rtb, 'td, 'it>(
         &'rtb self,
         members: Vector<RcTm>,
         u: UnifierSet,
