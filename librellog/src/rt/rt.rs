@@ -3,7 +3,7 @@ use std::cell::{Cell, RefCell};
 use rpds::Vector;
 
 use crate::{
-    ast::{dup::TmDuplicator, tm_displayer::TmDisplayer, BinOpSymbol, RcTm, Tm},
+    ast::{dup::TmDuplicator, BinOpSymbol, RcTm, Tm},
     lex::tok::Tok,
     utils::{cloning_iter::CloningIterator, deferred_iter::DeferredIter},
 };

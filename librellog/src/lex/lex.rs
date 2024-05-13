@@ -9,9 +9,9 @@ use nom::{
     branch::alt,
     bytes::complete::{tag, take_while, take_while1},
     character::complete::{anychar, multispace0, satisfy},
-    combinator::{cut, fail, not, opt, peek, recognize, value},
+    combinator::{cut, fail, not, opt, recognize, value},
     error::{context, VerboseError},
-    multi::{many0, many1},
+    multi::many0,
     sequence::{delimited, preceded, terminated, tuple},
     Finish, Parser,
 };

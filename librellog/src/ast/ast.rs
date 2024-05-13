@@ -390,8 +390,8 @@ impl ClassifyTerm<Var> for RcTm {
             (Tm::TxtCons(car1, cdr1), Tm::TxtCons(car2, cdr2)) => {
                 car1.superficially_unifiable(car2) && cdr1.superficially_unifiable(cdr2)
             }
-            (cons @ Tm::TxtCons(car, cdr), Tm::TxtSeg(seg))
-            | (Tm::TxtSeg(seg), cons @ Tm::TxtCons(car, cdr)) => {
+            (cons @ Tm::TxtCons(car, _cdr), Tm::TxtSeg(seg))
+            | (Tm::TxtSeg(seg), cons @ Tm::TxtCons(car, _cdr)) => {
                 let first_char = match seg.segment_as_str().chars().next() {
                     Some(c) => c,
                     // If no chars in this segment, check tail.
