@@ -1,14 +1,13 @@
 use std::{
     cell::RefCell,
     fmt::{self, Display, Formatter},
-    path::PathBuf,
+    path::{Path, PathBuf},
 };
 
 use nom::{
     branch::alt,
     combinator::{all_consuming, cut, opt},
-    error::{context, ParseError},
-    error::{ContextError, ErrorKind},
+    error::{context, ContextError, ErrorKind, ParseError},
     multi::{many0, many1, separated_list1},
     sequence::{delimited, preceded, tuple},
     Finish, IResult, Parser,
@@ -17,7 +16,7 @@ use nom_i9n::{I9nError, I9nErrorCtx, I9nErrorSituation, I9nInput, TokenizedInput
 use rpds::Vector;
 
 use crate::{
-    ast::{partial_txt::PartialTxt, BinOpSymbol, Item, Module, RcTm, Rel, Tm},
+    ast::{BinOpSymbol, Item, Module, RcTm, Rel, Tm},
     data_structures::{Int, Map, Sym, Var},
     lex::{
         tok::{
@@ -27,6 +26,12 @@ use crate::{
         LexError,
     },
 };
+
+use self::txt_tmpl::txt;
+
+#[cfg(test)]
+mod tests;
+mod txt_tmpl;
 
 type Res<'ts, T> = IResult<Toks<'ts>, T, Error<'ts>>;
 type BaseInput<'ts> = &'ts [At<Tok>];
@@ -51,9 +56,9 @@ impl<'ts> From<LexError> for Error<'ts> {
 
 impl<'ts> Display for Error<'ts> {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        let user_input_buf = PathBuf::from("<unknown_src>");
         let fname_borrow = self.fname.borrow();
-        let fname = fname_borrow.as_ref().unwrap_or(&user_input_buf);
+        let binding = PathBuf::from("<unknown_src>");
+        let fname = fname_borrow.as_ref().unwrap_or(&binding);
 
         for (i, problem) in &self.stack {
             let loc = match i {
@@ -138,8 +143,11 @@ impl<'ts> ParseError<Toks<'ts>> for Error<'ts> {
     }
 }
 
-pub fn entire_module(ts: Toks) -> Result<Module, Error> {
-    let (_ts, m) = all_consuming(module)(ts).finish()?;
+pub fn entire_module(ts: Toks, fname: Option<impl AsRef<Path>>) -> Result<Module, Error> {
+    let (_ts, m) = all_consuming(module)(ts).finish().map_err(|e| {
+        *e.fname.borrow_mut() = fname.map(|p| p.as_ref().into());
+        e
+    })?;
     Ok(m)
 }
 
@@ -210,6 +218,17 @@ impl Display for I9nErrorCtxDisplay {
     }
 }
 
+#[macro_export]
+macro_rules! expect_token {
+    ($ts:expr, $p:pat => $e:expr, $t:pat => $err_msg:expr) => {
+        match ::nom_i9n::I9nInput::split_first(&$ts).map(|(x, xs)| (x.clone().value(), xs)) {
+            Some(($p, i)) => Ok((i, $e)),
+            Some(($t, _)) => Err(nom::Err::Error(Error::with_message($ts, format!($err_msg)))),
+            None => Err($crate::parse::eof_error($ts)),
+        }
+    };
+}
+
 fn tok<'ts>(tgt: Tok) -> impl Parser<Toks<'ts>, At<Tok>, Error<'ts>> {
     let p = move |ts: Toks<'ts>| -> Res<'ts, At<Tok>> {
         match ts.split_first() {
@@ -233,47 +252,27 @@ fn eof_error(ts: Toks) -> nom::Err<Error> {
 }
 
 fn sym(ts: Toks) -> Res<Sym> {
-    match I9nInput::split_first(&ts).map(|(x, xs)| (x.clone().value(), xs)) {
-        Some((Tok::Sym(s), rest)) => Ok((rest, s)),
-        Some((t, _)) => Err(nom::Err::Error(Error::with_message(
-            ts,
-            format!("Expected symbol, found {t:?}"),
-        ))),
-        None => Err(eof_error(ts)),
-    }
+    expect_token!(
+        ts,
+        Tok::Sym(s) => s,
+        t => "Expected symbol, found {t:?}"
+    )
 }
 
 fn var(ts: Toks) -> Res<Var> {
-    match I9nInput::split_first(&ts).map(|(x, xs)| (x.clone().value(), xs)) {
-        Some((Tok::Var(v), rest)) => Ok((rest, v)),
-        Some((t, _)) => Err(nom::Err::Error(Error::with_message(
-            ts,
-            format!("Expected variable, found {t:?}"),
-        ))),
-        None => Err(eof_error(ts)),
-    }
+    expect_token!(
+        ts,
+        Tok::Var(v) => v,
+        t => "Expected variable, found {t:?}"
+    )
 }
 
 fn num(ts: Toks) -> Res<Int> {
-    match I9nInput::split_first(&ts).map(|(x, xs)| (x.clone().value(), xs)) {
-        Some((Tok::Int(n), rest)) => Ok((rest, n)),
-        Some((t, _)) => Err(nom::Err::Error(Error::with_message(
-            ts,
-            format!("Expected number, found {t:?}"),
-        ))),
-        None => Err(eof_error(ts)),
-    }
-}
-
-fn txt(ts: Toks) -> Res<String> {
-    match I9nInput::split_first(&ts).map(|(x, xs)| (x.clone().value(), xs)) {
-        Some((Tok::Txt(s), rest)) => Ok((rest, s)),
-        Some((t, _)) => Err(nom::Err::Error(Error::with_message(
-            ts,
-            format!("Expected text literal, found {t:?}"),
-        ))),
-        None => Err(eof_error(ts)),
-    }
+    expect_token!(
+        ts,
+        Tok::Int(n) => n,
+        t => "Expected number, found {t:?}"
+    )
 }
 
 fn attr(ts: Toks) -> Res<(Sym, RcTm)> {
@@ -290,11 +289,12 @@ fn attr(ts: Toks) -> Res<(Sym, RcTm)> {
                 tm,
             )),
         )),
-        // [AttrVarSameName] or [AttrVarSameName.3] or [AttrVarSameName.New]
+        // [AttrVarSameName] or [AttrVarSameName.3] or [AttrVarSameName.new]
         var.map(|v| {
             // `lower` created on separate line so INTERNER isn't shared AND mutated.
-            let lower = format!("{}", heck::AsSnakeCase(&v.name.to_str()[..]));
-            (lower.into(), Tm::Var(v))
+            let name = v.name.to_str().to_string();
+            let lower = Sym::from(format!("{}", heck::AsSnakeCase(name)).as_ref());
+            (lower, Tm::Var(v))
         }),
         // [attr_sym_same_name]
         sym.map(|s| (s, Tm::Sym(s))),
@@ -376,6 +376,13 @@ fn list(ts: Toks) -> Res<Tm> {
             break (ts, Tm::Nil);
         }
 
+        if ts.is_empty() {
+            return Err(nom::Err::Error(Error::with_message(
+                ts,
+                "Expected spread or closing brace".to_owned(),
+            )));
+        }
+
         let (new_ts, element) = tm.parse(ts)?;
         xs_reversed.push(element);
         ts = new_ts;
@@ -442,7 +449,7 @@ fn non_block_tm(ts: Toks) -> Res<Tm> {
         sym.map(Tm::Sym),
         var.map(Tm::Var),
         num.map(Tm::Int),
-        txt.map(|s| Tm::Txt(PartialTxt::from(s))),
+        txt,
         rel.map(Tm::Rel),
         list,
     ))
@@ -455,7 +462,7 @@ fn non_operator_non_block_tm(ts: Toks) -> Res<Tm> {
         sym.map(Tm::Sym),
         var.map(Tm::Var),
         num.map(Tm::Int),
-        txt.map(|s| Tm::Txt(PartialTxt::from(s))),
+        txt,
         rel.map(Tm::Rel),
         list,
     ))
@@ -531,166 +538,4 @@ pub fn module(ts: Toks) -> Res<Module> {
             m
         })
         .parse(ts)
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::{ast::tm_displayer::TmDisplayer, lex::tokenize, utils::my_nom::Span};
-    use pretty_assertions::assert_eq;
-    use rpds::vector;
-
-    #[track_caller]
-    fn parse_to_tm(src: &'static str) -> Tm {
-        let tokens = tokenize(Span::from(src), "blah.rellog".into()).unwrap();
-        let (rest, t) = tm.parse(tokens[..].into()).unwrap();
-
-        assert!(
-            rest.is_empty(),
-            "\nCould not parse entire input: ```\n{src}\n```\n\
-             Remaining input begins with: [{}]\n",
-            rest.iter()
-                .take(5)
-                .map(|tok| format!("`{}`", tok.as_ref()))
-                .collect::<Vec<_>>()
-                .join(", "),
-        );
-
-        t
-    }
-
-    #[test]
-    fn simple_nested_relation_tm() {
-        crate::init_interner();
-        let src = r#"[goal [List][Pred]][initial Sublist][final empty_list]"#;
-        let actual = parse_to_tm(src);
-
-        let expected = Tm::Rel(
-            vec![
-                (
-                    "goal".into(),
-                    Tm::Rel(
-                        vec![
-                            (
-                                "list".into(),
-                                Tm::Var(Var::from_source("List", None)).into(),
-                            ),
-                            (
-                                "pred".into(),
-                                Tm::Var(Var::from_source("Pred", None)).into(),
-                            ),
-                        ]
-                        .into_iter()
-                        .collect(),
-                    )
-                    .into(),
-                ),
-                (
-                    "initial".into(),
-                    Tm::Var(Var::from_source("Sublist", None)).into(),
-                ),
-                ("final".into(), Tm::Sym("empty_list".into()).into()),
-            ]
-            .into_iter()
-            .collect(),
-        );
-
-        assert_eq!(actual, expected, "Input was {:?}", src);
-    }
-
-    #[test]
-    fn simple_block() {
-        crate::init_interner();
-        let src = "
-    - [Blah]
-    - [Blah]
-    - [Blah]\n";
-
-        let actual = parse_to_tm(src);
-
-        let blah: RcTm = Tm::Rel(
-            vec![(
-                "blah".into(),
-                Tm::Var(Var::from_source("Blah", None)).into(),
-            )]
-            .into_iter()
-            .collect(),
-        )
-        .into();
-
-        let expected = Tm::Block(Dash, vector![blah.clone(), blah.clone(), blah.clone()]);
-
-        assert_eq!(actual, expected, "Input was {:?}", src);
-    }
-
-    #[test]
-    fn nested_block() {
-        crate::init_interner();
-        let src = "
-    - [Blah]
-    -
-        | [Blah]
-        | [Blah]
-    - [Blah]\n";
-
-        let actual = parse_to_tm(src);
-
-        let blah: RcTm = Tm::Rel(
-            vec![(
-                "blah".into(),
-                Tm::Var(Var::from_source("Blah", None)).into(),
-            )]
-            .into_iter()
-            .collect(),
-        )
-        .into();
-
-        let expected = Tm::Block(
-            Dash,
-            vector![
-                blah.clone(),
-                Tm::Block(Pipe, vector![blah.clone(), blah.clone()]).into(),
-                blah.clone()
-            ],
-        );
-
-        assert_eq!(actual, expected, "Input was {:?}", src);
-    }
-
-    #[test]
-    fn empty_list() {
-        crate::init_interner();
-        assert_eq!(parse_to_tm("{}"), Tm::Nil);
-    }
-
-    #[test]
-    fn singleton_list() {
-        crate::init_interner();
-        assert_eq!(
-            parse_to_tm("{123}"),
-            Tm::Cons(Tm::Int(123.into()).into(), Tm::Nil.into())
-        );
-    }
-
-    #[test]
-    fn multi_element_list() {
-        crate::init_interner();
-        let src = r#"{123 "asdf" {} [aardvark][Zebra] socrates Unknown {1 2 3}}"#;
-
-        let formatted = TmDisplayer::default()
-            .with_tm(&parse_to_tm(src))
-            .to_string();
-
-        assert_eq!(formatted, src);
-    }
-
-    #[test]
-    fn list_with_spread() {
-        crate::init_interner();
-        let src = r#"{X ...Xs}"#;
-        let tm = parse_to_tm(src);
-        let formatted = TmDisplayer::default().with_tm(&tm).to_string();
-
-        assert_eq!(formatted, src);
-    }
 }

@@ -5,6 +5,7 @@ use std::{
     io::{stderr, stdout, Write},
 };
 
+use nu_ansi_term::Color;
 use num::{Integer, ToPrimitive, Zero};
 use rpds::Vector;
 use unifier_set::DirectChildren;
@@ -12,11 +13,10 @@ use unifier_set::DirectChildren;
 use crate::{
     ast::{
         dup::{Dup, TmDuplicator},
-        partial_txt::PartialTxt,
+        txt::{Segment, TxtErr},
         Clause, RcTm, Rel, Sig, Tm,
     },
     data_structures::{Int, Sym, Var},
-    interner::IStr,
     lex::{self, tok::Tok},
     parse,
     rt::{
@@ -142,7 +142,7 @@ impl BuiltinsMap {
             ) -> Box<dyn SolnStream + 'state>
             + 'static,
     ) {
-        let sig: Sig = sig.iter().map(|s| s.into()).collect();
+        let sig: Sig = sig.iter().map(|s| Sym::from(*s)).collect();
 
         self.0.insert(
             sig.clone(),
@@ -296,17 +296,15 @@ impl BuiltinsMap {
 
                 (Tm::Rel(rel), Tm::Var(..)) => {
                     let sig_val = rel.iter().map(|(k, _)| {
-                        (*k, Tm::Var(Var::from_source(*k, None)).into())
+                        let v = heck::ToPascalCase::to_pascal_case(&*k.to_str());
+                        (*k, Tm::Var(Var::from_source(v.as_ref(), None)).into())
                     }).collect::<Rel>();
                     let sig_val = Tm::Rel(sig_val).into();
                     soln_stream::unifying(u, &sig_val, sig)
                 }
 
-                (Tm::Var(..), Tm::Rel(..)) => {
-                    soln_stream::unifying(u, rel, sig)
-                }
-
-                (Tm::Rel(_rel), Tm::Rel(_sig)) => soln_stream::unifying(u, rel, sig),
+                (Tm::Var(..), Tm::Rel(..))
+                | (Tm::Rel(..), Tm::Rel(..)) => soln_stream::unifying(u, rel, sig),
 
                 _ => Err::GenericError {
                     rel: r.to_string(),
@@ -390,7 +388,7 @@ impl BuiltinsMap {
 
         def_builtin!(intrs, |_rt, u, [tm as "must_be_txt"] as rel| {
             match u.reify_term(tm).as_ref() {
-                Tm::Txt(..) => soln_stream::success(u),
+                Tm::TxtSeg(..) | Tm::TxtCons(..) | Tm::Nil => soln_stream::success(u),
                 Tm::Var(..) => soln_stream::error(Err::InstantiationError{
                     rel: rel.to_string(),
                     tm: tm.clone()
@@ -443,7 +441,7 @@ impl BuiltinsMap {
         });
 
         def_builtin!(intrs, |_state, u, [term][variables] as _rel| {
-            let vars: BTreeSet<Var> = term.variables().cloned().collect();
+            let vars: BTreeSet<Var> = term.variables().collect();
             let vars = RcTm::list_from_iter(vars.into_iter().map(RcTm::from));
             soln_stream::unifying(u, &vars, variables)
         });
@@ -509,12 +507,12 @@ impl BuiltinsMap {
             match (pascal_case.as_ref(), snake_case.as_ref()) {
                 (Tm::Sym(pc), _) => {
                     let lower = format!("{}", heck::AsSnakeCase(&pc.to_str()[..]));
-                    let lower_sym = Tm::Sym(lower.into()).into();
+                    let lower_sym = Tm::Sym(Sym::from(lower.as_ref())).into();
                     soln_stream::unifying(u, &lower_sym, snake_case)
                 }
                 (_, Tm::Sym(sc)) => {
                     let lower = format!("{}", heck::AsPascalCase(&sc.to_str()[..]));
-                    let lower_sym = Tm::Sym(lower.into()).into();
+                    let lower_sym = Tm::Sym(Sym::from(lower.as_ref())).into();
                     soln_stream::unifying(u, &lower_sym, pascal_case)
                 }
                 _ => soln_stream::error(Err::GenericError {
@@ -525,83 +523,83 @@ impl BuiltinsMap {
             }
         });
 
-        def_builtin!(intrs, |_rt, u, [txt_car][txt_cdr][txt_cons] as rel| {
-            let txt_car_opt = match txt_car.as_ref() {
-                Tm::Sym(sym) => {
-                    let sym_str = sym.to_str();
-                    let mut it = sym_str.chars();
-                    let Some(first) = it.next() else {
-                         return soln_stream::error(Err::ArgumentTypeError {
-                            rel: rel.to_string(),
-                            key: "txt_car".to_string(),
-                            expected_ty: "single character symbol".to_string(),
-                            recieved_tm: txt_car.to_string() 
-                        });
-                    };
-                    let None = it.next() else {
-                         return soln_stream::error(Err::ArgumentTypeError {
-                            rel: rel.to_string(),
-                            key: "txt_car".to_string(),
-                            expected_ty: "single character symbol".to_string(),
-                            recieved_tm: txt_car.to_string() 
-                        });
-                    };
-                    Some(first)
-                }
-                Tm::Var(_) => None,
-                _ => return soln_stream::error(Err::ArgumentTypeError {
-                    rel: rel.to_string(),
-                    key: "txt_car".to_string(),
-                    expected_ty: "single character symbol".to_string(),
-                    recieved_tm: txt_car.to_string() 
-                })
-            };
+        // def_builtin!(intrs, |_rt, u, [txt_car][txt_cdr][txt_cons] as rel| {
+        //     let txt_car_opt = match txt_car.as_ref() {
+        //         Tm::Sym(sym) => {
+        //             let sym_str = sym.to_str();
+        //             let mut it = sym_str.chars();
+        //             let Some(first) = it.next() else {
+        //                  return soln_stream::error(Err::ArgumentTypeError {
+        //                     rel: rel.to_string(),
+        //                     key: "txt_car".to_string(),
+        //                     expected_ty: "single character symbol".to_string(),
+        //                     recieved_tm: txt_car.to_string()
+        //                 });
+        //             };
+        //             let None = it.next() else {
+        //                  return soln_stream::error(Err::ArgumentTypeError {
+        //                     rel: rel.to_string(),
+        //                     key: "txt_car".to_string(),
+        //                     expected_ty: "single character symbol".to_string(),
+        //                     recieved_tm: txt_car.to_string()
+        //                 });
+        //             };
+        //             Some(first)
+        //         }
+        //         Tm::Var(_) => None,
+        //         _ => return soln_stream::error(Err::ArgumentTypeError {
+        //             rel: rel.to_string(),
+        //             key: "txt_car".to_string(),
+        //             expected_ty: "single character symbol".to_string(),
+        //             recieved_tm: txt_car.to_string()
+        //         })
+        //     };
 
-            match (txt_car_opt, txt_cdr.as_ref(), txt_cons.as_ref()) {
-                (_, _, Tm::Txt(txt)) => {
-                    match txt.car_cdr() {
-                        Err(e) => soln_stream::error(e.into()),
-                        Ok(None) => soln_stream::failure(),
-                        Ok(Some((c, cs))) => {
-                            let buf = String::from(c);
-                            let c_sym = Tm::Sym(Sym::from(&buf)).into();
-                            let Some(u) = u.unify(txt_car, &c_sym) else {
-                                return soln_stream::failure();
-                            };
-                            let cs = Tm::Txt(cs).into();
-                            soln_stream::unifying(u, txt_cdr, &cs)
-                        }
-                    }
-                }
-                (Some(first), Tm::Txt(cdr), _) => {
-                    let new_cons = Tm::Txt(cdr.cons(first)).into();
-                    soln_stream::unifying(u, txt_cons, &new_cons)
-                }
+        //     match (txt_car_opt, txt_cdr.as_ref(), txt_cons.as_ref()) {
+        //         (_, _, Tm::Txt(txt)) => {
+        //             match txt.car_cdr() {
+        //                 Err(e) => soln_stream::error(e.into()),
+        //                 Ok(None) => soln_stream::failure(),
+        //                 Ok(Some((c, cs))) => {
+        //                     let buf = String::from(c);
+        //                     let c_sym = Tm::Sym(Sym::from(&buf)).into();
+        //                     let Some(u) = u.unify(txt_car, &c_sym) else {
+        //                         return soln_stream::failure();
+        //                     };
+        //                     let cs = Tm::Txt(cs).into();
+        //                     soln_stream::unifying(u, txt_cdr, &cs)
+        //                 }
+        //             }
+        //         }
+        //         (Some(first), Tm::Txt(cdr), _) => {
+        //             let new_cons = Tm::Txt(cdr.cons(first)).into();
+        //             soln_stream::unifying(u, txt_cons, &new_cons)
+        //         }
 
-                (Some(first), Tm::Var(..), _) => {
-                    let new_txt = PartialTxt::from_string_and_tail(first, txt_cdr.clone());
-                    let new_txt = Tm::Txt(new_txt).into();
-                    soln_stream::unifying(u, txt_cons, &new_txt)
-                }
-                (None, Tm::Var(..), Tm::Var(..)) => {
-                    soln_stream::error(Err::InstantiationError {
-                        rel: rel.to_string(),
-                        tm: txt_cons.clone()
-                    })
-                }
-                _ => soln_stream::error(Err::GenericError {
-                    rel: rel.to_string(),
-                    msg:
-                        "`[txt_car][txt_cdr][txt_cons]` requires either a symbol or a variable for \
-                        `txt_car`, a text or variable for `txt_cdr`, and a text object or variable \
-                        for `txt_cons`.".to_string()
-                })
-            }
-        });
+        //         (Some(first), Tm::Var(..), _) => {
+        //             let new_txt = TxtBlock::from_string_and_tail(first, txt_cdr.clone());
+        //             let new_txt = Tm::Txt(new_txt).into();
+        //             soln_stream::unifying(u, txt_cons, &new_txt)
+        //         }
+        //         (None, Tm::Var(..), Tm::Var(..)) => {
+        //             soln_stream::error(Err::InstantiationError {
+        //                 rel: rel.to_string(),
+        //                 tm: txt_cons.clone()
+        //             })
+        //         }
+        //         _ => soln_stream::error(Err::GenericError {
+        //             rel: rel.to_string(),
+        //             msg:
+        //                 "`[txt_car][txt_cdr][txt_cons]` requires either a symbol or a variable for \
+        //                 `txt_car`, a text or variable for `txt_cdr`, and a text object or variable \
+        //                 for `txt_cons`.".to_string()
+        //         })
+        //     }
+        // });
 
-        def_builtin!(intrs, |_rt, u, [txt_prefix][txt_suffix][txt_compound] as rel| {
-            txt_append::prefix_suffix_compound(&rel, u, txt_prefix, txt_suffix, txt_compound)
-        });
+        // def_builtin!(intrs, |_rt, u, [txt_prefix][txt_suffix][txt_compound] as rel| {
+        //     txt_append::prefix_suffix_compound(&rel, u, txt_prefix, txt_suffix, txt_compound)
+        // });
 
         def_builtin!(intrs, |_rt, u, [sum][x][y] as rel| {
             match (sum.as_ref(), x.as_ref(), y.as_ref()) {
@@ -919,7 +917,7 @@ impl BuiltinsMap {
             }
         }
 
-        fn io_write_impl(u: UnifierSet, mut text: &RcTm, stream: StdStream) -> Box<dyn SolnStream> {
+        fn io_write_impl(u: UnifierSet, text: &RcTm, stream: StdStream) -> Box<dyn SolnStream> {
             if let StdStream::StdIn = stream {
                 return soln_stream::error(Err::ArgumentTypeError {
                     rel: "[io_write][stream]".into(),
@@ -929,24 +927,17 @@ impl BuiltinsMap {
                 });
             }
 
-            while let Tm::Txt(txt) = text.as_ref() {
-                use nu_ansi_term::Color;
-                let to_print = Color::LightGray.italic().paint(txt.segment_as_str());
-                match stream {
-                    StdStream::StdOut => print!("{to_print}"),
-                    StdStream::StdErr => eprint!("{to_print}"),
-                    _ => unreachable!(),
-                }
-                text = txt.segment_tail();
-            }
+            let mut buf = String::new();
+            match text.try_collect_txt_to_string(&mut buf) {
+                Ok(()) => {}
+                Err(e) => return soln_stream::error(e.into()),
+            };
 
-            if !matches!(text.as_ref(), Tm::Nil) {
-                return soln_stream::error(Err::ArgumentTypeError {
-                    rel: "[io_write][stream]".into(),
-                    key: "io_write".into(),
-                    expected_ty: "text".into(),
-                    recieved_tm: "a partial string".into(),
-                });
+            let to_print = Color::LightGray.italic().paint(buf);
+            match stream {
+                StdStream::StdOut => print!("{to_print}"),
+                StdStream::StdErr => eprint!("{to_print}"),
+                _ => unreachable!(),
             }
 
             match stream {
@@ -1019,9 +1010,9 @@ impl BuiltinsMap {
                 }
 
                 // Outputting string repr:
-                (_, Tm::Var(..) | Tm::Txt(..)) => {
+                (_, Tm::Var(..) | Tm::TxtSeg(..) | Tm::TxtCons(..) | Tm::Nil) => {
                     let repr = term.to_string();
-                    let term = Tm::Txt(PartialTxt::from(repr)).into();
+                    let term = Tm::TxtSeg(Segment::from(repr)).into();
                     soln_stream::unifying(u, &term, text)
                 }
 
@@ -1082,11 +1073,11 @@ impl BuiltinsMap {
                 .as_os_str()
                 .to_string_lossy()
                 .into_owned();
-            soln_stream::unifying(u, cwd, &Tm::Txt(dir.into()).into())
+            soln_stream::unifying(u, cwd, &Tm::TxtSeg(dir.into()).into())
         });
 
         def_builtin!(intrs, |_rt, u, [cd] as rel| {
-            if !matches!(cd.as_ref(), Tm::Txt(..)) {
+            if !cd.is_txt() {
                 return Err::ArgumentTypeError {
                     rel: rel.to_string(),
                     key: "cd".into(),
@@ -1097,21 +1088,17 @@ impl BuiltinsMap {
             }
 
             let mut path = String::new();
-            let mut it = cd;
-
-            while let Tm::Txt(txt) = it.as_ref() {
-                path.push_str(txt.segment_as_str());
-                it = txt.segment_tail();
+            match cd.try_collect_txt_to_string(&mut path) {
+                Ok(()) => {}
+                Err(TxtErr::UninstantiatedTail(_)) =>
+                    return Err::UnexpectedPartialList {
+                        rel: rel.to_string(),
+                        key: "cd".into(),
+                        partial: cd.clone(),
+                    }
+                    .into(),
+                Err(e) => return soln_stream::error(e.into()),
             }
-
-            let &Tm::Nil = it.as_ref() else {
-                return Err::UnexpectedPartialList {
-                    rel: rel.to_string(),
-                    key: "cd".into(),
-                    partial: cd.clone(),
-                }
-                .into();
-            };
 
             if let Err(e) = std::env::set_current_dir(path) {
                 return soln_stream::error(e.into());
@@ -1261,7 +1248,24 @@ impl BuiltinsMap {
                     ]).into(),
                     Tm::Int(..) => tm!([int tm.clone()]).into(),
                     Tm::Sym(..) => tm!([sym tm.clone()]).into(),
-                    Tm::Txt(..) => tm!([txt tm.clone()]).into(),
+                    Tm::TxtSeg(seg) => {
+                        tm!([txt
+                            tm!([seg
+                                Tm::Sym(Sym::from(seg.segment_as_str())).into()
+                            ][tail
+                                reify(seg.segment_tail())
+                            ]).into()
+                        ]).into()
+                    }
+                    Tm::TxtCons(car, cdr) => {
+                        tm!([txt
+                            tm!([car
+                                reify(car)
+                            ][cdr
+                                reify(cdr)
+                            ]).into()
+                        ]).into()
+                    }
                     Tm::BinOp(f, lhs, rhs) => tm!([binop
                         tm!([functor
                                 (*f).into()
@@ -1273,7 +1277,7 @@ impl BuiltinsMap {
                         ]).into(),
                     Tm::Block(f, members) => tm!([block
                         tm!([functor
-                                Tm::Sym(IStr::from(f.to_string())).into()
+                                Tm::Sym(Sym::from(f.to_string().as_ref())).into()
                             ][members
                                 RcTm::list_from_iter(members.iter().map(reify))
                             ]).into()
@@ -1297,7 +1301,7 @@ impl BuiltinsMap {
 
         def_builtin!(intrs, |_state, u, [file_path][clauses][directives] as rel| {
             match (file_path.as_ref(), clauses.as_ref(), directives.as_ref()) {
-                (Tm::Txt(..), _, _) => {
+                (txt, _, _) if txt.is_txt() => {
                     let mut path_buf = String::new();
                     if file_path.try_collect_txt_to_string(&mut path_buf).is_err() {
                         return soln_stream::error(Err::UnexpectedPartialList {

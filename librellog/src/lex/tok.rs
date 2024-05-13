@@ -7,6 +7,8 @@ use crate::{
     utils::my_nom::Span,
 };
 
+pub const SPREAD: &str = "..";
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Tok {
     /// Open square bracket `[`
@@ -51,43 +53,83 @@ pub enum Tok {
     Sym(Sym),
     Var(Var),
     Int(Int),
-    Txt(String),
+
+    // ------------------------Text-related Tokens------------------------------
+    /// A double quote mark (`"`) which begins a text template literal.
+    OQuote,
+
+    /// A double quote mark (`"`) which ends a text template literal.
+    CQuote,
+
+    /// Three double quote marks (`"""`) which begin a text template literal.
+    OTripleQuote,
+
+    /// Three double quote marks (`"""`) which end a text template literal.
+    CTripleQuote,
+
+    /// A run of literal characters contained in a text template literal.
+    /// ```text
+    /// "abcdefg[{H I J}]klmnop[{..Rest}]"
+    ///  ^^^^^^^         ^^^^^^
+    ///  ex1             ex2
+    /// ```
+    TxtContent(String),
+
+    /// The symbol `[{` in a text template literal.
+    OTxtInterp,
+
+    /// The symbol `}]` in a text template literal.
+    CTxtInterp,
 }
 
 impl fmt::Display for Tok {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Tok::OBrack => write!(f, "["),
-            Tok::CBrack => write!(f, "]"),
-            Tok::COBrack => write!(f, "]["),
-            Tok::OBrace => write!(f, "{{"),
-            Tok::CBrace => write!(f, "}}"),
-            Tok::OParen => write!(f, "("),
-            Tok::CParen => write!(f, ")"),
-            Tok::Dash => write!(f, "-"),
-            Tok::Pipe => write!(f, "|"),
-            Tok::Comma => write!(f, ","),
-            Tok::Semicolon => write!(f, ";"),
-            Tok::Spread => write!(f, ".."),
-            Tok::Equal => write!(f, "="),
-            Tok::Tilde => write!(f, "~"),
-            Tok::PathSep => write!(f, "::"),
-            Tok::Sym(s) => write!(f, "{s}"),
-            Tok::Var(v) => write!(f, "{v}"),
-            Tok::Int(i) => write!(f, "{i}"),
-            Tok::Txt(s) if s.as_str().contains('\n') => {
-                write!(f, "\"\"\"\n{s}\n\"\"\"")
+        write!(
+            f,
+            "{}",
+            match self {
+                Tok::OBrack => "[",
+                Tok::CBrack => "]",
+                Tok::COBrack => "][",
+                Tok::OBrace => "{",
+                Tok::CBrace => "}",
+                Tok::OParen => "(",
+                Tok::CParen => ")",
+                Tok::Dash => "-",
+                Tok::Pipe => "|",
+                Tok::Comma => ",",
+                Tok::Semicolon => ";",
+                Tok::Spread => SPREAD,
+                Tok::Equal => "=",
+                Tok::Tilde => "~",
+                Tok::PathSep => "::",
+                Tok::Sym(s) => return write!(f, "{s}"),
+                Tok::Var(v) => return write!(f, "{v}"),
+                Tok::Int(i) => return write!(f, "{i}"),
+
+                Tok::OQuote => "\"…",
+                Tok::CQuote => "…\"",
+                Tok::OTripleQuote => "\"\"\"…",
+                Tok::CTripleQuote => "…\"\"\"",
+                Tok::TxtContent(s) => return write!(f, "\"…{s}…\""),
+                Tok::OTxtInterp => "[{",
+                Tok::CTxtInterp => "}]",
             }
-            Tok::Txt(s) => write!(f, "\"{s}\""),
-        }
+        )
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct At<T> {
     pub value: T,
     pub line: u32,
     pub col: usize,
+}
+
+impl<T: fmt::Debug> fmt::Debug for At<T> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}@{}:{}", self.value, self.line, self.col)
+    }
 }
 
 impl<T> At<T> {

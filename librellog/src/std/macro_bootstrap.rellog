@@ -27,7 +27,7 @@
 [macro_head
     [Doc]
 ][options {
-    [decorates [ClauseHead][clause_body _]]
+    [decorates [ClauseHead][clause_body _ThrowAway]]
 }][macro_body
     - logic=[rel ClauseHead][Sig]
     - { [fact [Sig][Doc]] }
@@ -44,7 +44,7 @@
 ][options {
     [decorates [ClauseHead][clause_body _]]
 }][macro_body
-    - { [fact [sig ClauseHead][doc ClauseDoc]] }
+    { [fact [sig ClauseHead][doc ClauseDoc]] }
 ]
 
 

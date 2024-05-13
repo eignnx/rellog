@@ -17,7 +17,7 @@ use crate::{
     parse::{self, Error},
 };
 
-use super::partial_txt::{PartialTxt, PartialTxtErr};
+use super::txt::{Segment, TxtErr};
 
 pub type Rel = Map<Sym, RcTm>;
 
@@ -27,12 +27,23 @@ pub enum Tm {
     Sym(Sym),
     Var(Var),
     Int(Int),
-    Txt(PartialTxt),
     Block(Tok, Vector<RcTm>),
     Rel(Rel),
     BinOp(BinOpSymbol, RcTm, RcTm),
     Cons(RcTm, RcTm),
     Nil,
+    TxtCons(RcTm, RcTm),
+    TxtSeg(Segment),
+}
+
+impl Tm {
+    pub fn is_nil(&self) -> bool {
+        matches!(self, Tm::Nil)
+    }
+
+    pub fn is_txt(&self) -> bool {
+        matches!(self, Tm::Nil | Tm::TxtSeg(..) | Tm::TxtCons(..))
+    }
 }
 
 impl Dup for Tm {
@@ -52,13 +63,8 @@ impl Dup for Tm {
                 Tm::Rel(rel)
             }
             Tm::BinOp(op, x, y) => Tm::BinOp(*op, x.dup(duper), y.dup(duper)),
-            Tm::Txt(txt) => {
-                // Better way to do this? See note in
-                // `<RcTm as DirectChildren>::map_direct_children`
-                let new_tail = txt.segment_tail().dup(duper);
-                let new_txt = PartialTxt::from_string_and_tail(txt.segment_as_str(), new_tail);
-                Tm::Txt(new_txt)
-            }
+            Tm::TxtCons(car, cdr) => Tm::TxtCons(car.dup(duper), cdr.dup(duper)),
+            Tm::TxtSeg(seg) => Tm::TxtSeg(seg.dup(duper)),
             Tm::Sym(_) | Tm::Int(_) | Tm::Nil => self.clone(),
         }
     }
@@ -70,8 +76,14 @@ impl Default for Tm {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct RcTm(Rc<Tm>);
+
+impl fmt::Debug for RcTm {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{:?}", &self.0)
+    }
+}
 
 impl RcTm {
     pub fn try_as_list(&self) -> Option<(Vector<RcTm>, Option<Var>)> {
@@ -137,22 +149,44 @@ impl RcTm {
         Self::from(list)
     }
 
-    pub fn try_collect_txt_to_string(&self, buf: &mut String) -> Result<(), PartialTxtErr> {
-        let mut rc_tm = self;
+    pub fn try_as_char(&self) -> Option<char> {
+        match self.as_ref() {
+            Tm::Sym(s) => {
+                let borr = s.to_str();
+                let mut chars = borr.chars();
+                let first = chars.next();
+                let rest = chars.next();
+                match (first, rest) {
+                    (Some(ch), None) => Some(ch),
+                    _ => None,
+                }
+            }
+            _ => None,
+        }
+    }
+
+    pub fn try_collect_txt_to_string(&self, buf: &mut String) -> Result<(), TxtErr> {
         loop {
-            match rc_tm.as_ref() {
-                Tm::Txt(txt) => {
-                    buf.push_str(txt.segment_as_str());
-                    rc_tm = txt.segment_tail();
+            match self.as_ref() {
+                Tm::TxtCons(car, cdr) => {
+                    match car.try_as_char() {
+                        Some(ch) => buf.push(ch),
+                        None => return Err(TxtErr::NonCharInTxt(car.clone())),
+                    }
+                    cdr.try_collect_txt_to_string(buf)?;
+                }
+                Tm::TxtSeg(seg) => {
+                    buf.push_str(seg.segment_as_str());
+                    seg.tail().try_collect_txt_to_string(buf)?;
                 }
                 Tm::Nil => return Ok(()),
-                Tm::Var(var) => return Err(PartialTxtErr::UninstantiatedTail(var.clone())),
+                Tm::Var(var) => return Err(TxtErr::UninstantiatedTail(var.clone())),
                 Tm::Sym(..)
                 | Tm::Int(..)
                 | Tm::Block(..)
                 | Tm::Rel(..)
                 | Tm::BinOp(..)
-                | Tm::Cons(..) => return Err(PartialTxtErr::NonTxtTail(rc_tm.clone())),
+                | Tm::Cons(..) => return Err(TxtErr::NonTxtTail(self.clone())),
             }
         }
     }
@@ -185,8 +219,15 @@ impl RcTm {
             .into()
     }
 
-    pub fn is_nil(&self) -> bool {
-        matches!(self.as_ref(), Tm::Nil)
+    fn char(ch: char) -> RcTm {
+        let mut s = String::with_capacity(4);
+        s.push(ch);
+        Self::sym(s)
+    }
+
+    #[allow(dead_code)]
+    fn try_unwrap(self) -> Result<Tm, RcTm> {
+        Rc::try_unwrap(self.0).map_err(RcTm)
     }
 }
 
@@ -306,7 +347,7 @@ impl From<Sig> for RcTm {
 
 impl From<String> for RcTm {
     fn from(s: String) -> Self {
-        Self(Rc::new(Tm::Txt(PartialTxt::from(s))))
+        Self(Rc::new(Tm::TxtSeg(Segment::from(s))))
     }
 }
 
@@ -318,7 +359,7 @@ impl From<Rel> for RcTm {
 
 impl From<&Tok> for RcTm {
     fn from(value: &Tok) -> Self {
-        Self(Rc::new(Tm::Sym(value.to_string().into())))
+        Self(Rc::new(Tm::Sym(Sym::from(value.to_string().as_ref()))))
     }
 }
 
@@ -339,50 +380,140 @@ impl ClassifyTerm<Var> for RcTm {
     fn superficially_unifiable(&self, other: &Self) -> bool {
         match (self.as_ref(), other.as_ref()) {
             (Tm::Sym(s1), Tm::Sym(s2)) => s1 == s2,
-            (Tm::Var(_), Tm::Var(_)) => true,
+            (Tm::Var(_), _) | (_, Tm::Var(_)) => true,
             (Tm::Int(n1), Tm::Int(n2)) => n1 == n2,
-            (Tm::Txt(txt1), Tm::Txt(txt2)) => {
-                // We don't *need* to walk the segments because this is supposed
-                // to be a superficial check.
-                let s1 = txt1.segment_as_str();
-                let s2 = txt2.segment_as_str();
-                let prefix_len = usize::min(s1.len(), s2.len());
-                s1[..prefix_len] == s2[..prefix_len]
+            (Tm::TxtSeg(seg1), Tm::TxtSeg(seg2)) => {
+                let s1 = seg1.segment_as_str();
+                let s2 = seg2.segment_as_str();
+                s1.starts_with(s2) || s2.starts_with(s1)
             }
+            (Tm::TxtCons(car1, cdr1), Tm::TxtCons(car2, cdr2)) => {
+                car1.superficially_unifiable(car2) && cdr1.superficially_unifiable(cdr2)
+            }
+            (cons @ Tm::TxtCons(car, cdr), Tm::TxtSeg(seg))
+            | (Tm::TxtSeg(seg), cons @ Tm::TxtCons(car, cdr)) => {
+                let first_char = match seg.segment_as_str().chars().next() {
+                    Some(c) => c,
+                    // If no chars in this segment, check tail.
+                    None => {
+                        return RcTm::from(cons.clone())
+                            .superficially_unifiable(seg.segment_tail());
+                    }
+                };
+                let first_char_sym = RcTm::sym(first_char.to_string().as_str());
+                car.superficially_unifiable(&first_char_sym)
+                // && cdr.superficially_unifiable(&seg_cdr)
+            }
+            (Tm::TxtSeg(seg), Tm::Nil) | (Tm::Nil, Tm::TxtSeg(seg)) => {
+                seg.segment_as_str().is_empty()
+            }
+            (Tm::TxtCons(..), Tm::Nil) | (Tm::Nil, Tm::TxtCons(..)) => false,
             (Tm::Block(f1, _), Tm::Block(f2, _)) => f1 == f2,
             (Tm::Rel(r1), Tm::Rel(r2)) => r1.keys().eq(r2.keys()),
             (Tm::Cons(_, _), Tm::Cons(_, _)) => true,
             (Tm::Nil, Tm::Nil) => true,
             (Tm::BinOp(op1, _, _), Tm::BinOp(op2, _, _)) => op1 == op2,
-            _ => false,
+            ////////////////////////////////////////////////////////////////////
+            (Tm::Sym(_), Tm::Int(_))
+            | (Tm::Sym(_), Tm::Block(_, _))
+            | (Tm::Sym(_), Tm::Rel(_))
+            | (Tm::Sym(_), Tm::BinOp(_, _, _))
+            | (Tm::Sym(_), Tm::Cons(_, _))
+            | (Tm::Sym(_), Tm::Nil)
+            | (Tm::Sym(_), Tm::TxtCons(_, _))
+            | (Tm::Sym(_), Tm::TxtSeg(_)) => false,
+            (Tm::Int(_), Tm::Sym(_))
+            | (Tm::Int(_), Tm::Block(_, _))
+            | (Tm::Int(_), Tm::Rel(_))
+            | (Tm::Int(_), Tm::BinOp(_, _, _))
+            | (Tm::Int(_), Tm::Cons(_, _))
+            | (Tm::Int(_), Tm::Nil)
+            | (Tm::Int(_), Tm::TxtCons(_, _))
+            | (Tm::Int(_), Tm::TxtSeg(_)) => false,
+            (Tm::Block(_, _), Tm::Sym(_))
+            | (Tm::Block(_, _), Tm::Int(_))
+            | (Tm::Block(_, _), Tm::Rel(_))
+            | (Tm::Block(_, _), Tm::BinOp(_, _, _))
+            | (Tm::Block(_, _), Tm::Cons(_, _))
+            | (Tm::Block(_, _), Tm::Nil)
+            | (Tm::Block(_, _), Tm::TxtCons(_, _))
+            | (Tm::Block(_, _), Tm::TxtSeg(_)) => false,
+            (Tm::Rel(_), Tm::Sym(_))
+            | (Tm::Rel(_), Tm::Int(_))
+            | (Tm::Rel(_), Tm::Block(_, _))
+            | (Tm::Rel(_), Tm::BinOp(_, _, _))
+            | (Tm::Rel(_), Tm::Cons(_, _))
+            | (Tm::Rel(_), Tm::Nil)
+            | (Tm::Rel(_), Tm::TxtCons(_, _))
+            | (Tm::Rel(_), Tm::TxtSeg(_)) => false,
+            (Tm::BinOp(_, _, _), Tm::Sym(_))
+            | (Tm::BinOp(_, _, _), Tm::Int(_))
+            | (Tm::BinOp(_, _, _), Tm::Block(_, _))
+            | (Tm::BinOp(_, _, _), Tm::Rel(_))
+            | (Tm::BinOp(_, _, _), Tm::Cons(_, _))
+            | (Tm::BinOp(_, _, _), Tm::Nil)
+            | (Tm::BinOp(_, _, _), Tm::TxtCons(_, _))
+            | (Tm::BinOp(_, _, _), Tm::TxtSeg(_)) => false,
+            (Tm::Cons(_, _), Tm::Sym(_))
+            | (Tm::Cons(_, _), Tm::Int(_))
+            | (Tm::Cons(_, _), Tm::Block(_, _))
+            | (Tm::Cons(_, _), Tm::Rel(_))
+            | (Tm::Cons(_, _), Tm::BinOp(_, _, _))
+            | (Tm::Cons(_, _), Tm::Nil)
+            | (Tm::Cons(_, _), Tm::TxtCons(_, _))
+            | (Tm::Cons(_, _), Tm::TxtSeg(_)) => false,
+            (Tm::Nil, Tm::Sym(_))
+            | (Tm::Nil, Tm::Int(_))
+            | (Tm::Nil, Tm::Block(_, _))
+            | (Tm::Nil, Tm::Rel(_))
+            | (Tm::Nil, Tm::BinOp(_, _, _))
+            | (Tm::Nil, Tm::Cons(_, _)) => false,
+            (Tm::TxtCons(_, _), Tm::Sym(_))
+            | (Tm::TxtCons(_, _), Tm::Int(_))
+            | (Tm::TxtCons(_, _), Tm::Block(_, _))
+            | (Tm::TxtCons(_, _), Tm::Rel(_))
+            | (Tm::TxtCons(_, _), Tm::BinOp(_, _, _))
+            | (Tm::TxtCons(_, _), Tm::Cons(_, _)) => false,
+            (Tm::TxtSeg(_), Tm::Sym(_))
+            | (Tm::TxtSeg(_), Tm::Int(_))
+            | (Tm::TxtSeg(_), Tm::Block(_, _))
+            | (Tm::TxtSeg(_), Tm::Rel(_))
+            | (Tm::TxtSeg(_), Tm::BinOp(_, _, _))
+            | (Tm::TxtSeg(_), Tm::Cons(_, _)) => false,
         }
     }
 }
 
 impl DirectChildren<Var> for RcTm {
-    fn direct_children<'a>(&'a self) -> Box<dyn Iterator<Item = &'a Self> + 'a> {
+    fn direct_children<'a>(&'a self) -> Box<dyn Iterator<Item = Self> + 'a> {
         match self.as_ref() {
             Tm::Sym(_) | Tm::Var(_) | Tm::Int(_) | Tm::Nil => Box::new(iter::empty()),
-            Tm::Txt(txt) => Box::new(iter::once(txt.segment_tail())),
-            Tm::Block(_, members) => Box::new(members.iter()),
-            Tm::Rel(rel) => Box::new(rel.values()),
-            Tm::BinOp(_, x, y) => Box::new([x, y].into_iter()),
-            Tm::Cons(head, tail) => Box::new(iter::once(head).chain(iter::once(tail))),
+            // To the Rellog programmer, a direct child of `"abc"` is "bc",
+            // even if `"abc"` is a `TxtSeg`. In other words, text strings should
+            // feel just like cons cells of characters.
+            Tm::TxtSeg(seg) => match seg.car_cdr() {
+                Ok(Some((car, cdr))) => {
+                    Box::new([RcTm::char(car), Tm::TxtSeg(cdr).into()].into_iter())
+                }
+                _ => Box::new(iter::once(seg.tail().clone())),
+            },
+            Tm::TxtCons(car, cdr) => {
+                Box::new(iter::once(car.clone()).chain(iter::once(cdr.clone())))
+            }
+            Tm::Block(_, members) => Box::new(members.iter().cloned()),
+            Tm::Rel(rel) => Box::new(rel.values().cloned()),
+            Tm::BinOp(_, x, y) => Box::new([x, y].into_iter().cloned()),
+            Tm::Cons(head, tail) => {
+                Box::new(iter::once(head.clone()).chain(iter::once(tail.clone())))
+            }
         }
     }
 
-    fn map_direct_children<'a>(&'a self, mut f: impl FnMut(&'a Self) -> Self + 'a) -> Self {
+    fn map_direct_children(&self, mut f: impl FnMut(&Self) -> Self) -> Self {
         match self.as_ref() {
             Tm::Sym(_) | Tm::Var(_) | Tm::Int(_) | Tm::Nil => self.clone(),
-            Tm::Txt(txt) => {
-                // Here we're only copying this segment's text content. Is this
-                // the best way to do it?
-                // Could we map the tail *first*, then see if it's still
-                // "equivalent" and only copy the text segment if it's not?
-                let new_tail = f(txt.segment_tail());
-                let txt_clone = PartialTxt::from_string_and_tail(txt.segment_as_str(), new_tail);
-                Tm::Txt(txt_clone).into()
-            }
+            Tm::TxtSeg(seg) => map_direct_children_txt_seg(seg, f),
+            Tm::TxtCons(car, cdr) => Tm::TxtCons(f(car), f(cdr)).into(),
             Tm::Block(functor, members) => {
                 Tm::Block(functor.clone(), members.iter().map(f).collect()).into()
             }
@@ -390,6 +521,22 @@ impl DirectChildren<Var> for RcTm {
             Tm::BinOp(op, x, y) => Tm::BinOp(*op, f(x), f(y)).into(),
             Tm::Cons(head, tail) => Tm::Cons(f(head), f(tail)).into(),
         }
+    }
+}
+
+fn map_direct_children_txt_seg(seg: &Segment, mut f: impl FnMut(&RcTm) -> RcTm) -> RcTm {
+    match seg.car_cdr() {
+        Ok(None) => Tm::TxtSeg(seg.clone()).into(),
+        Ok(Some((car, cdr))) => {
+            let new_car = f(&RcTm::char(car));
+            let new_cdr_rctm = f(&Tm::TxtSeg(cdr).into());
+            Tm::TxtCons(new_car, new_cdr_rctm).into()
+        }
+        Err(e) => match e {
+            TxtErr::NonTxtTail(..) => Tm::TxtSeg(seg.clone_with_new_tail(f)).into(),
+            TxtErr::UninstantiatedTail(..) => Tm::TxtSeg(seg.clone_with_new_tail(f)).into(),
+            TxtErr::NonCharInTxt(..) => todo!(),
+        },
     }
 }
 
@@ -431,7 +578,7 @@ pub const DEFERENCE_TABLE: &[BinOpSymbol] = &[
 
 impl From<BinOpSymbol> for Tm {
     fn from(value: BinOpSymbol) -> Self {
-        Tm::Sym(IStr::from(value.to_string()))
+        Tm::Sym(Sym::from(value.to_string().as_ref()))
     }
 }
 
@@ -515,8 +662,11 @@ impl From<&Sig> for Tm {
             .iter()
             .copied()
             .map(|sym| {
-                let pascal = sym.to_str().to_pascal_case();
-                (sym, RcTm::from(Tm::Var(Var::from_source(pascal, None))))
+                let pascal = sym.to_str().to_pascal_case().to_string();
+                (
+                    sym,
+                    RcTm::from(Tm::Var(Var::from_source(pascal.as_str(), None))),
+                )
             })
             .collect();
         Tm::Rel(rel)
@@ -526,7 +676,8 @@ impl From<&Sig> for Tm {
 impl fmt::Display for Sig {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         for key in &self.0 {
-            write!(f, "[{}]", key.to_str().to_pascal_case())?;
+            let key = key.to_str().to_pascal_case().to_string();
+            write!(f, "[{}]", key)?;
         }
         Ok(())
     }
@@ -577,8 +728,9 @@ impl Module {
         filename: PathBuf,
         token_buf: &mut Vec<At<Tok>>,
     ) -> Result<Module, Error<'_>> {
-        let tokens = lex::tokenize_into(token_buf, LocatedSpan::new(src.as_ref()), filename)?;
-        parse::entire_module(tokens)
+        let tokens =
+            lex::tokenize_into(token_buf, LocatedSpan::new(src.as_ref()), filename.clone())?;
+        parse::entire_module(tokens, Some(filename))
     }
 }
 

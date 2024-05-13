@@ -1,0 +1,12 @@
+---
+source: librellog/src/lex/tests.rs
+expression: output
+input_file: librellog/src/lex/snapshot_tests/multiline_txt.rellog
+---
+Ok(
+    [
+        OTripleQuote@1:1,
+        TxtContent("This is a multiline text literal.")@2:1,
+        CTripleQuote@2:34,
+    ],
+)

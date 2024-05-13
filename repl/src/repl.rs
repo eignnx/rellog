@@ -36,11 +36,12 @@ pub struct Repl {
 
 impl Repl {
     pub fn new_loading_files(fnames: Vec<String>) -> Self {
+        #[allow(clippy::arc_with_non_send_sync)]
         let line_editor = Arc::new(LineEditor::new());
         let mut session = Session::new(".").unwrap_or_else(|e| {
             println!(
                 "{}",
-                Color::Red.paint(format!("# Error creating session: {e}"))
+                Color::Red.paint(format!("# Error creating session:\n{e}"))
             );
             println!("{}", Color::Red.paint("# Exiting..."));
             std::process::exit(1);

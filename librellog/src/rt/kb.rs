@@ -45,7 +45,7 @@ impl KnowledgeBase {
 
         let mut tok_buf = Vec::new();
         let tokens = lex::tokenize_into(&mut tok_buf, src.as_ref(), path.as_ref().into())?;
-        let m = parse::entire_module(tokens)?;
+        let m = parse::entire_module(tokens, Some(path))?;
 
         self.import(m);
 

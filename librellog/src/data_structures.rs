@@ -18,8 +18,8 @@ pub type Map<K, V> = RedBlackTreeMap<K, V>;
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Var {
-    pub name: IStr,
-    pub suffix: Option<IStr>,
+    pub name: Sym,
+    pub suffix: Option<Sym>,
     pub gen: Generation,
 }
 
@@ -59,18 +59,20 @@ impl From<Generation> for Tm {
 impl Var {
     pub const SUFFIX_SEPARATOR: &'static str = ".";
 
-    pub fn from_repl(name: impl Into<IStr>, suffix: Option<IStr>) -> Self {
+    pub fn from_repl(name: impl Into<Sym>, suffix: Option<Sym>) -> Self {
+        let name = name.into();
         Self {
-            name: name.into(),
-            suffix: suffix.map(Into::into),
+            name,
+            suffix,
             gen: Generation::Repl,
         }
     }
 
-    pub fn from_source(name: impl Into<IStr>, suffix: Option<IStr>) -> Self {
+    #[track_caller]
+    pub fn from_source(name: impl Into<Sym>, suffix: Option<Sym>) -> Self {
         Self {
             name: name.into(),
-            suffix: suffix.map(Into::into),
+            suffix,
             gen: Generation::Source,
         }
     }
@@ -83,7 +85,7 @@ impl Var {
     }
 
     pub fn is_original(&self) -> bool {
-        matches!(self.gen, Generation::Repl) // Either rename the method or think about Generation::Source.
+        matches!(self.gen, Generation::Repl) // TODO: Either rename the method or think about Generation::Source.
     }
 
     pub fn should_display_at_top_level(&self) -> bool {
@@ -98,7 +100,7 @@ impl Dup for Var {
 }
 
 impl Deref for Var {
-    type Target = IStr;
+    type Target = Sym;
 
     fn deref(&self) -> &Self::Target {
         &self.name

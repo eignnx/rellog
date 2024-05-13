@@ -9,7 +9,7 @@ use crate::{
     lex::tok::Tok,
 };
 
-use super::{partial_txt::PartialTxt, BinOpSymbol};
+use super::{txt::Segment, BinOpSymbol};
 
 #[derive(Clone, Default)]
 pub struct TmDisplayer<'tm> {
@@ -110,7 +110,7 @@ impl<'tm> TmDisplayer<'tm> {
     }
 
     fn fmt_sym(&self, f: &mut Formatter<'_>, sym: &IStr) -> fmt::Result {
-        let sym = sym.to_str();
+        let sym = sym.to_str().to_string();
         if sym.is_empty()
             || sym.contains(|c: char| !c.is_alphanumeric() && c != '_')
             || sym
@@ -170,7 +170,10 @@ impl<'tm> TmDisplayer<'tm> {
                     // writeln!(f, "[{sym}")?;
                     // write!(f, "{}]", self.indent.dedented())?;
                 }
-                (s, Tm::Var(v)) if s.to_str().to_pascal_case() == v.to_str().as_ref() => {
+                #[allow(clippy::cmp_owned)]
+                (s, Tm::Var(v))
+                    if s.to_str().to_pascal_case().to_string() == v.to_str().to_string() =>
+                {
                     write!(f, "[{v}]")?;
                     // writeln!(f, "[{v}")?;
                     // write!(f, "{}]", self.indent.dedented())?;
@@ -191,7 +194,10 @@ impl<'tm> TmDisplayer<'tm> {
                 (s1, Tm::Sym(s2)) if s1 == s2 => {
                     write!(f, "[{sym}]")?;
                 }
-                (s, Tm::Var(v)) if s.to_str().to_pascal_case() == v.to_str().as_ref() => {
+                #[allow(clippy::cmp_owned)]
+                (s, Tm::Var(v))
+                    if s.to_str().to_pascal_case().to_string() == v.to_str().to_string() =>
+                {
                     write!(f, "[{v}]")?;
                 }
                 _ => write!(f, "[{sym} {}]", self.with_tm(tm.as_ref()))?,
@@ -302,13 +308,52 @@ impl<'tm> TmDisplayer<'tm> {
         }
     }
 
-    fn fmt_txt(&self, f: &mut Formatter<'_>, txt: &PartialTxt) -> fmt::Result {
-        let mut txt = txt;
-        let mut content = String::from(txt.segment_as_str());
+    fn fmt_txt(&self, f: &mut Formatter<'_>, seg: &Segment) -> fmt::Result {
+        let mut content = String::from(seg.segment_as_str());
+        self.continue_txt(f, seg.segment_tail(), &mut content)
+    }
 
-        while let Tm::Txt(next_txt) = txt.segment_tail().as_ref() {
-            txt = next_txt;
-            content.push_str(next_txt.segment_as_str());
+    fn fmt_txt_cons(&self, f: &mut Formatter<'_>, car: &RcTm, cdr: &RcTm) -> fmt::Result {
+        let mut content = String::new();
+        if let Some(ch) = car.try_as_char() {
+            content.push(ch);
+        } else {
+            content.push_str(&format!("[{{{}}}]", car));
+        }
+        self.continue_txt(f, cdr, &mut content)
+    }
+
+    fn continue_txt(
+        &self,
+        f: &mut Formatter<'_>,
+        mut tail: &RcTm,
+        content: &mut String,
+    ) -> fmt::Result {
+        loop {
+            match tail.as_ref() {
+                Tm::TxtSeg(ref seg) => {
+                    content.push_str(seg.segment_as_str());
+                    tail = seg.segment_tail();
+                }
+                Tm::TxtCons(car, cdr) => {
+                    match car.try_as_char() {
+                        Some(ch) => content.push(ch),
+                        None => content.push_str(&format!("[{{{}}}]", car)),
+                    }
+                    tail = cdr;
+                }
+                Tm::Nil => break,
+                Tm::Var(_)
+                | Tm::Sym(_)
+                | Tm::Int(_)
+                | Tm::Block(_, _)
+                | Tm::Rel(_)
+                | Tm::BinOp(_, _, _)
+                | Tm::Cons(_, _) => {
+                    write!(content, "[{{..{}}}]", tail)?;
+                    break;
+                }
+            }
         }
 
         let lines: Vec<_> = content.lines().collect();
@@ -326,11 +371,11 @@ impl<'tm> TmDisplayer<'tm> {
             write!(f, "{line}")?;
         }
 
-        if !matches!(txt.segment_tail().as_ref(), Tm::Nil) {
-            // If it's not text, and the tail wasn't Nil, break
-            // and display the tail (either Var or malformed).
-            write!(f, "[{} {tail}]", Tok::Spread, tail = txt.segment_tail())?;
-        }
+        // if !matches!(seg.segment_tail().as_ref(), Tm::Nil) {
+        //     // If it's not text, and the tail wasn't Nil, break
+        //     // and display the tail (either Var or malformed).
+        //     write!(f, "[{} {tail}]", Tok::Spread, tail = seg.segment_tail())?;
+        // }
 
         match lines.len() {
             0 | 1 => f.write_str("\"")?,
@@ -365,7 +410,8 @@ impl<'tm> fmt::Display for TmDisplayer<'tm> {
             Tm::Sym(s) => self.fmt_sym(f, s),
             Tm::Var(v) => write!(f, "{v}"),
             Tm::Int(i) => write!(f, "{i}"),
-            Tm::Txt(txt) => self.fmt_txt(f, txt),
+            Tm::TxtSeg(seg) => self.fmt_txt(f, seg),
+            Tm::TxtCons(car, cdr) => self.fmt_txt_cons(f, car, cdr),
             Tm::Block(functor, members) => self.fmt_block(f, functor, members),
             Tm::Rel(map) => self.fmt_rel(map, f),
             Tm::BinOp(op, x, y) => self.fmt_bin_op(f, op, x, y),

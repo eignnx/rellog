@@ -3,8 +3,7 @@ use std::cell::{Cell, RefCell};
 use rpds::Vector;
 
 use crate::{
-    ast::dup::TmDuplicator,
-    ast::{BinOpSymbol, RcTm, Tm},
+    ast::{dup::TmDuplicator, tm_displayer::TmDisplayer, BinOpSymbol, RcTm, Tm},
     lex::tok::Tok,
     utils::{cloning_iter::CloningIterator, deferred_iter::DeferredIter},
 };
@@ -91,11 +90,11 @@ impl Rt {
             Tm::Rel(_) => self.solve_rel(query.clone(), u, td),
             Tm::Block(functor, members) => match functor {
                 Tok::Pipe => Box::new(
-                    self.solve_or_block(members.clone(), u, td)
+                    self.solve_disjunctive_block(members.clone(), u, td)
                         .chain(self.deferred_decr_recursion_depth()),
                 ),
                 Tok::Dash => Box::new(
-                    self.solve_and_block(members.clone(), u, td)
+                    self.solve_conjunctive_block(members.clone(), u, td)
                         .chain(self.deferred_decr_recursion_depth()),
                 ),
                 _ => {
@@ -137,7 +136,12 @@ impl Rt {
                     )
                 }
             }
-            Tm::Sym(..) | Tm::Int(..) | Tm::Txt(..) | Tm::Cons(..) | Tm::Nil => {
+            Tm::Sym(..)
+            | Tm::Int(..)
+            | Tm::TxtSeg(..)
+            | Tm::TxtCons(..)
+            | Tm::Cons(..)
+            | Tm::Nil => {
                 self.decr_recursion_depth();
                 Err::AttemptToQueryNonCallable(query.clone()).into()
             }
@@ -219,7 +223,7 @@ impl Rt {
         )
     }
 
-    fn solve_or_block<'rtb, 'td, 'it>(
+    fn solve_disjunctive_block<'rtb, 'td, 'it>(
         &'rtb self,
         members: Vector<RcTm>,
         u: UnifierSet,
@@ -234,7 +238,7 @@ impl Rt {
             .flat_map(move |q| self.solve_query_impl(q, u.clone(), td))
     }
 
-    fn solve_and_block<'rtb, 'td, 'it>(
+    fn solve_conjunctive_block<'rtb, 'td, 'it>(
         &'rtb self,
         members: Vector<RcTm>,
         u: UnifierSet,
@@ -302,7 +306,7 @@ fn test_runtime() {
 ";
 
     let tokens = lex::tokenize(src, "".into()).unwrap();
-    let module = parse::entire_module(tokens[..].into()).unwrap();
+    let module = parse::entire_module(tokens[..].into(), "<test_runtime>".into()).unwrap();
 
     let rt = Rt::new(module);
 
