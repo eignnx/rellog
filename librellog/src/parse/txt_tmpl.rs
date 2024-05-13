@@ -204,7 +204,6 @@ fn validate_interps<'ts>(ts: Toks<'ts>, segments: &[TmplSegment]) -> Res<'ts, Tm
 
 fn inner_txt_tmpl(ts: Toks) -> Res<Tm> {
     let (ts, segments): (_, Vec<TmplSegment>) = many0(tmpl_segment).parse(ts)?;
-    dbg!(&segments);
     let (_, tail) = validate_interps(ts.clone(), &segments[..])?;
 
     let mut tmpl = tail;
@@ -237,7 +236,5 @@ fn triple_quoted_txt_tmpl(ts: Toks) -> Res<Tm> {
 }
 
 pub fn txt(ts: Toks) -> Res<Tm> {
-    let (ts, text) = alt((triple_quoted_txt_tmpl, quoted_txt_tmpl)).parse(ts)?;
-    dbg!(&text);
-    Ok((ts, text))
+    alt((triple_quoted_txt_tmpl, quoted_txt_tmpl)).parse(ts)
 }

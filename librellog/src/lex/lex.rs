@@ -210,7 +210,7 @@ fn tokenize_impl<'i>(mut input: Span<'i>, ts: &mut Vec<At<Tok>>) -> Res<'i, ()> 
                 )
                 .parse(input)?;
 
-                let buf = dbg!(String::from(*content.fragment()));
+                let buf = String::from(*content.fragment());
                 if !buf.is_empty() {
                     // Skip empty strings.
                     ts.push(Tok::TxtContent(buf).at(input));

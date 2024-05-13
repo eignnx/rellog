@@ -310,17 +310,14 @@ impl<'tm> TmDisplayer<'tm> {
 
     fn fmt_txt(&self, f: &mut Formatter<'_>, seg: &Segment) -> fmt::Result {
         let mut content = String::from(seg.segment_as_str());
-        dbg!(("Pushin segment", &content));
         self.continue_txt(f, seg.segment_tail(), &mut content)
     }
 
     fn fmt_txt_cons(&self, f: &mut Formatter<'_>, car: &RcTm, cdr: &RcTm) -> fmt::Result {
         let mut content = String::new();
         if let Some(ch) = car.try_as_char() {
-            dbg!(("Pushing char", ch));
             content.push(ch);
         } else {
-            dbg!(("Pushing non-char", &car));
             content.push_str(&format!("[{{{}}}]", car));
         }
         self.continue_txt(f, cdr, &mut content)
@@ -333,14 +330,12 @@ impl<'tm> TmDisplayer<'tm> {
         content: &mut String,
     ) -> fmt::Result {
         loop {
-            match dbg!(tail.as_ref()) {
+            match tail.as_ref() {
                 Tm::TxtSeg(ref seg) => {
                     content.push_str(seg.segment_as_str());
-                    dbg!(("Pushing segment", seg.segment_as_str()));
                     tail = seg.segment_tail();
                 }
                 Tm::TxtCons(car, cdr) => {
-                    dbg!(&car);
                     match car.try_as_char() {
                         Some(ch) => content.push(ch),
                         None => content.push_str(&format!("[{{{}}}]", car)),
@@ -362,7 +357,6 @@ impl<'tm> TmDisplayer<'tm> {
         }
 
         let lines: Vec<_> = content.lines().collect();
-        dbg!(&lines);
 
         // Print the opening quote mark(s)
         match lines.len() {
@@ -374,7 +368,6 @@ impl<'tm> TmDisplayer<'tm> {
             if lines.len() > 1 {
                 write!(f, "\n{}", self.indent)?;
             }
-            dbg!(("Writing line", line));
             write!(f, "{line}")?;
         }
 

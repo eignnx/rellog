@@ -73,10 +73,6 @@ impl Rt {
         'rtb: 'it,
         'td: 'it,
     {
-        // eprintln!(
-        //     ">>> solve_query_impl:\n{}",
-        //     TmDisplayer::default().indenting(&query)
-        // );
         self.query_stack.borrow_mut().push(u.reify_term(&query));
         self.maybe_breakpoint(Event::Call);
 

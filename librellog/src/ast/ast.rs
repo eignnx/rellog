@@ -171,7 +171,7 @@ impl RcTm {
                 Tm::TxtCons(car, cdr) => {
                     match car.try_as_char() {
                         Some(ch) => buf.push(ch),
-                        None => return dbg!(Err(TxtErr::NonCharInTxt(car.clone()))),
+                        None => return Err(TxtErr::NonCharInTxt(car.clone())),
                     }
                     cdr.try_collect_txt_to_string(buf)?;
                 }
@@ -180,7 +180,7 @@ impl RcTm {
                     seg.tail().try_collect_txt_to_string(buf)?;
                 }
                 Tm::Nil => return Ok(()),
-                Tm::Var(var) => return dbg!(Err(TxtErr::UninstantiatedTail(var.clone()))),
+                Tm::Var(var) => return Err(TxtErr::UninstantiatedTail(var.clone())),
                 Tm::Sym(..)
                 | Tm::Int(..)
                 | Tm::Block(..)
@@ -380,35 +380,32 @@ impl ClassifyTerm<Var> for RcTm {
     fn superficially_unifiable(&self, other: &Self) -> bool {
         match (self.as_ref(), other.as_ref()) {
             (Tm::Sym(s1), Tm::Sym(s2)) => s1 == s2,
-            (Tm::Var(_), _) | (_, Tm::Var(_)) => dbg!(true),
+            (Tm::Var(_), _) | (_, Tm::Var(_)) => true,
             (Tm::Int(n1), Tm::Int(n2)) => n1 == n2,
             (Tm::TxtSeg(seg1), Tm::TxtSeg(seg2)) => {
-                let s1 = dbg!(seg1.segment_as_str());
-                let s2 = dbg!(seg2.segment_as_str());
+                let s1 = seg1.segment_as_str();
+                let s2 = seg2.segment_as_str();
                 s1.starts_with(s2) || s2.starts_with(s1)
             }
             (Tm::TxtCons(car1, cdr1), Tm::TxtCons(car2, cdr2)) => {
-                car1.superficially_unifiable(car2) //&& cdr1.superficially_unifiable(cdr2)
+                car1.superficially_unifiable(car2) && cdr1.superficially_unifiable(cdr2)
             }
             (cons @ Tm::TxtCons(car, cdr), Tm::TxtSeg(seg))
             | (Tm::TxtSeg(seg), cons @ Tm::TxtCons(car, cdr)) => {
-                dbg!(seg.segment_as_str(), car, cdr);
                 let first_char = match seg.segment_as_str().chars().next() {
                     Some(c) => c,
                     // If no chars in this segment, check tail.
                     None => {
-                        println!(">>>>>>>>>>>>>>>>>>> No chars in string segment.");
                         return RcTm::from(cons.clone())
                             .superficially_unifiable(seg.segment_tail());
                     }
                 };
-                dbg!(first_char);
                 let first_char_sym = RcTm::sym(first_char.to_string().as_str());
-                dbg!(car.superficially_unifiable(&first_char_sym))
+                car.superficially_unifiable(&first_char_sym)
                 // && cdr.superficially_unifiable(&seg_cdr)
             }
             (Tm::TxtSeg(seg), Tm::Nil) | (Tm::Nil, Tm::TxtSeg(seg)) => {
-                dbg!(dbg!(seg.segment_as_str()).is_empty())
+                seg.segment_as_str().is_empty()
             }
             (Tm::TxtCons(..), Tm::Nil) | (Tm::Nil, Tm::TxtCons(..)) => false,
             (Tm::Block(f1, _), Tm::Block(f2, _)) => f1 == f2,
@@ -494,7 +491,7 @@ impl DirectChildren<Var> for RcTm {
             // To the Rellog programmer, a direct child of `"abc"` is "bc",
             // even if `"abc"` is a `TxtSeg`. In other words, text strings should
             // feel just like cons cells of characters.
-            Tm::TxtSeg(seg) => match dbg!(seg.car_cdr()) {
+            Tm::TxtSeg(seg) => match seg.car_cdr() {
                 Ok(Some((car, cdr))) => {
                     Box::new([RcTm::char(car), Tm::TxtSeg(cdr).into()].into_iter())
                 }
@@ -515,44 +512,7 @@ impl DirectChildren<Var> for RcTm {
     fn map_direct_children(&self, mut f: impl FnMut(&Self) -> Self) -> Self {
         match self.as_ref() {
             Tm::Sym(_) | Tm::Var(_) | Tm::Int(_) | Tm::Nil => self.clone(),
-            Tm::TxtSeg(seg) => match seg.car_cdr() {
-                Ok(Some((car, cdr))) => {
-                    // TODO(perf): Is it safe to reuse `car` instead of "computing" `new_car`?
-                    let Some(new_car) = f(&RcTm::char(car)).try_as_char() else {
-                        unreachable!()
-                    };
-                    let new_cdr_rctm = f(&Tm::TxtSeg(cdr).into());
-                    match new_cdr_rctm.as_ref() {
-                        Tm::TxtSeg(new_cdr) => Tm::TxtSeg(new_cdr.cons(new_car)).into(),
-                        other => Tm::TxtCons(RcTm::char(new_car), other.clone().into()).into(),
-                    }
-                }
-                Ok(None) => {
-                    println!(">>>>>>> car_cdr == Ok(None): Self == {self:?}, seg == {seg:?}");
-                    Tm::TxtSeg(Segment::from_string_and_tail(
-                        seg.segment_as_str(),
-                        f(seg.tail()),
-                    ))
-                    .into()
-                }
-                _ => unimplemented!(),
-            },
-            // Tm::TxtSeg(seg) => {
-            //     /////////////////////////////////////////
-            //     match seg.car_cdr() {
-            //         Ok(Some((car, cdr))) => {
-            //             let new_tail = f(&Tm::TxtSeg(cdr).into());
-            //             let seg_clone =
-            //                 Segment::from_string_and_tail(car.segment_as_str(), new_tail);
-            //             Tm::TxtSeg(seg_clone).into()
-            //         }
-            //         Ok(None) => self.clone(),
-            //         Err(_) => self.clone(),
-            //     }
-            //     // let new_tail = f(seg.tail());
-            //     // let seg_clone = Segment::from_string_and_tail(seg.segment_as_str(), new_tail);
-            //     // Tm::TxtSeg(seg_clone).into()
-            // }
+            Tm::TxtSeg(seg) => map_direct_children_txt_seg(seg, f),
             Tm::TxtCons(car, cdr) => Tm::TxtCons(f(car), f(cdr)).into(),
             Tm::Block(functor, members) => {
                 Tm::Block(functor.clone(), members.iter().map(f).collect()).into()
@@ -561,6 +521,22 @@ impl DirectChildren<Var> for RcTm {
             Tm::BinOp(op, x, y) => Tm::BinOp(*op, f(x), f(y)).into(),
             Tm::Cons(head, tail) => Tm::Cons(f(head), f(tail)).into(),
         }
+    }
+}
+
+fn map_direct_children_txt_seg(seg: &Segment, mut f: impl FnMut(&RcTm) -> RcTm) -> RcTm {
+    match seg.car_cdr() {
+        Ok(None) => Tm::TxtSeg(seg.clone()).into(),
+        Ok(Some((car, cdr))) => {
+            let new_car = f(&RcTm::char(car));
+            let new_cdr_rctm = f(&Tm::TxtSeg(cdr).into());
+            Tm::TxtCons(new_car, new_cdr_rctm).into()
+        }
+        Err(e) => match e {
+            TxtErr::NonTxtTail(..) => Tm::TxtSeg(seg.clone_with_new_tail(f)).into(),
+            TxtErr::UninstantiatedTail(..) => Tm::TxtSeg(seg.clone_with_new_tail(f)).into(),
+            TxtErr::NonCharInTxt(..) => todo!(),
+        },
     }
 }
 
