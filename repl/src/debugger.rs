@@ -203,7 +203,7 @@ impl Debugger {
 
     fn print_help(&self) {
         println!("# Debugger Help");
-        println!("#  help | h                Show debugger help.");
+        println!("#  help | h | ?            Show debugger help.");
         println!("#  nodebug | d | nodbg     Quit debugger.");
         println!("#  step | <ENTER>          Advance to the goal to be solved.");
         println!("#  (watch | w) WATCH_CRIT  Add a watch criterion.");
