@@ -1,0 +1,21 @@
+[gen_docs][Before][After]
+    Before = "
+    # Documentation
+    Multiline?
+    [{..After}]"
+
+[Tag][Inner]
+    - "<"; Tag; ">"
+    - Inner
+    - "</"; Tag; ">"
+
+[impl][Sig][Doc]
+    - "<section>"
+    - "<h1>"; [fmt_sig Sig]; "</h1>"
+    - "<p>"; Doc; "</p>"
+    - "</section>"
+
+[fmt_sig Sig]
+    - logic=[term Sig][Text]
+    - Text
+
