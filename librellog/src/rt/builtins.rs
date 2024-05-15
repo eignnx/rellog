@@ -1231,6 +1231,42 @@ impl BuiltinsMap {
                 .map(Ok))
         });
 
+        def_builtin!(intrs, |_state, u, [tm][class] as _rel| {
+            let cls = match tm.as_ref() {
+                Tm::Nil  => tm.clone(),
+                Tm::Cons(..) => tm.clone(),
+                Tm::Var(v) => tm!([var
+                    tm!([name
+                        Tm::Sym(v.name).into()
+                    ][suffix
+                        v.suffix.map(|s| Tm::Sym(s).into()).unwrap_or(Tm::Nil.into())
+                    ][gen
+                        v.gen.into()
+                    ]).into()
+                ]).into(),
+                Tm::Int(..) => Tm::Sym("int".into()).into(),
+                Tm::Sym(..) => Tm::Sym("sym".into()).into(),
+                Tm::TxtSeg(..) => Tm::Sym("txt".into()).into(),
+                Tm::TxtCons(..) => Tm::Sym("txt".into()).into(),
+                Tm::BinOp(f, ..) => tm!([binop (*f).into()]).into(),
+                Tm::Block(f, members) => tm!([block
+                    tm!([functor
+                            Tm::Sym(Sym::from(f.to_string().as_ref())).into()
+                        ][members
+                            RcTm::list_from_iter(members.iter().cloned())
+                        ]).into()
+                    ]).into(),
+                Tm::Rel(rel) => tm!([rel
+                        Tm::Rel(rel.iter().map(|(k, _)| {
+                            let k_sym: RcTm = Tm::Sym(*k).into();
+                            (*k, k_sym) // TODO: use key-variable pairs instead of key-symbol pairs (make it a Sig).
+                        }).collect()).into()
+                    ]).into(),
+            };
+
+            soln_stream::unifying(u, class, &cls)
+        });
+
         def_builtin!(intrs, |_state, u, [tm_in][reified_tm_out] as _rel| {
 
             fn reify(tm: &RcTm) -> RcTm {
