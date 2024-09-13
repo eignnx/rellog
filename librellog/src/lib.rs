@@ -3,6 +3,7 @@
 
 pub mod ast;
 pub mod data_structures;
+pub mod det;
 pub mod interner;
 pub mod lex;
 pub mod parse;
