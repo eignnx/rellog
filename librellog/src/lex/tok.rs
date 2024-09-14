@@ -8,6 +8,7 @@ use crate::{
 };
 
 pub const SPREAD: &str = "..";
+pub const EOL_COMMENT_BEGIN: &str = "#";
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Tok {

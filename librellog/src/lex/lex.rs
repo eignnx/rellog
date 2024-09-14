@@ -17,7 +17,7 @@ use nom::{
 };
 use nom_i9n::{I9nInput, TokenizedInput};
 
-use super::tok::SPREAD;
+use super::tok::{EOL_COMMENT_BEGIN, SPREAD};
 
 fn unquoted_sym(i: Span) -> Res<Sym> {
     recognize(tuple((
@@ -176,6 +176,11 @@ fn expr_tok(i: Span) -> Res<Tok> {
     .parse(i)
 }
 
+fn comment(i: Span) -> Res<()> {
+    let (i, _) = opt(preceded(tag(EOL_COMMENT_BEGIN), take_while(|c| c != '\n'))).parse(i)?;
+    Ok((i, ()))
+}
+
 fn tokenize_impl<'i>(mut input: Span<'i>, ts: &mut Vec<At<Tok>>) -> Res<'i, ()> {
     let mut stack: Vec<LexCtx> = vec![LexCtx::Expr];
 
@@ -185,7 +190,9 @@ fn tokenize_impl<'i>(mut input: Span<'i>, ts: &mut Vec<At<Tok>>) -> Res<'i, ()> 
             .expect("stack begins initialized with LexCtx::Expr");
         let (i, t) = match state {
             LexCtx::Expr => {
-                let (i_after_ws, _) = multispace0(input)?;
+                let (i, _) = multispace0(input)?;
+                let (i, _comment) = comment(i)?;
+                let (i_after_ws, _) = multispace0(i)?;
                 let (i, t) = context("Token in expression context", expr_tok)(i_after_ws)?;
                 (i, t.at(i_after_ws))
             }
