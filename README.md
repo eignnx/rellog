@@ -4,7 +4,7 @@ It means "Relational Prolog".
 
 ## Idea
 
-Instead of predicates, this implementation focuses on relations. A Prolog predicate can be thought of as a name and an ordered tuple of arguments, but a Rellog relation is an unordered collection of name-value pairs (called attributes).
+Instead of **predicates**, this implementation focuses on **relations**. A Prolog predicate can be thought of as a name and an ordered tuple of arguments, but a Rellog relation is an unordered collection of name-value pairs (called attributes).
 
 While in Prolog you might write
 
@@ -14,9 +14,9 @@ append([1, 2], [3, 4], Compound)
 
 in Rellog you could write any of the following:
 
-```clojure
+```perl
 [prefix {1 2}][suffix {3 4}][compound Compound]
-[prefix {1 2}][suffix {3 4}][Compound]
+[prefix {1 2}][suffix {3 4}][Compound] # (Argument punning for `Compound`)
 [suffix {3 4}][prefix {1 2}][Compound]
 [suffix {3 4}][Compound][prefix {1 2}]
 [prefix {1 2}][Compound][suffix {3 4}]
@@ -26,15 +26,15 @@ in Rellog you could write any of the following:
 
 ## Example
 
-```clojure
+```perl
 [prefix {}][Suffix][compound Suffix]
 [prefix {A ..As}][Suffix][compound {A ..Compound}]
     - [prefix As][suffix Suffix][Compound]
 
-[forward {}][backward {}]
-[forward {A ..As}][Backward]
-    - [forward As][backward AsBackward]
-    - [prefix AsBackward][suffix {A}][compound Backward]
+[forwards {}][backwards {}]
+[forwards {A ..As}][Backwards]
+    - [forwards As][backwards AsBackwards]
+    - [prefix AsBackwards][suffix {A}][compound Backwards]
 ```
 
 Note that conjunctions are expressed as indented `-`-preceded lists.
@@ -42,7 +42,7 @@ Note that conjunctions are expressed as indented `-`-preceded lists.
 ## Goals
 
 * Focus on relations between values rather than names of relations.
-* Be easy to type. Avoid unusual symbols (like backtick, ampersand, caret, fore/backslash, tilde).
+* Be easy to type, avoid symbols requiring holding the `shift` key.
 * Have clean, simple syntax for grammars (DCGs).
 * Have efficient string types that still feel like lists.
 * Prioritize automatic choicepoint elimination rather than efficiency. This makes irrelevant many common uses of "cut."
@@ -71,7 +71,6 @@ $ cargo run
 
 ### Table of Contents
 - [Overview: The Big Ideas](#overview-the-big-ideas)
-- [Getting Help](#getting-help)
 - [Clauses](#clauses)
 - [Rellog Values](#rellog-values)
     - [Symbols](#symbols)
@@ -82,6 +81,7 @@ $ cargo run
     - [Operators](#operators)
     - [Lists](#lists)
     - [Blocks](#blocks)
+- [Getting Help](#getting-help)
 - [The REPL](#the-repl)
 
 
@@ -91,11 +91,11 @@ Rellog is all about ***relations***. A relation is a set of associations of valu
 
 An example of a relation might be a student-teacher relationship. In Rellog, the sentence "Gideon and Aditya are students of Dr. Blum" could be expressed as two facts about the world:
 
-```clojure
-[[comment "Fact #1:"]]
+```perl
+# Fact #1:
 [student gideon][teacher dr_blum]
 
-[[comment "Fact #2:"]]
+# Fact #2:
 [student aditya][teacher dr_blum]
 ```
 
@@ -135,20 +135,25 @@ An interesting question to ask might be "who are all the students of Dr. Na?"
 
 We can pose this question as a Rellog query in the REPL:
 
-```clojure
--- [instructor dr_na][Course];
-   [Course][Student]
+> Note: lines beginning with two dashes (`--`) are meant to be entered in the REPL.
+
+```perl
+-- [instructor dr_na][Course] ; [Course][Student]
 
     - Course = cmpsc439
-    - Student = gideon
+    - Student = gideon # Press ENTER to search for additional solutions
 |
     - Course = cmpsc439
     - Student = aditya
+    # Exactly 1 solution found.
 ```
+
+The system says there are two solutions to the query. In the first one, `Course` is bound to `cmpsc439` and `Student` is bound to `gideon`. Pressing `ENTER` has rellog go search for more solutions, if there are any. In this case one other solution is found.
 
 We could even define the `[Student][Teacher]` relation in Rellog by writing a fact with a collection of conditions:
 
-```clojure
+```perl
+# In a .rellog file:
 [Student][Teacher]
     - [instructor Teacher][Course]
     - [Course][Student]
@@ -162,44 +167,13 @@ This rule says:
 
 Now, to ask who Gideon's teachers are we could query:
 
-```yaml
+```perl
 -- [student gideon][Teacher]
 
     - Teacher = dr_null
 |
     - Teacher = dr_na
 ```
-
-### Getting Help
-
-There are many relations predefined for you to use in your Rellog code. Use the `[Sig][Doc]` relation to query them:
-
-```yaml
--- [Sig][Doc]
-
-    - Sig = [Prefix][Suffix][Compound]
-    - Doc =
-       """
-       Relates a list `Compound` to some partitioning 
-       of itself into a `Prefix` and a `Suffix`. Also 
-       works for text strings.
-       """
-```
-
-The `[Sig][Help]` relation is good to use to document your own relations too.
-
-There's also the `[Help]` relation. It performs a side-effect when queried (so it's not a pure relation). It prints out the `Help` text associated with the signature passed in:
-
-```
--- [help [Pred][Succ]]
-
-Relation: [Pred][Succ]
---------------
-Relates two adjacent integers: a predecessor and a successor.
-```
-
-
-It's just a little easier on the eyes.
 
 ### Clauses
 
@@ -227,7 +201,7 @@ A clause is a top-level definition. A clause is either:
     This rule says "an `X` is `mortal` if that `X` is `human`.
 
     Lets query the `mortal` rule.
-    ```yaml
+    ```perl
     -- [mortal socrates]
         - [true] # Exactly 1 solution found.
     
@@ -263,6 +237,8 @@ area_51
 multiply
 
 'NotAVariable'
+
+'still 1 singular/valid @symbol'
 ```
 
 #### Integers
@@ -276,13 +252,26 @@ Arbitrarily-sized integers (positive or negative whole numbers)
 - Represent textual data.
 - Useful when text must be constructed or parsed.
 - **Warning: Text is still a work in progress.**
+
+##### Text Templates
+Text templates allow manipulation of text in the same way that lists can be manipulated. Compare the following:
+
+| Lists | Text |
+|-------|------|
+| `{1 2 3}` | `"abc"` |
+| `{1 2 ..Rest}` | `"ab[{..Rest}]"` |
+| `{1 X 3}` | `"a[{X}]c"` |
+| `{1 X Y 4 5}` | `"a[{X Y}]de"` |
+
+Note: You can only have one spread segment (`[{..Variable}]`) per text template, and it must appear at the very end of the literal. You can have as many character interpolation segments (like `[{Char}]`) as you like though.
+
 ##### Examples
-```python
+```perl
 "Hello?"
 
 "Text strings may contain spaces and punctuation."
 
-# The remainder of this example is 1 text string literal:
+# The following is 1 text string literal:
 """
 They can also be multi-line.
 
@@ -294,19 +283,52 @@ a single paragraph.
 
 Double linebreaks create a new paragraph.
 """
+
+# The following text templates are equivalent:
+"abc"
+"a[{b}]c"
+"[{a}]b[{c}]"
+"[{a b c}]"
+"a[{.."bc"}]"
+"[{a}][{.."bc"}]"
+"a[{.."b[{.."c"}]"}]"
 ```
+
 
 #### Variables
 - Must start with a capital letter or an underscore (`_`).
 - Very similar to variables in *algebra*.
 - Less similar to the variables in *imperative programming languages*.
 - May be *known* (bound to a specific value) or *unknown* (not yet bound to a value).
+- May optionally contain a period (`.`) which adds a distinguishing suffix.
+    - The suffix may be a (non-negative) integer, or an (unquoted) [symbol](#symbols).
 
 ##### Examples
 
-`X`, `ListReversed`, `State0`, `_123`
+`X`, `ListReversed`, `Pos2D`, `_123`, `X.0`, `State.final`
 
-#### Relations
+###### Suffixes
+
+Two variables with the same prefix but different suffixes (for example `S.0` and `S.1`) are seen as:
+1. distinct from the perspective of the runtime, but
+2. identical for the purposes of [argument punning](#argument-punning).
+
+In the following example, the variables `Arg.sub` and `Arg.sup` are distinct variables because their suffixes are different (`sub` vs `sup`), but are able to be punned in the same way because they have the same stem (`Arg`).
+
+```perl
+[[clause_doc "<:->"]]
+[in Tcx.0][sub [Arg.sub][Ret.sub]][sup [Arg.sup][Ret.sup]][out Tcx]
+    - [sub Arg.sup][sup Arg.sub][in Tcx.0][out Tcx.1]
+    - [fn [subst Tcx.1][tm Ret.sub]][ret Ret.sub1]
+    - [fn [subst Tcx.1][tm Ret.sup]][ret Ret.sup1]
+    - [sub Ret.sub1][sup Ret.sup1][in Tcx.1][out Tcx]
+```
+
+In other words, the following two lists are syntactically equivalent terms:
+- `{[arg Arg.sub] blah [arg Arg.sup]}`
+- `{[Arg.sub] blah [Arg.sup]}`
+
+#### Relation Values
 
 - Sets of ***key-value pairs***. We call a key-value pair an ***attribute***.
 - The set of keys defines the name of a relation e.i. the set `{k1, k2, k3}` corresponds to a relation whose ***signature*** is `[K1][K2][K3]`.
@@ -318,6 +340,20 @@ Double linebreaks create a new paragraph.
     ```yaml
     [List]   [Member]
     ```
+
+##### Argument Punning
+If the name of the key of a relation's attribute is the same\* as the name of the variable or symbol which is it's value, the key may be omitted.
+
+For example:
+```yaml
+[fav_color FavColor] = [FavColor]
+[the_name the_name] = [the_name]
+```
+
+\* Names are compared by converting out of snake_case/PascalCase first e.g. `FavColor or fav_color --> {fav color}` and `the_name --> {the name}`.
+
+See also: [Variable Suffixes](#suffixes)
+
 ##### Examples
 ```yaml
 [list L][member M]
@@ -329,7 +365,7 @@ Double linebreaks create a new paragraph.
 
 [numerator 4][denominator 3][Quotient][Remainder]
 
-# The following 2 are the same:
+# The following 2 are the same due to argument punning:
 [Prefix][Suffix][Compound]
 [prefix Prefix][suffix Suffix][compound Compound]
 
@@ -444,6 +480,38 @@ The following is an abbreviation used to write out lists:
 | [or][that 49]
 | [or][even][this]
 ```
+
+### Getting Help
+
+There are many relations predefined for you to use in your Rellog code. Use the `[Sig][Doc]` relation to query them:
+
+```yaml
+-- [Sig][Doc]
+
+    - Sig = [Prefix][Suffix][Compound]
+    - Doc =
+       """
+       Relates a list `Compound` to some partitioning 
+       of itself into a `Prefix` and a `Suffix`. Also 
+       works for text strings.
+       """
+```
+
+The `[Sig][Help]` relation is good to use to document your own relations too.
+
+There's also the `[Help]` relation. It performs a side-effect when queried (so it's not a pure relation). It prints out the `Help` text associated with the signature passed in:
+
+```
+-- [help [Pred][Succ]]
+
+Relation: [Pred][Succ]
+--------------
+Relates two adjacent integers: a predecessor and a successor.
+```
+
+It's just a little easier on the eyes.
+
+
 
 ### The REPL
 
