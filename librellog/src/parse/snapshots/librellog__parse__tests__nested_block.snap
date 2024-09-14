@@ -1,0 +1,20 @@
+---
+source: librellog/src/parse/tests.rs
+expression: parse_to_tm(src)
+---
+Ok(
+    Block(
+        Dash,
+        Vector {
+            root: Leaf(
+                [
+                    Rel(RedBlackTreeMap { root: Some(Node { entry: Entry { key: Sym(blah), value: Var(Var(Blah$)) }, color: Black, left: None, right: None }), size: 1 }),
+                    Block(Pipe, Vector { root: Leaf([Rel(RedBlackTreeMap { root: Some(Node { entry: Entry { key: Sym(blah), value: Var(Var(Blah$)) }, color: Black, left: None, right: None }), size: 1 }), Rel(RedBlackTreeMap { root: Some(Node { entry: Entry { key: Sym(blah), value: Var(Var(Blah$)) }, color: Black, left: None, right: None }), size: 1 })]), bits: 5, length: 2 }),
+                    Rel(RedBlackTreeMap { root: Some(Node { entry: Entry { key: Sym(blah), value: Var(Var(Blah$)) }, color: Black, left: None, right: None }), size: 1 }),
+                ],
+            ),
+            bits: 5,
+            length: 3,
+        },
+    ),
+)

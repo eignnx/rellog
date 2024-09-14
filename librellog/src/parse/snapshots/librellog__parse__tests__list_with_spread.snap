@@ -1,0 +1,10 @@
+---
+source: librellog/src/parse/tests.rs
+expression: parse_to_tm(src)
+---
+Ok(
+    Cons(
+        Var(Var(X$)),
+        Var(Var(Xs$)),
+    ),
+)

@@ -1,0 +1,42 @@
+---
+source: librellog/src/parse/tests.rs
+expression: parse_to_tm(src)
+---
+Ok(
+    Rel(
+        RedBlackTreeMap {
+            root: Some(
+                Node {
+                    entry: Entry {
+                        key: Sym(initial),
+                        value: Var(Var(Sublist$)),
+                    },
+                    color: Black,
+                    left: Some(
+                        Node {
+                            entry: Entry {
+                                key: Sym(goal),
+                                value: Rel(RedBlackTreeMap { root: Some(Node { entry: Entry { key: Sym(list), value: Var(Var(List$)) }, color: Black, left: None, right: Some(Node { entry: Entry { key: Sym(pred), value: Var(Var(Pred$)) }, color: Red, left: None, right: None }) }), size: 2 }),
+                            },
+                            color: Black,
+                            left: None,
+                            right: None,
+                        },
+                    ),
+                    right: Some(
+                        Node {
+                            entry: Entry {
+                                key: Sym(final),
+                                value: Sym(Sym(empty_list)),
+                            },
+                            color: Black,
+                            left: None,
+                            right: None,
+                        },
+                    ),
+                },
+            ),
+            size: 3,
+        },
+    ),
+)

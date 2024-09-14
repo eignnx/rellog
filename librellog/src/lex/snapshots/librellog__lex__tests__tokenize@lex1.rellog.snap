@@ -7,7 +7,7 @@ Ok(
     [
         OBrack@1:1,
         Sym(Sym(mortal))@1:2,
-        Sym(Sym(socrates))@1:8,
+        Sym(Sym(socrates))@1:9,
         CBrack@1:17,
     ],
 )

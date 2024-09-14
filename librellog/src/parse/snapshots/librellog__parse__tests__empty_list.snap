@@ -1,6 +1,5 @@
 ---
 source: librellog/src/parse/tests.rs
-assertion_line: 60
 expression: "parse_to_tm(\"{}\")"
 ---
 Ok(

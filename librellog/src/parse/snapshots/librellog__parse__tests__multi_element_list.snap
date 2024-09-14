@@ -1,0 +1,10 @@
+---
+source: librellog/src/parse/tests.rs
+expression: parse_to_tm(src)
+---
+Ok(
+    Cons(
+        Int(123),
+        Cons(TxtSeg("asdf"->Nil), Cons(Nil, Cons(Rel(RedBlackTreeMap { root: Some(Node { entry: Entry { key: Sym(aardvark), value: Sym(Sym(aardvark)) }, color: Black, left: None, right: Some(Node { entry: Entry { key: Sym(zebra), value: Var(Var(Zebra$)) }, color: Red, left: None, right: None }) }), size: 2 }), Cons(Sym(Sym(socrates)), Cons(Var(Var(Unknown$)), Cons(Cons(Int(1), Cons(Int(2), Cons(Int(3), Nil))), Nil)))))),
+    ),
+)
