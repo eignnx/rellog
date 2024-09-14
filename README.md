@@ -14,7 +14,7 @@ append([1, 2], [3, 4], Compound)
 
 in Rellog you could write any of the following:
 
-```perl
+```ruby
 [prefix {1 2}][suffix {3 4}][compound Compound]
 [prefix {1 2}][suffix {3 4}][Compound] # (Argument punning for `Compound`)
 [suffix {3 4}][prefix {1 2}][Compound]
@@ -26,18 +26,31 @@ in Rellog you could write any of the following:
 
 ## Example
 
-```perl
+```ruby
 [prefix {}][Suffix][compound Suffix]
-[prefix {A ..As}][Suffix][compound {A ..Compound}]
-    - [prefix As][suffix Suffix][Compound]
+[prefix {First ..Rest}][Suffix][compound {First ..Compound}]
+    - [prefix Rest][suffix Suffix][Compound]
 
 [forwards {}][backwards {}]
-[forwards {A ..As}][Backwards]
-    - [forwards As][backwards AsBackwards]
-    - [prefix AsBackwards][suffix {A}][compound Backwards]
+[forwards {First ..Forwards.rest}][Backwards]
+    - [Forwards.rest][Backwards.rest]
+    - [prefix Backwards.rest][suffix {First}][compound Backwards]
 ```
 
 Note that conjunctions are expressed as indented `-`-preceded lists.
+
+The equivalent Prolog code would be:
+
+```prolog
+append([], Suffix, Suffix).
+append([First | Rest], Suffix, [First | Compound]) :-
+    append(Rest, Suffix, Compound).
+
+reverse([], []).
+reverse([First | Rest], Backwards) :-
+    reverse(Rest, RestReversed),
+    append(RestReversed, [First], Backwards).
+```
 
 ## Goals
 
