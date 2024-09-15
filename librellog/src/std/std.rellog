@@ -1,10 +1,5 @@
-
-[[comment
-    """
-    [Prefix][Suffix][Compound]
-        - [txt_prefix Prefix][txt_suffix Suffix][txt_compound Compound]
-    """
-]]
+# [Prefix][Suffix][Compound]
+#     - [txt_prefix Prefix][txt_suffix Suffix][txt_compound Compound]
 
 [[doc "Relates a list to its reversal."]]
 [[todo
@@ -13,10 +8,10 @@
     Does it need to be an intrinsic?
     """
 ]]
-[forward {}][backward {}]
-[forward {A ..As}][Backward]
-    - [forward As][backward AsBackward]
-    - [prefix AsBackward][suffix {A}][compound Backward]
+[forwards {}][backwards {}]
+[forwards {A ..As}][Backwards]
+    - [forwards As][backwards AsBackwards]
+    - [prefix AsBackwards][suffix {A}][compound Backwards]
 
 [[doc "Relates a list to a member of that list."]]
 [list {Member ..Rest}][Member]
@@ -38,7 +33,7 @@
 [can_be [list L]]
     - [must_be_var L]
 
-[can_be [int N]]
+[can_be [num N]]
     | [must_be_num N]
     | [must_be_var N]
 
@@ -250,14 +245,13 @@
     remainder of Remainder)`. More precisely, the relationship is `Numerator = 
     Quotient * Denominator + Remainder`.
     
-    Can be used to express divisibility (when Remainder is set to 0), as well as
-    multiplication (when Remainder is 0).
+    Can be used to express divisibility (when `Remainder` is set to 0), as well as
+    multiplication (when `Remainder` is 0).
 
-    Alias: [Num][Den][Quo][Rem]
+    Alias: `[Num][Den][Quo][Rem]`
 
-
-    Common Modes:
-
+    ## Common Modes
+    ```
     [num][den][Quo][Rem]   <=> quo = num / den, rem = num % den
 
     [Num][den][quo][rem]   <=> num = den * quo + rem
@@ -275,6 +269,7 @@
     [num][Den][quo 1][rem] <=> den = num - rem
 
     [num][den 1][Quo][rem] <=> quo = num - rem
+    ```
     """
 ]
 
