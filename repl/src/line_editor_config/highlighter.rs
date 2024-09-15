@@ -41,7 +41,7 @@ impl Highlighter for RellogReplConfigHandle {
                 ('{', LexCtx::MaybeTxtInterp) => {
                     ctx = LexCtx::TxtInterp;
                     stack.push((out.buffer.len(), ch));
-                    rainbow_bracket(stack.len())
+                    rainbow_bracket(stack.len() - 1)
                 }
                 (_, LexCtx::MaybeTxtInterp) => {
                     ctx = LexCtx::Quoted;
@@ -59,7 +59,7 @@ impl Highlighter for RellogReplConfigHandle {
                     Some((open_idx, open)) => {
                         if matching_brackets(open, ch) {
                             ctx = LexCtx::MaybeQuoted;
-                            rainbow_bracket(stack.len() + 1)
+                            rainbow_bracket(stack.len())
                         } else {
                             out.buffer[open_idx] = (error_style(), open.to_string());
                             error_style()
@@ -137,7 +137,7 @@ fn str_style() -> Style {
 
 fn rainbow_bracket(depth: usize) -> Style {
     match depth % 3 {
-        0 => Style::default().bold().fg(Color::LightBlue),
+        0 => Style::default().bold().fg(Color::Green),
         1 => Style::default().bold().fg(Color::Yellow),
         2 => Style::default().bold().fg(Color::Magenta),
         _ => unreachable!(),
