@@ -166,18 +166,19 @@ impl RcTm {
     }
 
     pub fn try_collect_txt_to_string(&self, buf: &mut String) -> Result<(), TxtErr> {
+        let mut current = self;
         loop {
-            match self.as_ref() {
+            match current.as_ref() {
                 Tm::TxtCons(car, cdr) => {
                     match car.try_as_char() {
                         Some(ch) => buf.push(ch),
                         None => return Err(TxtErr::NonCharInTxt(car.clone())),
                     }
-                    cdr.try_collect_txt_to_string(buf)?;
+                    current = cdr;
                 }
                 Tm::TxtSeg(seg) => {
                     buf.push_str(seg.segment_as_str());
-                    seg.tail().try_collect_txt_to_string(buf)?;
+                    current = seg.tail();
                 }
                 Tm::Nil => return Ok(()),
                 Tm::Var(var) => return Err(TxtErr::UninstantiatedTail(var.clone())),
