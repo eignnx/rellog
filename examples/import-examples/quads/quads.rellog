@@ -1,7 +1,7 @@
-[[exports
-    - square::'*'
-    - rectangle::'*'
-][submodules
+[[submodules
     - square
     - rectangle
+][reexporting
+    - square::'*'
+    - rectangle::'*'
 ]]

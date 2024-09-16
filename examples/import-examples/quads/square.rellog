@@ -1,8 +1,4 @@
-[[export
-    - [square_width][square_area]
-]]
-
-
+[[pub]]
 [SquareWidth][SquareArea]
     - [factors {SquareWidth SquareWidth}][product SquareArea]
 

@@ -1,16 +1,12 @@
-[[exporting {
-    [Rule][Output]
-    [Rule][Before][After]
-}]]
-
-
 [txt_prefix ""][TxtSuffix][txt_compound TxtSuffix]
 [txt_prefix "[{X ..Xs}]"][TxtSuffix][txt_compound "[{X ..Ys}]"]
     - [txt_prefix Xs][TxtSuffix][txt_compound Ys]
 
+[[pub]]
 [Rule][Output]
     - [Rule][before ""][after Output]
 
+[[pub]]
 [Rule][Before][After]
     - [tm Rule][Class]
     - [Rule][Class][Before][After]
