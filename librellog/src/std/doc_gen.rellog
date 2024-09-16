@@ -1,8 +1,12 @@
-[gen_docs][Before][After]
-    Before = "
+[[importing {
+    std::dcgs::txt
+}]]
+
+[gen_docs]
+    """
     # Documentation
     Multiline?
-    [{..After}]"
+    """
 
 [Tag][Inner]
     - "<"; Tag; ">"
@@ -10,10 +14,10 @@
     - "</"; Tag; ">"
 
 [impl][Sig][Doc]
-    - "<section>"
-    - "<h1>"; [fmt_sig Sig]; "</h1>"
-    - "<p>"; Doc; "</p>"
-    - "</section>"
+    [tag "section"][inner
+        - [tag "h1"][inner [fmt_sig Sig]]
+        - [tag "p"][inner Doc]
+    ]
 
 [fmt_sig Sig]
     - logic=[term Sig][Text]

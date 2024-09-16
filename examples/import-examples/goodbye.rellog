@@ -1,4 +1,3 @@
-[[exports [GoodbyeWorld]]]
-
+[[pub]]
 [goodbye_world]
     - [io_writeln "Goodbye, world!"][stream stdout]

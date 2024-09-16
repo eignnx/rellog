@@ -1,6 +1,7 @@
-[[export
-    - [circle_radius][circle_area]
-]]
-
+[[pub]]
 [CircleRadius][CircleArea]
-    - [formula {3 mul {CircleRadius mul CircleRadius}}][result CircleArea]
+    - [
+        formula {3 mul {CircleRadius mul CircleRadius}}
+    ][
+        result CircleArea
+    ]

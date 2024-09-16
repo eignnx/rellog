@@ -1,6 +1,3 @@
-# [Prefix][Suffix][Compound]
-#     - [txt_prefix Prefix][txt_suffix Suffix][txt_compound Compound]
-
 [[doc "Relates a list to its reversal."]]
 [[todo
     """

@@ -1,4 +1,7 @@
-[[exporting { [Rule][Output] [Rule][Before][After] }]]
+[[exporting {
+    [Rule][Output]
+    [Rule][Before][After]
+}]]
 
 
 [txt_prefix ""][TxtSuffix][txt_compound TxtSuffix]

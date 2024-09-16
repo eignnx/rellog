@@ -191,7 +191,7 @@ fn tokenize_impl<'i>(mut input: Span<'i>, ts: &mut Vec<At<Tok>>) -> Res<'i, ()> 
         let (i, t) = match state {
             LexCtx::Expr => {
                 let (i, _) = multispace0(input)?;
-                let (i, _comment) = comment(i)?;
+                let (i, _comment) = context("End-of-line comment", comment).parse(i)?;
                 let (i_after_ws, _) = multispace0(i)?;
                 let (i, t) = context("Token in expression context", expr_tok)(i_after_ws)?;
                 (i, t.at(i_after_ws))
@@ -234,6 +234,8 @@ fn tokenize_impl<'i>(mut input: Span<'i>, ts: &mut Vec<At<Tok>>) -> Res<'i, ()> 
             }
 
             LexCtx::TxtInterp => {
+                let (input, _) = multispace0(input)?;
+                let (input, _) = context("End-of-line comment", comment).parse(input)?;
                 let (i_after_ws, _) = multispace0(input)?;
                 let close_interp = value(Tok::CTxtInterp, tag("}]"));
                 context(
