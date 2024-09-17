@@ -47,15 +47,17 @@
 :- use_module(library(dcg/basics), []).
 :- use_module(library(dcg/high_order), [sequence//5]).
 
-'[eq]'([]).
-'[eq]'([X, X | Xs]) :-
-    '[eq]'(Xs).
 
 :- begin_tests('[eq]').
 test(first) :- '[eq]'([]).
 test(second) :- '[eq]'([a, a, a, a, a, a, a, a, a, a]).
 test(third, [fail]) :- '[eq]'([a, b, c, d, e, f, g, h, i, j]).
 :- end_tests('[eq]').
+
+'[eq]'([]).
+'[eq]'([X, X | Xs]) :-
+    '[eq]'(Xs).
+
 
 csym(Name, Head, Tail) :-
     nonvar(Name),
@@ -71,6 +73,18 @@ csyms([H|T]) -->
     csyms(T).
 csyms([]) -->
     "".
+    
+
+:- begin_tests('[attrs][rel]').
+test(first, [error(_)]) :- '[attrs][rel]'([], '[]'()).
+test(second) :- '[attrs][rel]'(['[key][value]'(single, 1)], '[single]'(1)).
+test(third) :-
+        '[attrs][rel]'(
+            ['[key][value]'(my, 1), '[key][value]'(cool, 2), '[key][value]'(rel, 3)],
+            '[my][cool][rel]'(1,2,3)
+        ).
+test(fourth, [error(invalid_rellog_functor)]) :- '[attrs][rel]'(_, regular_prolog_predicate(1,2)).
+:- end_tests('[attrs][rel]').
 
 '[attrs][rel]'(Attrs, Rel) :-
     (
@@ -90,19 +104,13 @@ csyms([]) -->
     )
     -> true
     ; throw(error(invalid_rellog_functor, Rel)).
-    
-    
-:- begin_tests('[attrs][rel]').
-test(first, [error(_)]) :- '[attrs][rel]'([], '[]'()).
-test(second) :- '[attrs][rel]'(['[key][value]'(single, 1)], '[single]'(1)).
-test(third) :-
-        '[attrs][rel]'(
-            ['[key][value]'(my, 1), '[key][value]'(cool, 2), '[key][value]'(rel, 3)],
-            '[my][cool][rel]'(1,2,3)
-        ).
-test(fourth, [error(invalid_rellog_functor)]) :- '[attrs][rel]'(_, regular_prolog_predicate(1,2)).
-:- end_tests('[attrs][rel]').
 
+
+:- begin_tests('[attr][key][value]').
+test(first) :- '[attr][key][value]'('[a]'(1), a, 1).
+test(second) :- '[attr][key][value]'('[blah]'(1234), blah, 1234).
+test(third, [error(multi_key_rel_is_not_an_attr)]) :- '[attr][key][value]'('[too][many][keys]'(1,2,3), _, _).
+:- end_tests('[attr][key][value]').
 
 '[attr][key][value]'(Attr, Key, Value) :-
     '[attrs][rel]'(SingletonList, Attr),
@@ -113,15 +121,16 @@ test(fourth, [error(invalid_rellog_functor)]) :- '[attrs][rel]'(_, regular_prolo
     ).
 
 
+:- begin_tests('[rel][sig]').
+test(first) :- '[rel][sig]'('[asdf]'(1234), '[asdf]'(_)).
+test(second) :- '[rel][sig]'('[asdf][qwerty]'(1234, 2345), '[asdf][qwerty]'(_, _)).
+:- end_tests('[rel][sig]').
 
-:- begin_tests('[attr][key][value]').
-test(first) :- '[attr][key][value]'('[a]'(1), a, 1).
-test(second) :- '[attr][key][value]'('[blah]'(1234), blah, 1234).
-test(third, [error(multi_key_rel_is_not_an_attr)]) :- '[attr][key][value]'('[too][many][keys]'(1,2,3), _, _).
-:- end_tests('[attr][key][value]').
-
-
-'[rel][sig]'(_Rel, _Sig).
+'[rel][sig]'(Rel, Sig) :-
+    Rel =.. [Functor | RelArgs],
+    length(RelArgs, Argc),
+    length(SigArgs, Argc),
+    Sig =.. [Functor | SigArgs].
 
 
 '[gt][lt]'(_Gt, _Lt).
