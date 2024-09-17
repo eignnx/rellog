@@ -51,6 +51,12 @@
 '[eq]'([X, X | Xs]) :-
     '[eq]'(Xs).
 
+:- begin_tests('[eq]').
+test(first) :- '[eq]'([]).
+test(second) :- '[eq]'([a, a, a, a, a, a, a, a, a, a]).
+test(third, [fail]) :- '[eq]'([a, b, c, d, e, f, g, h, i, j]).
+:- end_tests('[eq]').
+
 csym(Name, Head, Tail) :-
     nonvar(Name),
     format(codes(Head, Tail), '~w', [Name]).
@@ -67,136 +73,165 @@ csyms([]) -->
     "".
 
 '[attrs][rel]'(Attrs, Rel) :-
-    Rel =.. [Functor | Args],
-    % Parse the Rellog functor:
-    atom_chars(Functor, FChars),
-    phrase((
-        % sequence(:Start, :Element, :Sep, :End, ?List)//
-        sequence("[", csym, "][", "]", Keys)
-    ), FChars),
-    maplist(
-        [Key, Value, '[key][value]'(Key, Value)]>>true,
-        Keys,
-        Args,
-        Attrs
-    ).
+    (
+        Rel =.. [Functor | Args],
+        % Parse the Rellog functor:
+        atom_chars(Functor, FChars),
+        phrase((
+            % sequence(:Start, :Element, :Sep, :End, ?List)//
+            sequence("[", csym, "][", "]", Keys)
+        ), FChars),
+        maplist(
+            [Key, Value, '[key][value]'(Key, Value)]>>true,
+            Keys,
+            Args,
+            Attrs
+        )
+    )
+    -> true
+    ; throw(error(invalid_rellog_functor, Rel)).
     
+    
+:- begin_tests('[attrs][rel]').
+test(first, [error(_)]) :- '[attrs][rel]'([], '[]'()).
+test(second) :- '[attrs][rel]'(['[key][value]'(single, 1)], '[single]'(1)).
+test(third) :-
+        '[attrs][rel]'(
+            ['[key][value]'(my, 1), '[key][value]'(cool, 2), '[key][value]'(rel, 3)],
+            '[my][cool][rel]'(1,2,3)
+        ).
+test(fourth, [error(_)]) :- '[attrs][rel]'(_, regular_prolog_predicate(1,2)).
+:- end_tests('[attrs][rel]').
 
 
-'[attr][key][value]'(Attr, Key, Value).
+'[attr][key][value]'(Attr, Key, Value) :-
+    '[attrs][rel]'(SingletonList, Attr),
+    (
+        SingletonList = ['[key][value]'(Key, Value)]
+    ->  true
+    ;   throw(error(multi_key_rel_is_not_an_attr, Attr))
+    ).
 
 
-'[rel][sig]'(Rel, Sig).
 
+:- begin_tests('[attr][key][value]').
+test(first) :- '[attr][key][value]'('[a]'(1), a, 1).
+test(second) :- '[attr][key][value]'('[blah]'(1234), blah, 1234).
+test(third, [error(_)]) :- '[attr][key][value]'('[too][many][keys]'(1,2,3), _, _).
+:- end_tests('[attr][key][value]').
 
-'[gt][lt]'(Gt, Lt).
 
+'[rel][sig]'(_Rel, _Sig).
 
-'[gte][lte]'(Gte, Lte).
 
+'[gt][lt]'(_Gt, _Lt).
 
-'[must_be_var]'(MustBeVar).
 
+'[gte][lte]'(_Gte, _Lte).
 
-'[must_be_num]'(MustBeNum).
 
+'[must_be_var]'(_MustBeVar).
 
-'[must_be_sym]'(MustBeSym).
 
+'[must_be_num]'(_MustBeNum).
 
-'[must_be_txt]'(MustBeTxt).
 
+'[must_be_sym]'(_MustBeSym).
 
-'[must_be_rel]'(MustBeRel).
 
+'[must_be_txt]'(_MustBeTxt).
 
-'[key][rel][value]'(Key, Rel, Value).
 
+'[must_be_rel]'(_MustBeRel).
 
-'[term][variables]'(Term, Variables).
 
+'[key][rel][value]'(_Key, _Rel, _Value).
 
-'[duplicate][original]'(Duplicate, Original).
 
+'[term][variables]'(_Term, _Variables).
 
-'[duplicate][original][renamed][renaming]'(Duplicate, Original, Renamed, Renaming).
 
+'[duplicate][original]'(_Duplicate, _Original).
 
-'[pascal_case][snake_case]'(PascalCase, SnakeCase).
 
+'[duplicate][original][renamed][renaming]'(_Duplicate, _Original, _Renamed, _Renaming).
 
-'[sum][x][y]'(Sum, X, Y).
 
+'[pascal_case][snake_case]'(_PascalCase, _SnakeCase).
 
-'[product][x][y]'(Product, X, Y).
 
+'[sum][x][y]'(_Sum, _X, _Y).
 
-'[difference][minuend][subtrahend]'(Difference, Minuend, Subtrahend).
 
+'[product][x][y]'(_Product, _X, _Y).
 
-'[denominator][numerator][quotient][remainder]'(Denominator, Numerator, Quotient, Remainder).
 
+'[difference][minuend][subtrahend]'(_Difference, _Minuend, _Subtrahend).
 
-'[pred][succ]'(Pred, Succ).
 
+'[denominator][numerator][quotient][remainder]'(_Denominator, _Numerator, _Quotient, _Remainder).
 
-'[true]'(True).
 
+'[pred][succ]'(_Pred, _Succ).
 
-'[false]'(False).
 
+'[true]'(_True).
 
-'[not]'(Not).
 
+'[false]'(_False).
 
-'[goal][truth]'(Goal, Truth).
 
+'[not]'(_Not).
 
-'[io_write][stream]'(IoWrite, Stream).
 
+'[goal][truth]'(_Goal, _Truth).
 
-'[io_writeln][stream]'(IoWriteln, Stream).
 
+'[io_write][stream]'(_IoWrite, _Stream).
 
-'[term][text]'(Term, Text).
 
+'[io_writeln][stream]'(_IoWriteln, _Stream).
 
-'[block][functor][members]'(Block, Functor, Members).
 
+'[term][text]'(_Term, _Text).
 
-'[cwd]'(Cwd).
 
+'[block][functor][members]'(_Block, _Functor, _Members).
 
-'[cd]'(Cd).
 
+'[cwd]'(_Cwd).
 
-'[ls]'(Ls).
 
+'[cd]'(_Cd).
 
-'[recursion_limit]'(RecursionLimit).
 
+'[ls]'(_Ls).
 
-'[directive]'(Directive).
 
+'[recursion_limit]'(_RecursionLimit).
 
-'[directives]'(Directives).
 
+'[directive]'(_Directive).
 
-'[clause_body][clause_head]'(ClauseBody, ClauseHead).
 
+'[directives]'(_Directives).
 
-'[class][tm]'(Class, Tm).
 
+'[clause_body][clause_head]'(_ClauseBody, _ClauseHead).
 
-'[reified_tm_out][tm_in]'(ReifiedTmOut, TmIn).
 
+'[class][tm]'(_Class, _Tm).
 
-'[clauses][directives][file_path]'(Clauses, Directives, FilePath).
 
+'[reified_tm_out][tm_in]'(_ReifiedTmOut, _TmIn).
 
-'[raises]'(Raises).
 
+'[clauses][directives][file_path]'(_Clauses, _Directives, _FilePath).
 
-'[builtins]'(Builtins).
+
+'[raises]'(_Raises).
+
+
+'[builtins]'(_Builtins).
 
 
