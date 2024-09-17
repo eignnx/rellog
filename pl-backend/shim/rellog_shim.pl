@@ -100,7 +100,7 @@ test(third) :-
             ['[key][value]'(my, 1), '[key][value]'(cool, 2), '[key][value]'(rel, 3)],
             '[my][cool][rel]'(1,2,3)
         ).
-test(fourth, [error(_)]) :- '[attrs][rel]'(_, regular_prolog_predicate(1,2)).
+test(fourth, [error(invalid_rellog_functor)]) :- '[attrs][rel]'(_, regular_prolog_predicate(1,2)).
 :- end_tests('[attrs][rel]').
 
 
@@ -117,7 +117,7 @@ test(fourth, [error(_)]) :- '[attrs][rel]'(_, regular_prolog_predicate(1,2)).
 :- begin_tests('[attr][key][value]').
 test(first) :- '[attr][key][value]'('[a]'(1), a, 1).
 test(second) :- '[attr][key][value]'('[blah]'(1234), blah, 1234).
-test(third, [error(_)]) :- '[attr][key][value]'('[too][many][keys]'(1,2,3), _, _).
+test(third, [error(multi_key_rel_is_not_an_attr)]) :- '[attr][key][value]'('[too][many][keys]'(1,2,3), _, _).
 :- end_tests('[attr][key][value]').
 
 
