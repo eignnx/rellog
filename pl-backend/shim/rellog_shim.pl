@@ -46,7 +46,8 @@
 :- set_prolog_flag(double_quotes, chars).
 :- use_module(library(dcg/basics), []).
 :- use_module(library(dcg/high_order), [sequence//5]).
-
+:- use_module(library(clpfd)).
+:- op(50, fx, #).
 
 :- begin_tests('[eq]').
 test(first) :- '[eq]'([]).
@@ -133,10 +134,44 @@ test(second) :- '[rel][sig]'('[asdf][qwerty]'(1234, 2345), '[asdf][qwerty]'(_, _
     Sig =.. [Functor | SigArgs].
 
 
-'[gt][lt]'(_Gt, _Lt).
+:- begin_tests('[gt][lt]').
+test(first) :- '[gt][lt]'(2, 1).
+test(second, [fail]) :- '[gt][lt]'(1, 2).
+test(third, [fail]) :- '[gt][lt]'(1, 1).
+test(fourth) :-
+    '[gt][lt]'(Big, Small),
+    Big = 100,
+    Small = 99.
+test(fifth, [fail]) :-
+    '[gt][lt]'(Big, Small),
+    Big = 99,
+    Small = 100.
+:- end_tests('[gt][lt]').
+
+'[gt][lt]'(Gt, Lt) :-
+    #Gt #> #Lt.
 
 
-'[gte][lte]'(_Gte, _Lte).
+:- begin_tests('[gte][lte]').
+test(first) :- '[gte][lte]'(2, 1).
+test(second) :- '[gte][lte]'(1, 1).
+test(third, [fail]) :- '[gte][lte]'(1, 2).
+test(fourth) :-
+    '[gte][lte]'(Big, Small),
+    Big = 100,
+    Small = 99.
+test(fifth) :-
+    '[gte][lte]'(Big, Small),
+    Big = 99,
+    Small = 99.
+test(sixth, [fail]) :-
+    '[gte][lte]'(Big, Small),
+    Big = 99,
+    Small = 100.
+:- end_tests('[gte][lte]').
+
+'[gte][lte]'(Gte, Lte) :-
+    #Gte #>= #Lte.
 
 
 '[must_be_var]'(_MustBeVar).
