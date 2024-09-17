@@ -8,7 +8,6 @@
 [prefix {A ..As}][Suffix][compound {A ..Compound}]
     - [prefix As][suffix Suffix][Compound]
 
-
 [[pub]]
 [Rule][Output]
     - [Rule][before {}][after Output]

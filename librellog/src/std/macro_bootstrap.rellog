@@ -1,4 +1,3 @@
-
 [impl][rule MacroHead ~ [macro MacroInfo]][Before][After]
     - MacroInfo = [NextRelDef]
     - [MacroHead][Options][MacroBody]
@@ -42,7 +41,7 @@
 [macro_head
     [ClauseDoc]
 ][options {
-    [decorates [ClauseHead][clause_body _]]
+    [decorates [ClauseHead][clause_body _ThrowAway]]
 }][macro_body
     { [fact [sig ClauseHead][doc ClauseDoc]] }
 ]
@@ -60,3 +59,7 @@
 
 
 [macro_head [Importing]][options {}][macro_body {}]
+
+[macro_head [Pub]][options {
+    [decorates [ClauseHead][clause_body _]]
+}][macro_body {}]

@@ -1,4 +1,11 @@
 [workspace]
 
 resolver = "2"
-members = ["repl", "librellog", "char-list", "nom_i9n", "unifier_set"]
+members = [
+    "repl",
+    "librellog",
+    "char-list",
+    "nom_i9n",
+    "unifier_set",
+    "pl-backend",
+]

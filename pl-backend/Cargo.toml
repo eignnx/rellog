@@ -1,0 +1,10 @@
+[package]
+name = "pl-backend"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+librellog = { path = "../librellog" }
+nom_locate = "4.0.0"
+nom_i9n = { path = "../nom_i9n" }
+nom = "7.1.1"

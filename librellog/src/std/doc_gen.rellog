@@ -1,6 +1,6 @@
-[[importing {
-    std::dcgs::txt
-}]]
+[[importing
+    - std::dcgs::txt
+]]
 
 [gen_docs]
     """

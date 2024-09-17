@@ -18,7 +18,7 @@
 [fn [Subst][tm [UnivVar.0]]][ret [UnivVar]]
     - [list Subst][member [old UnivVar.0][new UnivVar]]
 [fn [Subst][tm [UnivVar]]][ret [UnivVar]]
-    - [not [list Subst][member [old UnivVar][New._]]]
+    - [not [list Subst][member [old UnivVar][new _]]]
 [fn [Subst][tm unit]][ret unit]
 [fn [Subst][tm [ExisVar]]][Ret]
     - [list Subst][member [ExisVar][Binding]]
@@ -39,7 +39,7 @@
     - Subst = {[old UnivVar][new ExisVar]}
     - [fn [Subst][Tm.0]][ret Tm.1]
     - [in Tcx.ext][sub Tm.1][Sup][out Tcx.1]
-    - [compound Tcx.1][Prefix._][suffix {[marker ExisVar] ..Tcx}]
+    - [compound Tcx.1][prefix _][suffix {[marker ExisVar] ..Tcx}]
 
 [[comment
     """
