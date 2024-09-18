@@ -1,7 +1,7 @@
 use std::io;
 
 use librellog::{
-    ast::{BinOpSymbol, RcTm, Tm},
+    ast::{txt::TxtErr, BinOpSymbol, RcTm, Tm},
     data_structures::Var,
 };
 
@@ -53,13 +53,7 @@ impl Compile<SwiProlog> for RcTm {
             }
             Tm::Var(var) => var.compile(f, compiler)?,
             Tm::Int(i) => write!(f, "{i}")?,
-            Tm::TxtCons(..) | Tm::TxtSeg(..) => {
-                let mut buf = String::new();
-                match self.try_collect_txt_to_string(&mut buf) {
-                    Ok(()) => write!(f, "\"{}\"", buf)?,
-                    _ => write!(f, "\"<ERROR>\"")?,
-                }
-            }
+            Tm::TxtSeg(..) | Tm::TxtCons(..) => compiler.compile_txt(f, self)?,
             Tm::BinOp(bsym, lhs, rhs) => match bsym {
                 BinOpSymbol::Equal => {
                     write!(f, "(")?;
@@ -90,6 +84,65 @@ impl Compile<SwiProlog> for RcTm {
                     write!(f, ")")?;
                 }
             },
+        }
+        Ok(())
+    }
+}
+
+impl SwiProlog {
+    fn compile_txt(&mut self, f: &mut dyn io::Write, txt: &RcTm) -> io::Result<()> {
+        let mut buf = String::new();
+        if txt.try_collect_txt_to_string(&mut buf).is_ok() {
+            write!(f, "\"{buf}\"")?;
+            return Ok(());
+        }
+
+        let mut tail = txt;
+        let mut first = true;
+        write!(f, "[")?;
+        loop {
+            if !first {
+                write!(f, ", ")?;
+            }
+
+            match tail.as_ref() {
+                Tm::Nil => break,
+                Tm::TxtCons(ch, rest) => {
+                    ch.compile(f, self)?;
+                    tail = rest;
+                }
+                Tm::TxtSeg(seg) => {
+                    for ch in seg.segment_as_str().chars() {
+                        if !first {
+                            write!(f, ", ")?;
+                        }
+                        ch.compile(f, self)?;
+                        first = false;
+                    }
+                    tail = seg.segment_tail();
+                }
+                _ => {
+                    write!(f, " | ")?;
+                    tail.compile(f, self)?;
+                    break;
+                }
+            }
+            first = false;
+        }
+        write!(f, "]")?;
+        Ok(())
+    }
+}
+
+impl Compile<SwiProlog> for char {
+    fn compile(&self, f: &mut dyn std::io::Write, _: &mut SwiProlog) -> io::Result<()> {
+        match self {
+            '\\' => write!(f, r"'\\'")?,
+            '\'' => write!(f, r"'\''")?,
+            '\n' => write!(f, r"'\n'")?,
+            '\r' => write!(f, r"'\r'")?,
+            'a'..='z' => write!(f, "{}", self)?,
+            ch => write!(f, "'{ch}'")?,
         }
         Ok(())
     }
