@@ -174,19 +174,53 @@ test(sixth, [fail]) :-
     #Gte #>= #Lte.
 
 
-'[must_be_var]'(_MustBeVar).
+'[must_be_var]'(Term) :- var(Term).
 
 
-'[must_be_num]'(_MustBeNum).
+'[must_be_num]'(Term) :- number(Term).
 
 
-'[must_be_sym]'(_MustBeSym).
+'[must_be_sym]'(Term) :- atom(Term).
+
+:- begin_tests('[must_be_txt]').
+:- set_prolog_flag(double_quotes, chars).
+test(empty_txt) :- '[must_be_txt]'("").
+test(single_char_txt) :- '[must_be_txt]'("a").
+test(longer_txt) :- '[must_be_txt]'("abc").
+test(includes_non_char, [fail]) :- '[must_be_txt]'([a,b,3]).
+test(partial_string, [fail]) :- '[must_be_txt]'([a, b, c | _]).
+:- end_tests('[must_be_txt]').
+
+'[must_be_txt]'(Term) :-
+    \+ var(Term),
+    (
+        Term = []
+    -> 
+        true
+    ;
+        Term = [C | Cs],
+        '[must_be_sym]'(C),
+        '[must_be_txt]'(Cs)
+    ).
 
 
-'[must_be_txt]'(_MustBeTxt).
+:- begin_tests('[must_be_rel]').
+test(var, [fail]) :- '[must_be_rel]'(X).
+test(empty_rel, [error(_)]) :- '[must_be_rel]'('[]'()).
+test(single_key_rel) :- '[must_be_rel]'('[a]'(1)).
+test(multi_key_rel) :- '[must_be_rel]'('[a][b][c]'(1,2,3)).
+test(missing_key, [error(invalid_rellog_functor)]) :- '[must_be_rel]'('[a][b][c]'(1,2)).
+test(extra_key, [error(invalid_rellog_functor)]) :- '[must_be_rel]'('[a][b][c]'(1,2,3,4)).
+test(non_rel, [error(invalid_rellog_functor)]) :- '[must_be_rel]'(my_predicate(1)).
+:- end_tests('[must_be_rel]').
 
+'[must_be_rel]'(Term) :-
+    \+ var(Term),
+    Term =.. [Functor | Args],
+    length(Args, Arity),
+    '[attrs][rel]'(Attrs, Term),
+    length(Attrs, Arity).
 
-'[must_be_rel]'(_MustBeRel).
 
 
 '[key][rel][value]'(_Key, _Rel, _Value).
