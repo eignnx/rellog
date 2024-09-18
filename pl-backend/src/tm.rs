@@ -112,6 +112,7 @@ impl SwiProlog {
                     tail = rest;
                 }
                 Tm::TxtSeg(seg) => {
+                    first = true;
                     for ch in seg.segment_as_str().chars() {
                         if !first {
                             write!(f, ", ")?;
