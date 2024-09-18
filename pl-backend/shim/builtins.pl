@@ -239,7 +239,8 @@ tests(var_rel, [fail]) :- '[key][rel][value]'(a, _Rel, _).
 
 
 
-'[term][variables]'(_Term, _Variables).
+'[term][variables]'(Term, Variables) :-
+    term_variables(Term, Variables).
 
 
 '[duplicate][original]'(_Duplicate, _Original).
@@ -266,13 +267,13 @@ tests(var_rel, [fail]) :- '[key][rel][value]'(a, _Rel, _).
 '[pred][succ]'(_Pred, _Succ).
 
 
-'[true]'(_True).
+'[true]'(_).
 
 
-'[false]'(_False).
+'[false]'(_) :- fail.
 
 
-'[not]'(_Not).
+'[not]'(Goal) :- \+ Goal.
 
 
 '[goal][truth]'(_Goal, _Truth).
@@ -308,10 +309,23 @@ tests(var_rel, [fail]) :- '[key][rel][value]'(a, _Rel, _).
 '[directives]'(_Directives).
 
 
-'[clause_body][clause_head]'(_ClauseBody, _ClauseHead).
+'[clause_body][clause_head]'(ClauseBody, ClauseHead) :-
+    clause(ClauseHead, ClauseBody).
 
 
-'[class][tm]'(_Class, _Tm).
+'[class][tm]'(Class, Tm) :-
+    ( Tm = [] -> Class = Tm
+    ; Tm = [_|_] -> Class = Tm
+    ; '[must_be_var]'(Tm) -> Class = '[var]'(Tm)
+    ; '[must_be_num]'(Tm) -> Class = int
+    ; '[must_be_sym]'(Tm) -> Class = sym
+    ; '[must_be_txt]'(Tm) -> Class = txt
+    ; Tm = '$block'(Functor, Members) ->
+        Class = '[block]'('[functor][members]'(Functor, Members))
+    ; '[must_be_rel]'(Tm) ->
+        '[rel][sig]'(Tm, Sig),
+        Class = '[rel]'(Sig)
+    ).
 
 
 '[reified_tm_out][tm_in]'(_ReifiedTmOut, _TmIn).
