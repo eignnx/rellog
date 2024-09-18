@@ -205,7 +205,7 @@ test(partial_string, [fail]) :- '[must_be_txt]'([a, b, c | _]).
 
 
 :- begin_tests('[must_be_rel]').
-test(var, [fail]) :- '[must_be_rel]'(X).
+test(var, [fail]) :- '[must_be_rel]'(_).
 test(empty_rel, [error(_)]) :- '[must_be_rel]'('[]'()).
 test(single_key_rel) :- '[must_be_rel]'('[a]'(1)).
 test(multi_key_rel) :- '[must_be_rel]'('[a][b][c]'(1,2,3)).
@@ -216,14 +216,27 @@ test(non_rel, [error(invalid_rellog_functor)]) :- '[must_be_rel]'(my_predicate(1
 
 '[must_be_rel]'(Term) :-
     \+ var(Term),
-    Term =.. [Functor | Args],
+    Term =.. [_Functor | Args],
     length(Args, Arity),
     '[attrs][rel]'(Attrs, Term),
     length(Attrs, Arity).
 
 
+:- begin_tests('[key][rel][value]').
+test(single_key) :- '[key][rel][value]'(a, '[a]'(1), 1).
+test(multi_key) :- '[key][rel][value]'(b, '[a][b][c]'(1,2,3), 2).
+test(missing_key, [fail]) :- '[key][rel][value]'(d, '[a][b][c]'(1,2,3), _).
+tests(var_rel, [fail]) :- '[key][rel][value]'(a, _Rel, _).
+:- end_tests('[key][rel][value]').
 
-'[key][rel][value]'(_Key, _Rel, _Value).
+'[key][rel][value]'(Key, Rel, Value) :-
+    (
+        var(Rel) -> throw(error(instantiation_error, Rel))
+    ;
+        '[attrs][rel]'(Attrs, Rel),
+        memberchk('[key][value]'(Key, Value), Attrs)
+    ).
+
 
 
 '[term][variables]'(_Term, _Variables).
