@@ -39,11 +39,9 @@ impl Compile<SwiProlog> for RcTm {
                     write!(f, ")")?;
                 }
                 BinOpSymbol::PathSep => {
-                    write!(f, "'::'(")?;
                     lhs.compile(f, compiler)?;
-                    write!(f, ", ")?;
+                    write!(f, ":")?; // Trust that user wrote term having thought about precedence.
                     rhs.compile(f, compiler)?;
-                    write!(f, ")")?;
                 }
                 BinOpSymbol::Tilde => {
                     write!(f, "'~'(")?;
@@ -55,7 +53,7 @@ impl Compile<SwiProlog> for RcTm {
                 BinOpSymbol::Semicolon => {
                     write!(f, "(")?;
                     lhs.compile(f, compiler)?;
-                    write!(f, ", ")?;
+                    write!(f, ", ")?; // Rellog's `;` is Prolog's `,`.
                     rhs.compile(f, compiler)?;
                     write!(f, ")")?;
                 }
