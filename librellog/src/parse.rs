@@ -407,9 +407,13 @@ fn left_associative_binop(
         ))
         .parse(ts)?;
 
-        let output = rest.into_iter().fold(first, |so_far, next| {
-            Tm::BinOp(bin_op_symbol, so_far.into(), next.into())
-        });
+        let mut all = rest.into_iter().rev().chain(std::iter::once(first));
+
+        let mut output = all.next().expect("At least 1 item since its a binop");
+
+        for next in all {
+            output = Tm::BinOp(bin_op_symbol, next.into(), output.into());
+        }
 
         Ok((ts, output))
     }
@@ -494,7 +498,7 @@ fn operator_tm(ts: Toks) -> Res<Tm> {
             right_associative_binop(Tok::Semicolon, BinOpSymbol::Semicolon),
             right_associative_binop(Tok::Equal, BinOpSymbol::Equal),
             right_associative_binop(Tok::Tilde, BinOpSymbol::Tilde),
-            right_associative_binop(Tok::PathSep, BinOpSymbol::PathSep),
+            left_associative_binop(Tok::PathSep, BinOpSymbol::PathSep),
         )),
     )
     .parse(ts)
