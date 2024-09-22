@@ -44,15 +44,7 @@ impl RelId {
                 s.push('\'');
                 Sym::from(&s[..])
             }
-            ArgOrder::Translated(arg_ordering) => {
-                let mut s = String::new();
-                s.push_str("'pl");
-                for key in arg_ordering {
-                    write!(s, "[{key}]").unwrap();
-                }
-                s.push('\'');
-                Sym::from(&s[..])
-            }
+            ArgOrder::Translated { pred_name, .. } => *pred_name,
         }
     }
 }
@@ -66,7 +58,7 @@ impl Compile<SwiProlog> for RelId {
 #[derive(Debug, Clone)]
 enum ArgOrder {
     RellogOrder,
-    Translated(Vec<Sym>),
+    Translated { pred_name: Sym, arg_order: Vec<Sym> },
 }
 
 struct RelInfo {

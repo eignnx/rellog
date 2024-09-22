@@ -230,6 +230,7 @@ fn impl_deps(deps: &RcTm, f: &mut dyn io::Write, compiler: &mut SwiProlog) -> io
                     write!(f, "{}/{}", rel_info.pred_name(), arity)?;
                     compiler.rel_map.insert(rel_id, rel_info);
                 }
+
                 Import::Pred {
                     pred_name,
                     arg_bindings,
@@ -238,12 +239,13 @@ fn impl_deps(deps: &RcTm, f: &mut dyn io::Write, compiler: &mut SwiProlog) -> io
 
                     let rel_info = RelInfo {
                         sig: Sig::from(arg_bindings.iter().cloned()),
-                        pred_arg_order: ArgOrder::Translated(
-                            arg_bindings.iter().cloned().collect(),
-                        ),
+                        pred_arg_order: ArgOrder::Translated {
+                            pred_name: *pred_name,
+                            arg_order: arg_bindings.to_vec(),
+                        },
                     };
 
-                    write!(f, "{pred_name}/{arity} as {}", rel_info.pred_name())?;
+                    write!(f, "{pred_name}/{arity}")?;
 
                     compiler
                         .rel_map

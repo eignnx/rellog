@@ -29,11 +29,11 @@ impl Compile<SwiProlog> for RcTm {
                     }
                 };
 
-                write!(f, "{}(", rel_info.pred_name())?;
-
                 let arg_order = rel_info.pred_arg_order.clone();
+
                 match arg_order {
                     ArgOrder::RellogOrder => {
+                        write!(f, "{}(", rel_info.pred_name())?;
                         for (i, (_key, val)) in rel.iter().enumerate() {
                             if i > 0 {
                                 write!(f, ", ")?;
@@ -42,8 +42,12 @@ impl Compile<SwiProlog> for RcTm {
                         }
                         write!(f, ")")?;
                     }
-                    ArgOrder::Translated(arg_ordering) => {
-                        for (i, key) in arg_ordering.iter().enumerate() {
+                    ArgOrder::Translated {
+                        pred_name,
+                        arg_order,
+                    } => {
+                        write!(f, "{pred_name}(")?;
+                        for (i, key) in arg_order.iter().enumerate() {
                             if i > 0 {
                                 write!(f, ", ")?;
                             }
