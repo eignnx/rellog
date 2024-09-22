@@ -11,8 +11,14 @@ impl Compile<SwiProlog> for RcTm {
     fn compile(&self, f: &mut dyn io::Write, compiler: &mut SwiProlog) -> io::Result<()> {
         match &**self {
             Tm::Nil => write!(f, "[]")?,
-            Tm::Cons(..) => compiler.compile_list(f, self)?,
+            Tm::Cons(..) => {
+                let old = compiler.tm_is_callable;
+                compiler.tm_is_callable = false;
+                compiler.compile_list(f, self)?;
+                compiler.tm_is_callable = old;
+            }
             Tm::Rel(rel) => {
+                let old = compiler.tm_is_callable;
                 let sig = Sig::from(rel.keys().cloned());
                 let rel_id = RelId::from_sig(&sig);
                 let default_rel_info = RelInfo {
@@ -23,7 +29,9 @@ impl Compile<SwiProlog> for RcTm {
                 let rel_info = match compiler.rel_map.get(&rel_id) {
                     Some(rel_info) => rel_info,
                     None => {
-                        eprintln!("WARNING: RelInfo not found for {}", sig);
+                        if compiler.tm_is_callable {
+                            eprintln!("WARNING: RelInfo not found for {}", sig);
+                        }
                         // Assume it's a builtin; provide default value.
                         &default_rel_info
                     }
@@ -31,6 +39,7 @@ impl Compile<SwiProlog> for RcTm {
 
                 let arg_order = rel_info.pred_arg_order.clone();
 
+                compiler.tm_is_callable = false; // subterms are generally not callable
                 match arg_order {
                     ArgOrder::RellogOrder => {
                         write!(f, "{}(", rel_info.pred_name())?;
@@ -57,6 +66,7 @@ impl Compile<SwiProlog> for RcTm {
                         write!(f, ")")?;
                     }
                 }
+                compiler.tm_is_callable = old;
             }
             Tm::Sym(sym) => sym.compile(f, compiler)?,
             Tm::Block(functor, members) => {
@@ -72,7 +82,13 @@ impl Compile<SwiProlog> for RcTm {
             }
             Tm::Var(var) => var.compile(f, compiler)?,
             Tm::Int(i) => write!(f, "{i}")?,
-            Tm::TxtSeg(..) | Tm::TxtCons(..) => compiler.compile_txt(f, self)?,
+            Tm::TxtSeg(..) | Tm::TxtCons(..) => {
+                let old = compiler.tm_is_callable;
+                compiler.tm_is_callable = false;
+                compiler.compile_txt(f, self)?;
+                compiler.tm_is_callable = old;
+            }
+
             Tm::BinOp(bsym, lhs, rhs) => match bsym {
                 BinOpSymbol::Equal => {
                     write!(f, "(")?;

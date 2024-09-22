@@ -22,6 +22,7 @@ pub trait Compile<Compiler> {
 
 pub struct SwiProlog {
     rel_map: HashMap<RelId, RelInfo>,
+    tm_is_callable: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -120,6 +121,7 @@ fn main() {
 
     let mut compiler = SwiProlog {
         rel_map: HashMap::new(),
+        tm_is_callable: false,
     };
 
     module

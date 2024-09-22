@@ -23,7 +23,9 @@ impl Compile<SwiProlog> for Clause {
             Some(ref body) => {
                 writeln!(f, " :-")?;
                 write!(f, "\t")?;
+                compiler.tm_is_callable = true;
                 body.compile(f, compiler)?;
+                compiler.tm_is_callable = false;
             }
         }
 
