@@ -637,12 +637,17 @@ impl Sig {
     pub fn from_rel(rel: &Rel) -> Self {
         Self::from_iter(rel.keys().cloned())
     }
+
+    pub fn keys(&self) -> impl Iterator<Item = &Sym> {
+        self.0.iter()
+    }
 }
 
 impl FromIterator<Sym> for Sig {
     fn from_iter<I: IntoIterator<Item = Sym>>(iter: I) -> Self {
         let mut v: Vec<_> = iter.into_iter().collect();
-        v.sort();
+        // Sort by string content, not IStr index.
+        v.sort_by_cached_key(|sym| sym.to_str().to_string());
         Self(v.into_iter().collect())
     }
 }

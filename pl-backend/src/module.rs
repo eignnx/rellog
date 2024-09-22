@@ -1,13 +1,13 @@
 use std::io;
 
 use librellog::{
-    ast::{BinOpSymbol, Clause, Item, Module, RcTm, Rel, Tm},
+    ast::{BinOpSymbol, Clause, Item, Module, RcTm, Rel, Sig, Tm},
     data_structures::Sym,
     lex::tok::Tok,
     rel_match,
 };
 
-use crate::{Compile, SwiProlog};
+use crate::{ArgOrder, Compile, RelId, RelInfo, SwiProlog};
 
 impl Compile<SwiProlog> for Module {
     fn compile(&self, f: &mut dyn io::Write, compiler: &mut SwiProlog) -> io::Result<()> {
@@ -48,7 +48,7 @@ impl Compile<SwiProlog> for Module {
                     writeln!(f)?;
                     writeln!(f)?;
                 }
-                Item::Directive(directive) => {}
+                Item::Directive(_directive) => {}
             }
         }
         Ok(())
@@ -219,15 +219,35 @@ fn impl_deps(deps: &RcTm, f: &mut dyn io::Write, compiler: &mut SwiProlog) -> io
         fn compile(&self, f: &mut dyn std::io::Write, compiler: &mut SwiProlog) -> io::Result<()> {
             match self {
                 Import::Rel(rel) => {
-                    compiler.compile_rel(f, rel)?;
+                    let sig = Sig::from(rel.iter().map(|(key, _)| *key));
+                    let rel_id = RelId::from_sig(&sig);
+                    let arity = sig.keys().count();
+                    let rel_info = RelInfo {
+                        sig,
+                        pred_arg_order: ArgOrder::RellogOrder,
+                    };
+
+                    write!(f, "{}/{}", rel_info.pred_name(), arity)?;
+                    compiler.rel_map.insert(rel_id, rel_info);
                 }
                 Import::Pred {
                     pred_name,
                     arg_bindings,
                 } => {
                     let arity = arg_bindings.len();
-                    let mangled = compiler.mangle_sig(arg_bindings.iter());
-                    write!(f, "{pred_name}/{arity} as '{mangled}'")?;
+
+                    let rel_info = RelInfo {
+                        sig: Sig::from(arg_bindings.iter().cloned()),
+                        pred_arg_order: ArgOrder::Translated(
+                            arg_bindings.iter().cloned().collect(),
+                        ),
+                    };
+
+                    write!(f, "{pred_name}/{arity} as {}", rel_info.pred_name())?;
+
+                    compiler
+                        .rel_map
+                        .insert(RelId(Sig::from(arg_bindings.iter().cloned())), rel_info);
                 }
             }
             Ok(())

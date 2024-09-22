@@ -1,8 +1,16 @@
-use std::io::{self, Read, Write};
+use std::{
+    collections::{BTreeMap, HashMap},
+    io::{self, Read, Write},
+};
 
 use nom::{Finish, Parser};
 
-use librellog::{ast::Rel, init_interner, interner::IStr};
+use librellog::{
+    ast::{Rel, Sig},
+    data_structures::Sym,
+    init_interner,
+    interner::IStr,
+};
 
 mod clause;
 mod module;
@@ -12,18 +20,69 @@ pub trait Compile<Compiler> {
     fn compile(&self, f: &mut dyn std::io::Write, compiler: &mut Compiler) -> io::Result<()>;
 }
 
-pub struct SwiProlog {}
+pub struct SwiProlog {
+    rel_map: HashMap<RelId, RelInfo>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct RelId(Sig);
+
+impl RelId {
+    pub fn from_sig(sig: &Sig) -> Self {
+        Self(sig.clone())
+    }
+
+    pub fn to_sym(&self, arg_order: &ArgOrder) -> Sym {
+        use std::fmt::Write;
+        match arg_order {
+            ArgOrder::RellogOrder => {
+                let mut s = String::new();
+                s.push('\'');
+                for key in self.0.keys() {
+                    write!(s, "[{}]", key).unwrap();
+                }
+                s.push('\'');
+                Sym::from(&s[..])
+            }
+            ArgOrder::Translated(arg_ordering) => {
+                let mut s = String::new();
+                s.push_str("'pl");
+                for key in arg_ordering {
+                    write!(s, "[{key}]").unwrap();
+                }
+                s.push('\'');
+                Sym::from(&s[..])
+            }
+        }
+    }
+}
+
+impl Compile<SwiProlog> for RelId {
+    fn compile(&self, f: &mut dyn Write, _: &mut SwiProlog) -> io::Result<()> {
+        write!(f, "'{}'", self.0)
+    }
+}
+
+#[derive(Debug, Clone)]
+enum ArgOrder {
+    RellogOrder,
+    Translated(Vec<Sym>),
+}
+
+struct RelInfo {
+    sig: Sig,
+    pred_arg_order: ArgOrder,
+}
+
+impl RelInfo {
+    pub fn pred_name(&self) -> Sym {
+        RelId(self.sig.clone()).to_sym(&self.pred_arg_order)
+    }
+}
 
 impl SwiProlog {
-    fn mangle_sig<'a>(&'a self, iter: impl Iterator<Item = &'a IStr>) -> String {
-        use std::fmt::Write;
-        let mut v: Vec<_> = iter.collect();
-        v.sort();
-        let mut buf = String::new();
-        for key in v {
-            write!(buf, "[{key}]").unwrap();
-        }
-        buf
+    fn mangle_sig<'a>(&'a self, iter: impl Iterator<Item = &'a IStr>) -> RelId {
+        RelId::from_sig(&Sig::from(iter.cloned()))
     }
 
     fn compile_rel(&mut self, f: &mut dyn Write, rel: &Rel) -> io::Result<()> {
@@ -34,7 +93,8 @@ impl SwiProlog {
             rel
         };
         let pred_name = self.mangle_sig(rel.iter().map(|(key, _)| *key));
-        write!(f, "'{pred_name}'(")?;
+        pred_name.compile(f, self)?;
+        write!(f, "(")?;
         for (i, value) in rel.into_iter().map(|pair| pair.1).enumerate() {
             if i > 0 {
                 write!(f, ", ")?;
@@ -66,7 +126,11 @@ fn main() {
 
     assert!(rest.is_empty(), "Could not parse entire input: {:?}", rest);
 
+    let mut compiler = SwiProlog {
+        rel_map: HashMap::new(),
+    };
+
     module
-        .compile(&mut std::io::stdout().lock(), &mut SwiProlog {})
+        .compile(&mut std::io::stdout().lock(), &mut compiler)
         .unwrap();
 }

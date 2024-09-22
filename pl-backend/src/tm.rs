@@ -1,11 +1,11 @@
 use std::io;
 
 use librellog::{
-    ast::{BinOpSymbol, RcTm, Tm},
+    ast::{BinOpSymbol, RcTm, Sig, Tm},
     data_structures::{Sym, Var},
 };
 
-use crate::{Compile, SwiProlog};
+use crate::{ArgOrder, Compile, RelId, RelInfo, SwiProlog};
 
 impl Compile<SwiProlog> for RcTm {
     fn compile(&self, f: &mut dyn io::Write, compiler: &mut SwiProlog) -> io::Result<()> {
@@ -13,7 +13,46 @@ impl Compile<SwiProlog> for RcTm {
             Tm::Nil => write!(f, "[]")?,
             Tm::Cons(..) => compiler.compile_list(f, self)?,
             Tm::Rel(rel) => {
-                compiler.compile_rel(f, rel)?;
+                let sig = Sig::from(rel.keys().cloned());
+                let rel_id = RelId::from_sig(&sig);
+                let default_rel_info = RelInfo {
+                    sig: sig.clone(),
+                    pred_arg_order: ArgOrder::RellogOrder,
+                };
+
+                let rel_info = match compiler.rel_map.get(&rel_id) {
+                    Some(rel_info) => rel_info,
+                    None => {
+                        eprintln!("WARNING: RelInfo not found for {}", sig);
+                        // Assume it's a builtin; provide default value.
+                        &default_rel_info
+                    }
+                };
+
+                write!(f, "{}(", rel_info.pred_name())?;
+
+                let arg_order = rel_info.pred_arg_order.clone();
+                match arg_order {
+                    ArgOrder::RellogOrder => {
+                        for (i, (_key, val)) in rel.iter().enumerate() {
+                            if i > 0 {
+                                write!(f, ", ")?;
+                            }
+                            val.compile(f, compiler)?;
+                        }
+                        write!(f, ")")?;
+                    }
+                    ArgOrder::Translated(arg_ordering) => {
+                        for (i, key) in arg_ordering.iter().enumerate() {
+                            if i > 0 {
+                                write!(f, ", ")?;
+                            }
+                            let val = rel.get(key).unwrap();
+                            val.compile(f, compiler)?;
+                        }
+                        write!(f, ")")?;
+                    }
+                }
             }
             Tm::Sym(sym) => sym.compile(f, compiler)?,
             Tm::Block(functor, members) => {
