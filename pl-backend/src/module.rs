@@ -57,6 +57,7 @@ impl Compile<SwiProlog> for Module {
 
 struct Directive {
     rel: Rel,
+    #[allow(dead_code)]
     following_clause: Option<Clause>,
 }
 
