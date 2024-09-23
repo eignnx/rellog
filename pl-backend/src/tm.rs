@@ -3,6 +3,7 @@ use std::io;
 use librellog::{
     ast::{BinOpSymbol, RcTm, Sig, Tm},
     data_structures::{Sym, Var},
+    lex::tok::Tok,
 };
 
 use crate::{ArgOrder, Compile, RelId, RelInfo, SwiProlog};
@@ -69,17 +70,29 @@ impl Compile<SwiProlog> for RcTm {
                 compiler.tm_is_callable = old;
             }
             Tm::Sym(sym) => sym.compile(f, compiler)?,
-            Tm::Block(functor, members) => {
-                writeln!(f, "'$block'('{functor}', [")?;
-                for (i, member) in members.iter().enumerate() {
-                    if i > 0 {
-                        writeln!(f, ",")?;
+            Tm::Block(functor, members) => match functor {
+                Tok::Dash => {
+                    for (i, member) in members.iter().enumerate() {
+                        if i > 0 {
+                            writeln!(f, ",")?;
+                            write!(f, "\t")?;
+                        }
+                        member.compile(f, compiler)?;
                     }
-                    write!(f, "\t\t")?;
-                    member.compile(f, compiler)?;
                 }
-                write!(f, "\n\t])")?;
-            }
+                Tok::Pipe => {
+                    writeln!(f, "(")?;
+                    for (i, member) in members.iter().enumerate() {
+                        if i > 0 {
+                            writeln!(f, "\n\t;")?;
+                        }
+                        write!(f, "\t\t")?;
+                        member.compile(f, compiler)?;
+                    }
+                    write!(f, "\n\t)")?;
+                }
+                _ => todo!("Operator for {:?}", functor),
+            },
             Tm::Var(var) => var.compile(f, compiler)?,
             Tm::Int(i) => write!(f, "{i}")?,
             Tm::TxtSeg(..) | Tm::TxtCons(..) => {
