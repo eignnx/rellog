@@ -44,7 +44,9 @@ impl Compile<SwiProlog> for RcTm {
                 match arg_order {
                     ArgOrder::RellogOrder => {
                         write!(f, "{}(", rel_info.pred_name())?;
-                        for (i, (_key, val)) in rel.iter().enumerate() {
+                        let mut values = rel.iter().collect::<Vec<_>>();
+                        values.sort_by_cached_key(|(key, _)| key.to_string());
+                        for (i, (_key, val)) in values.iter().enumerate() {
                             if i > 0 {
                                 write!(f, ", ")?;
                             }
