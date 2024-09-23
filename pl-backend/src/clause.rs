@@ -18,15 +18,20 @@ impl Compile<SwiProlog> for Clause {
             },
         );
 
-        match self.body {
-            None => {}
-            Some(ref body) => {
+        if let Some(ref body) = self.body {
+            if compiler
+                .dcg_rules
+                .contains(&RelId(Sig::from_rel(&self.head)))
+            {
+                writeln!(f, " -->")?;
+            } else {
                 writeln!(f, " :-")?;
-                write!(f, "\t")?;
-                compiler.tm_is_callable = true;
-                body.compile(f, compiler)?;
-                compiler.tm_is_callable = false;
             }
+
+            write!(f, "\t")?;
+            compiler.tm_is_callable = true;
+            body.compile(f, compiler)?;
+            compiler.tm_is_callable = false;
         }
 
         write!(f, ".")?;

@@ -70,6 +70,13 @@ impl Compile<SwiProlog> for Directive {
             [deps = deps] => {
                 impl_deps(deps, f, compiler)?;
             },
+            [pred = pred][args = args] => {
+                impl_pred_args(pred, args, f, compiler)?;
+            },
+            // To mark DCG rules.
+            [rule = _] => {
+                impl_rule_decorator(f, self, compiler)?;
+            },
             else => {
                 write!(f, "/* :- ")?;
                 compiler.compile_rel(f, &self.rel)?;
@@ -90,6 +97,52 @@ fn impl_mod(modname: &RcTm, f: &mut dyn io::Write, _compiler: &mut SwiProlog) ->
     } else {
         panic!("Module name must be a symbol");
     }
+
+    Ok(())
+}
+
+/// # Example
+/// ```text
+/// [[pred my_pred][args {arg1_name arg2_name}]]
+/// ```
+fn impl_pred_args(
+    pred: &RcTm,
+    args: &RcTm,
+    f: &mut dyn io::Write,
+    compiler: &mut SwiProlog,
+) -> io::Result<()> {
+    let Tm::Sym(pred) = pred.as_ref() else {
+        panic!("[[Pred][Args]] predicate name must be a symbol: {}", pred);
+    };
+    let Some((args, None)) = args.try_as_list() else {
+        panic!("[[Pred][Args]] arguments must be a list: {}", args);
+    };
+    let Some(args) = args
+        .into_iter()
+        .map(RcTm::try_as_sym)
+        .collect::<Option<Vec<_>>>()
+    else {
+        panic!("[[Pred][Args]] arguments must be symbols: {}", args);
+    };
+
+    compiler.rel_map.insert(
+        RelId(Sig::from(args.iter().cloned())),
+        RelInfo {
+            sig: Sig::from(args.iter().cloned()),
+            pred_arg_order: ArgOrder::Translated {
+                pred_name: *pred,
+                arg_order: args.clone(),
+            },
+        },
+    );
+
+    write!(
+        f,
+        "/* decl {} := {}/{} */",
+        Sig::from(args.iter().cloned()),
+        pred,
+        args.len()
+    )?;
 
     Ok(())
 }
@@ -273,6 +326,27 @@ fn impl_deps(deps: &RcTm, f: &mut dyn io::Write, compiler: &mut SwiProlog) -> io
             panic!("Dependencies must be a `-` block of imports");
         }
     }
+
+    Ok(())
+}
+
+fn impl_rule_decorator(
+    _f: &mut dyn io::Write,
+    directive: &Directive,
+    compiler: &mut SwiProlog,
+) -> io::Result<()> {
+    let Directive {
+        following_clause, ..
+    } = directive;
+
+    let Some(following_clause) = following_clause else {
+        panic!("[[Rule]] decorator must be followed by a clause");
+    };
+
+    // Record that the following clause is associated with a DCG rule.
+    compiler
+        .dcg_rules
+        .insert(RelId(Sig::from_iter(following_clause.head.keys().cloned())));
 
     Ok(())
 }

@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     io::{self, Read, Write},
 };
 
@@ -23,6 +23,7 @@ pub trait Compile<Compiler> {
 pub struct SwiProlog {
     rel_map: HashMap<RelId, RelInfo>,
     tm_is_callable: bool,
+    dcg_rules: HashSet<RelId>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -70,6 +71,15 @@ pub enum ArgOrder {
 struct RelInfo {
     sig: Sig,
     pred_arg_order: ArgOrder,
+}
+
+impl Default for RelInfo {
+    fn default() -> Self {
+        Self {
+            sig: Sig::from_iter(std::iter::empty()),
+            pred_arg_order: ArgOrder::RellogOrder,
+        }
+    }
 }
 
 impl RelInfo {
@@ -127,6 +137,7 @@ fn main() {
     let mut compiler = SwiProlog {
         rel_map: HashMap::new(),
         tm_is_callable: false,
+        dcg_rules: HashSet::new(),
     };
 
     module
