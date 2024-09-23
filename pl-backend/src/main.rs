@@ -52,12 +52,17 @@ impl RelId {
 
 impl Compile<SwiProlog> for RelId {
     fn compile(&self, f: &mut dyn Write, _: &mut SwiProlog) -> io::Result<()> {
-        write!(f, "'{}'", self.0)
+        write!(f, "'")?;
+        for key in self.0.keys() {
+            write!(f, "[{}]", key)?;
+        }
+        write!(f, "'")?;
+        Ok(())
     }
 }
 
 #[derive(Debug, Clone)]
-enum ArgOrder {
+pub enum ArgOrder {
     RellogOrder,
     Translated { pred_name: Sym, arg_order: Vec<Sym> },
 }
